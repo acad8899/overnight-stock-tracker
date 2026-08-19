@@ -4,10 +4,10 @@ import datetime
 import requests
 
 # 頁面排版設定
-st.set_page_config(page_title="隔日沖主力短空雷達 (Pro 版)", layout="wide", page_icon="🎯")
+st.set_page_config(page_title="隔日沖主力短空雷達", layout="wide", page_icon="🎯")
 
-st.title("🎯 每日隔日沖主力短空雷達 (Pro 實戰版)")
-st.caption("即時整合「隔日沖分點籌碼」、「5MA/20MA 均線與 KD 技術指標」以及「社群推播」的全方位決策系統。")
+st.title("🎯 每日隔日沖主力短空雷達")
+st.caption("即時整合「隔日沖分點鎖碼籌碼」與「KD、5MA/20MA 技術指標」的短空決策系統。")
 
 # 知名隔日沖主力分點清單
 TARGET_BROKERS = [
@@ -20,10 +20,10 @@ TARGET_BROKERS = [
 ]
 
 # 側邊欄：篩選條件
-st.sidebar.header("🔍 籌碼與技術篩選")
+st.sidebar.header("🔍 篩選條件設定")
 min_ratio = st.sidebar.slider("隔日沖買超佔成交量比例 (%) 門檻：", min_value=5, max_value=40, value=10, step=1)
 selected_brokers = st.sidebar.multiselect("監控主力分點：", options=TARGET_BROKERS, default=TARGET_BROKERS)
-kd_filter = st.sidebar.checkbox("僅顯示 KD > 80 (高檔超買/過熱區)", value=False)
+kd_filter = st.sidebar.checkbox("僅顯示 KD > 80 (高檔過熱區)", value=False)
 
 # 計算 KD 指標函式
 def calculate_kd(closes, highs, lows, n=9):
@@ -33,15 +33,12 @@ def calculate_kd(closes, highs, lows, n=9):
     for i in range(n - 1, len(closes)):
         window_high = max(highs[i - n + 1:i + 1])
         window_low = min(lows[i - n + 1:i + 1])
-        if window_high == window_low:
-            rsv = 50.0
-        else:
-            rsv = (closes[i] - window_low) / (window_high - window_low) * 100
+        rsv = 50.0 if window_high == window_low else (closes[i] - window_low) / (window_high - window_low) * 100
         k = (2/3) * k + (1/3) * rsv
         d = (2/3) * d + (1/3) * k
     return round(k, 1), round(d, 1)
 
-# 透過原生 API 抓取真實技術面數據（不依賴 yfinance，保證穩定運行）
+# 透過原生 API 抓取技術面數據
 @st.cache_data(ttl=1800)
 def get_technical_data(stock_code):
     symbols = [f"{stock_code}.TW", f"{stock_code}.TWO"]
@@ -80,7 +77,7 @@ def get_technical_data(stock_code):
         except Exception:
             continue
             
-    return {"現價": "-", "5MA": "-", "20MA": "-", "月線乖離率(%)": 0.0, "K(9)": 50.0, "D(9)": 50.0, "均線狀態": "更新中"}
+    return {"現價": "-", "5MA": "-", "20MA": "-", "月線乖離率(%)": 0.0, "K(9)": 50.0, "D(9)": 50.0, "均線狀態": "無資料"}
 
 # 盤後資料整合核心
 @st.cache_data(ttl=1800)
@@ -98,8 +95,7 @@ def fetch_overnight_market_data():
     enhanced_list = []
     for item in base_pool:
         tech = get_technical_data(item["股票代號"])
-        combined = {**item, **tech}
-        enhanced_list.append(combined)
+        enhanced_list.append({**item, **tech})
         
     return pd.DataFrame(enhanced_list), today_str
 
@@ -116,7 +112,7 @@ df_filtered = df_raw[
 if kd_filter and not df_filtered.empty:
     df_filtered = df_filtered[df_filtered["K(9)"] >= 80]
 
-# 顯示頂部數據卡
+# 顯示頂部指標卡
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("📅 更新日期", update_date)
 c2.metric("🎯 鎖碼短空標的", f"{len(df_filtered)} 檔")
@@ -142,33 +138,10 @@ else:
 
 st.markdown("---")
 
-# 推播通知設定專區
-st.subheader("📲 手機自動推播通知 (Telegram / LINE)")
-col_note1, col_note2 = st.columns(2)
-
-with col_note1:
-    st.markdown("**🔔 Telegram 一鍵推播**")
-    tg_token = st.text_input("Telegram Bot Token (選填):", type="password")
-    tg_chat_id = st.text_input("Telegram Chat ID (選填):")
-    if st.button("🚀 發送今日短空名單到 Telegram"):
-        if tg_token and tg_chat_id:
-            msg_text = f"🎯 【隔日沖短空觀察名單】 {update_date}\n\n"
-            for _, r in df_filtered.iterrows():
-                msg_text += f"▪ {r['股票名稱']}({r['股票代號']}) | 現價:{r['現價']}\n  分點:{r['隔日沖分點']} (佔{r['佔成交量比例(%)']}%)\n  KD:({r['K(9)']}/{r['D(9)']}) | 軋空風險:{r['軋空風險']}\n\n"
-            
-            tg_url = f"https://api.telegram.org/bot{tg_token}/sendMessage"
-            res = requests.post(tg_url, data={"chat_id": tg_chat_id, "text": msg_text})
-            if res.status_code == 200:
-                st.success("✅ 推播成功！已發送至 Telegram。")
-            else:
-                st.error("❌ 發送失敗，請確認 Token 與 Chat ID 是否正確。")
-        else:
-            st.info("ℹ️ 輸入 Token 與 Chat ID 後即可測試推播。")
-
-with col_note2:
-    st.markdown("**💡 隔日早盤短空 SOP 紀律提醒**")
-    st.info("""
-    1. **09:00~09:15 觀察開盤**：開高見紅後若 5 分 K 跌破開盤價，且摜破分時均價線（VWAP），為標準切入點。
-    2. **正乖離與 KD 超買**：月線正乖離 > 15% 且 K(9) > 80 者，隔日沖倒貨容易引發急殺。
-    3. **嚴守停損**：股價帶量突破早盤高點或漲停鎖死，**立即無條件停損**。
-    """)
+# 短空操作 SOP 提示卡
+st.subheader("💡 隔日早盤短空 SOP 紀律提醒")
+st.info("""
+1. **09:00~09:15 觀察開盤**：開高見紅後若 5 分 K 跌破開盤價，且摜破分時均價線（VWAP），為標準切入點。
+2. **正乖離與 KD 超買**：月線正乖離 > 15% 且 K(9) > 80 者，隔日沖倒貨容易引發急殺。
+3. **嚴守停損**：股價帶量突破早盤高點或漲停鎖死，**立即無條件停損**。
+""")
