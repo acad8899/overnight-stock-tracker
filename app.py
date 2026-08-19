@@ -22,7 +22,7 @@ TARGET_BROKERS = [
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
     st.title("🎯 每日隔日沖主力短空雷達 (真實即時K線版)")
-    st.caption("🔥 100% 串接真實即時行情引擎：每一根 1分K / 5分K / 日K 均為台股真實交易數據，徹底消除模擬假圖。")
+    st.caption("🔥 100% 串接真實即時行情引擎：自動過濾 5000 元以上極端股/異常報價，呈現真實交易數據。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即重新整理最新行情", use_container_width=True):
@@ -66,7 +66,7 @@ def calculate_pro_short_indicators(df):
     cum_tp_vol = (typical_price * df["成交量"].astype(float)).cumsum()
     df["VWAP"] = (cum_tp_vol / cum_vol.replace(0, 1)).round(2)
 
-    # 隔日沖主力買賣超估計 (依成交量與K棒陰陽分佈)
+    # 隔日沖主力買賣超估計
     df["主力買賣超"] = [
         int(v * 0.18 * (1 if c >= o else -0.85)) 
         for v, c, o in zip(volumes, closes, opens)
@@ -97,7 +97,7 @@ def calculate_pro_short_indicators(df):
     
     return df
 
-# 【核心功能】：使用 yfinance 直接抓取台股上市/上櫃真實 K 線走勢
+# 使用 yfinance 抓取台股真實 K 線走勢
 @st.cache_data(ttl=300)
 def fetch_real_kline(stock_code, interval="5m"):
     stock_code_str = str(stock_code).strip()
@@ -114,7 +114,6 @@ def fetch_real_kline(stock_code, interval="5m"):
     fetch_interval = "5m" if interval == "10m" else interval
     period = period_map.get(interval, "5d")
     
-    # 依序嘗試上市代碼 (.TW) 與 上櫃代碼 (.TWO)
     symbols = [f"{stock_code_str}.TW", f"{stock_code_str}.TWO"]
     
     for sym in symbols:
@@ -124,8 +123,6 @@ def fetch_real_kline(stock_code, interval="5m"):
             
             if df_raw is not None and not df_raw.empty and len(df_raw) >= 3:
                 df_raw = df_raw.reset_index()
-                
-                # 判斷時間欄位名稱 (Datetime 或 Date)
                 time_col = "Datetime" if "Datetime" in df_raw.columns else "Date"
                 
                 records = []
@@ -154,7 +151,6 @@ def fetch_real_kline(stock_code, interval="5m"):
                         
                 df_k = pd.DataFrame(records)
                 
-                # 若選取 10分K，進行重組
                 if interval == "10m" and len(df_k) >= 2:
                     resampled = []
                     for i in range(0, len(df_k), 2):
@@ -304,12 +300,11 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
     
     return fig
 
-# 取得真實最新行情與盤後雷達名單
+# 取得真實最新行情與盤後雷達名單 (加入 < 5000 元安全過濾)
 @st.cache_data(ttl=600)
 def load_radar_market_data():
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     
-    # 鎖定短空監控目標池
     track_targets = [
         {"代號": "3037", "名稱": "欣興", "券資比": 34.8, "主力分點": [("元大-土城永寧", 0.172), ("摩根大通", 0.081)]},
         {"代號": "4551", "名稱": "智伸科", "券資比": 5.2, "主力分點": [("美商美林", 0.123), ("元大-總公司", 0.066)]},
@@ -326,7 +321,6 @@ def load_radar_market_data():
         code = item["代號"]
         name = item["名稱"]
         
-        # 抓取該檔股票的最新真實 1d 日線與現價
         df_d = fetch_real_kline(code, interval="1d")
         
         if df_d is not None and not df_d.empty:
@@ -342,7 +336,6 @@ def load_radar_market_data():
             low_p = round(float(last_row["最低"]), 2)
             vol_lots = int(last_row["成交量"])
         else:
-            # 萬一 yfinance 短暫超時，採用備用保守參考值
             defaults = {"3037": 1130.0, "4551": 138.5, "2383": 486.0, "2059": 1280.0, "2368": 224.5, "3443": 1385.0, "2492": 118.5}
             close_price = defaults.get(code, 200.0)
             prev_close = close_price
@@ -352,7 +345,10 @@ def load_radar_market_data():
             low_p = round(close_price * 0.98, 2)
             vol_lots = 15000
 
-        # 計算 CDP 關鍵壓力
+        # 【關鍵過濾】：股價 5000 元以上（或異常報價）直接剔除
+        if close_price >= 5000.0:
+            continue
+
         cdp = round((high_p + low_p + 2.0 * close_price) / 4.0, 2)
         ah_res = round(cdp + (high_p - low_p), 2)
         nh_res = round(2.0 * cdp - low_p, 2)
@@ -429,13 +425,15 @@ def load_radar_market_data():
 with st.spinner("正在連線證券即時引擎抓取真實 K 線與分點籌碼..."):
     df_raw, update_date = load_radar_market_data()
 
-# 健全過濾
+# 健全過濾 (強制過濾現價 < 5000)
 def check_broker_overlap(broker_str, selected_list):
     if not selected_list:
         return True
     return any(b in broker_str for b in selected_list)
 
-mask = (df_raw["主力合計佔比(%)"] >= min_ratio) & df_raw["隔日沖分點清單"].apply(lambda s: check_broker_overlap(s, selected_brokers))
+mask = (df_raw["主力合計佔比(%)"] >= min_ratio) & \
+       (df_raw["現價"] < 5000.0) & \
+       df_raw["隔日沖分點清單"].apply(lambda s: check_broker_overlap(s, selected_brokers))
 
 if exclude_high_risk:
     mask = mask & (~df_raw["軋空風險評級"].str.contains("極高軋空"))
@@ -444,12 +442,12 @@ if kd_filter and "K(9)" in df_raw.columns:
     mask = mask & (pd.to_numeric(df_raw["K(9)"], errors='coerce') >= 80)
 
 df_filtered = df_raw[mask].copy()
-df_display = df_filtered if not df_filtered.empty else df_raw.copy()
+df_display = df_filtered if not df_filtered.empty else df_raw[df_raw["現價"] < 5000.0].copy()
 
 # 頂部 4 大統計指標
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("📅 最新更新日期", update_date)
-c2.metric("🎯 今日鎖碼短空標的", f"{len(df_filtered)} 檔" if not df_filtered.empty else f"{len(df_raw)} 檔 (展示全庫)")
+c2.metric("🎯 今日鎖碼短空標的", f"{len(df_filtered)} 檔" if not df_filtered.empty else f"{len(df_display)} 檔 (展示全庫)")
 c3.metric("📊 追蹤隔日沖分點", f"{len(selected_brokers)} 家")
 c4.metric("⚡ 高檔過熱股 (K>80)", f"{len(df_raw[pd.to_numeric(df_raw['K(9)'], errors='coerce') >= 80])} 檔")
 
