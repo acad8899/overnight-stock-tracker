@@ -44,7 +44,7 @@ with st.expander("⚙️ 點此展開／收合【篩選條件與風控設定】"
         st.write("")
         kd_filter = st.checkbox("僅顯示 KD > 80 (過熱區)", value=False)
 
-# 計算實戰短空指標 (均線, VWAP, KDJ) - 已修復變數解包錯誤
+# 計算實戰短空指標 (均線, VWAP, KDJ)
 def calculate_pro_short_indicators(df):
     if df is None or df.empty:
         return pd.DataFrame()
@@ -72,7 +72,7 @@ def calculate_pro_short_indicators(df):
         for v, c, o in zip(volumes, closes, opens)
     ]
 
-    # KDJ (9, 3, 3) - 正確宣告 3 個列表
+    # KDJ (9, 3, 3)
     k, d = 50.0, 50.0
     k_list = []
     d_list = []
@@ -505,13 +505,36 @@ with left_side:
     st.session_state["selected_stock_code"] = target_code
 
     target_row = df_display[df_display["股票代號"] == target_code].iloc[0]
-    st.markdown("---")
-    st.markdown(f"**📌 {target_row['股票名稱']} 快速摘要**")
-    st.markdown(f"- **現價**：`{target_row['現價']} 元`")
-    st.markdown(f"- **主力均價**：`{target_row['主力加權成本']} 元`")
-    st.markdown(f"- **最高壓力 (AH)**：`{target_row['最高壓力(AH)']} 元`")
-    st.markdown(f"- **券資比**：`{target_row['券資比(%)']}%`")
-    st.markdown(f"- **風控評級**：{target_row['軋空風險評級']}")
+    
+    # 【已優化】：改為高對比度深色卡片，徹底消除看不清的淺綠色
+    summary_card_html = f"""
+    <div style="background-color: #1E1E1E; border: 1px solid #333333; border-radius: 8px; padding: 14px 16px; margin-top: 10px; color: #FFFFFF; font-family: monospace;">
+        <div style="font-size: 15px; font-weight: bold; color: #FFFFFF; border-bottom: 1px solid #333333; padding-bottom: 8px; margin-bottom: 10px;">
+            📌 {target_row['股票名稱']} ({target_code}) 快速摘要
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
+            <span style="color: #AAAAAA;">現價：</span>
+            <span style="font-weight: bold; color: #FFFFFF; font-size: 14px;">{target_row['現價']} 元</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
+            <span style="color: #AAAAAA;">主力均價：</span>
+            <span style="font-weight: bold; color: #00E5FF; font-size: 14px;">{target_row['主力加權成本']} 元</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
+            <span style="color: #AAAAAA;">最高壓力 (AH)：</span>
+            <span style="font-weight: bold; color: #FF4444; font-size: 14px;">{target_row['最高壓力(AH)']} 元</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
+            <span style="color: #AAAAAA;">券資比：</span>
+            <span style="font-weight: bold; color: #FFCC00; font-size: 14px;">{target_row['券資比(%)']}%</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 13px; border-top: 1px dashed #333333; padding-top: 8px;">
+            <span style="color: #AAAAAA;">風控評級：</span>
+            <span style="font-weight: bold;">{target_row['軋空風險評級']}</span>
+        </div>
+    </div>
+    """
+    st.markdown(summary_card_html, unsafe_allow_html=True)
 
 # 【右欄：多週期 K 線圖與分點損益儀表板】
 with right_side:
