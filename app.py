@@ -29,7 +29,7 @@ selected_brokers = st.sidebar.multiselect("監控主力分點：", options=TARGE
 exclude_high_risk = st.sidebar.checkbox("自動過濾「高軋空風險」標的 (保護空單)", value=False)
 kd_filter = st.sidebar.checkbox("僅顯示 KD > 80 (高檔過熱區)", value=False)
 
-if st.sidebar.button("🔄 手動強制重新爬取最新盤後數據"):
+if st.sidebar.button("🔄 手動強制重新整理"):
     st.cache_data.clear()
     st.rerun()
 
@@ -38,10 +38,11 @@ def calculate_pro_short_indicators(df):
     if df is None or len(df) == 0:
         return pd.DataFrame()
         
-    closes = df["收盤"].tolist()
-    highs = df["最高"].tolist()
-    lows = df["最低"].tolist()
-    volumes = df["成交量"].tolist()
+    df = df.copy()
+    closes = df["收盤"].astype(float).tolist()
+    highs = df["最高"].astype(float).tolist()
+    lows = df["最低"].astype(float).tolist()
+    volumes = df["成交量"].astype(float).tolist()
     
     df["5MA"] = df["收盤"].rolling(5, min_periods=1).mean().round(2)
     df["20MA"] = df["收盤"].rolling(20, min_periods=1).mean().round(2)
@@ -84,7 +85,7 @@ def calculate_pro_short_indicators(df):
 # 備援歷史 K 線產生器
 def generate_fallback_kline(stock_code, base_price=298.0, count=60):
     records = []
-    curr = base_price * 0.88
+    curr = float(base_price) * 0.88
     today = datetime.datetime.now()
     for i in range(count):
         d_str = (today - datetime.timedelta(days=(count - i))).strftime('%Y/%m/%d')
@@ -98,14 +99,14 @@ def generate_fallback_kline(stock_code, base_price=298.0, count=60):
     df_fb = pd.DataFrame(records)
     return calculate_pro_short_indicators(df_fb)
 
-# 抓取多週期 K 線數據
-@st.cache_data(ttl=600)
+# 抓取多週期 K 線數據 (不加快取，徹底杜絕 ValueError)
 def fetch_kline_data(stock_code, interval="1d"):
+    stock_code_str = str(stock_code).strip()
     range_map = {"1m": "5d", "5m": "1mo", "10m": "1mo", "30m": "1mo", "60m": "3mo", "1d": "1y"}
     fetch_interval = "5m" if interval == "10m" else interval
     time_range = range_map.get(interval, "3mo")
     
-    symbols = [f"{stock_code}.TW", f"{stock_code}.TWO"]
+    symbols = [f"{stock_code_str}.TW", f"{stock_code_str}.TWO"]
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     
     for sym in symbols:
@@ -134,10 +135,10 @@ def fetch_kline_data(stock_code, interval="1d"):
                                 
                             records.append({
                                 "日期": date_str, 
-                                "開盤": round(o, 2), 
-                                "最高": round(h, 2), 
-                                "最低": round(l, 2), 
-                                "收盤": round(c, 2), 
+                                "開盤": round(float(o), 2), 
+                                "最高": round(float(h), 2), 
+                                "最低": round(float(l), 2), 
+                                "收盤": round(float(c), 2), 
                                 "成交量": int(v) if (v is not None) else 0
                             })
                     
@@ -162,15 +163,15 @@ def fetch_kline_data(stock_code, interval="1d"):
             continue
             
     default_prices = {"2492": 298.0, "4551": 188.5, "3037": 348.0, "2383": 412.0, "2059": 1055.0}
-    p = default_prices.get(str(stock_code), 200.0)
-    return generate_fallback_kline(stock_code, base_price=p)
+    p = default_prices.get(stock_code_str, 200.0)
+    return generate_fallback_kline(stock_code_str, base_price=p)
 
 # 繪製專用 4 層短空實戰技術線圖
 def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, timeframe_label):
     last = df_k.iloc[-1]
     prev_close = df_k["收盤"].iloc[-2] if len(df_k) > 1 else last["收盤"]
-    change = round(last["收盤"] - prev_close, 2)
-    change_pct = round((change / prev_close) * 100, 2) if prev_close else 0.0
+    change = round(float(last["收盤"]) - float(prev_close), 2)
+    change_pct = round((change / float(prev_close)) * 100, 2) if prev_close else 0.0
     
     chg_color = "#FF3333" if change >= 0 else "#00CC00"
     chg_symbol = "↑" if change >= 0 else "↓"
@@ -235,7 +236,7 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
 
     if isinstance(ah_res, (int, float)):
         fig.add_hline(
-            y=ah_res, 
+            y=float(ah_res), 
             line=dict(color="#FF3333", width=1.2, dash="dot"), 
             annotation_text=f" 最高壓力(AH): {ah_res} ", 
             annotation_position="top left",
@@ -245,7 +246,7 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
         )
     if isinstance(broker_cost, (int, float)):
         fig.add_hline(
-            y=broker_cost, 
+            y=float(broker_cost), 
             line=dict(color="#00E5FF", width=1.2, dash="dash"), 
             annotation_text=f" 主力均價: {broker_cost} ", 
             annotation_position="top right", 
@@ -255,7 +256,7 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
         )
 
     # 2. 成交量
-    vol_colors = ['#FF3333' if c >= o else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
+    vol_colors = ['#FF3333' if float(c) >= float(o) else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
     fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['成交量'], marker_color=vol_colors, name='成交量'), row=2, col=1)
     if 'VOL_5MA' in df_k.columns:
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), name='5MA均量'), row=2, col=1)
@@ -289,7 +290,7 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
     
     return fig
 
-# 整合盤後短空雷達數據 (單一快取入口，徹底杜絕巢狀快取衝突)
+# 短空雷達數據核心
 @st.cache_data(ttl=1800)
 def load_radar_market_data():
     today_str = datetime.date.today().strftime("%Y-%m-%d")
@@ -332,25 +333,24 @@ def load_radar_market_data():
         }
     ]
     
-    # 預設技術指標行情
     tech_defaults = {
         "2492": {"現價": 298.0, "漲跌": 16.0, "漲跌幅(%)": 5.67, "5MA": 298.1, "20MA": 281.5, "月線乖離率(%)": 5.86, "CDP多空值": 293.6, "最高壓力(AH)": 332.1, "近高壓力(NH)": 317.2, "K(9)": 84.2, "D(9)": 79.5, "J(9)": 93.6, "均線狀態": "多頭排列"},
         "4551": {"現價": 188.5, "漲跌": 7.5, "漲跌幅(%)": 4.14, "5MA": 185.0, "20MA": 178.2, "月線乖離率(%)": 5.78, "CDP多空值": 186.2, "最高壓力(AH)": 196.5, "近高壓力(NH)": 191.0, "K(9)": 81.0, "D(9)": 76.5, "J(9)": 90.0, "均線狀態": "多頭排列"},
         "3037": {"現價": 348.0, "漲跌": 22.0, "漲跌幅(%)": 6.75, "5MA": 338.5, "20MA": 312.0, "月線乖離率(%)": 11.54, "CDP多空值": 342.0, "最高壓力(AH)": 368.0, "近高壓力(NH)": 356.0, "K(9)": 88.5, "D(9)": 82.0, "J(9)": 101.5, "均線狀態": "多頭排列"},
-        "2383": {"清價": 412.0, "現價": 412.0, "漲跌": 14.0, "漲跌幅(%)": 3.52, "5MA": 406.0, "20MA": 395.0, "月線乖離率(%)": 4.30, "CDP多空值": 409.0, "最高壓力(AH)": 426.0, "近高壓力(NH)": 418.0, "K(9)": 79.0, "D(9)": 74.0, "J(9)": 89.0, "均線狀態": "多頭排列"},
+        "2383": {"現價": 412.0, "漲跌": 14.0, "漲跌幅(%)": 3.52, "5MA": 406.0, "20MA": 395.0, "月線乖離率(%)": 4.30, "CDP多空值": 409.0, "最高壓力(AH)": 426.0, "近高壓力(NH)": 418.0, "K(9)": 79.0, "D(9)": 74.0, "J(9)": 89.0, "均線狀態": "多頭排列"},
         "2059": {"現價": 1055.0, "漲跌": 45.0, "漲跌幅(%)": 4.46, "5MA": 1030.0, "20MA": 980.0, "月線乖離率(%)": 7.65, "CDP多空值": 1045.0, "最高壓力(AH)": 1110.0, "近高壓力(NH)": 1080.0, "K(9)": 83.5, "D(9)": 78.0, "J(9)": 94.5, "均線狀態": "多頭排列"}
     }
     
     enhanced_list = []
     for item in real_candidates:
-        c_code = item["股票代號"]
+        c_code = str(item["股票代號"])
         tech = tech_defaults.get(c_code, {
             "現價": 200.0, "漲跌": 5.0, "漲跌幅(%)": 2.5, "5MA": 198.0, "20MA": 190.0,
             "月線乖離率(%)": 5.2, "CDP多空值": 198.0, "最高壓力(AH)": 210.0, "近高壓力(NH)": 205.0,
             "K(9)": 82.0, "D(9)": 77.0, "J(9)": 92.0, "均線狀態": "多頭排列"
         })
         
-        close_price = tech["現價"]
+        close_price = float(tech["現價"])
         detailed_brokers = []
         total_buy_shares = 0
         total_cost_amount = 0.0
@@ -359,10 +359,10 @@ def load_radar_market_data():
         
         for b in item["主力名單"]:
             b_name = b["分點"]
-            b_vol = b["買超張數"]
-            b_ratio = b["佔比(%)"]
+            b_vol = int(b["買超張數"])
+            b_ratio = float(b["佔比(%)"])
             
-            b_cost = round(close_price * b["成本折讓"], 2)
+            b_cost = round(close_price * float(b["成本折讓"]), 2)
             profit_per_share = close_price - b_cost
             profit_wan = round((profit_per_share * b_vol * 1000) / 10000, 2)
             p_rate = round((profit_per_share / b_cost) * 100, 2)
@@ -386,7 +386,7 @@ def load_radar_market_data():
         total_profit_wan = round((total_market_amount - total_cost_amount) / 10000, 1)
         total_p_rate = round(((total_market_amount - total_cost_amount) / total_cost_amount) * 100, 2)
 
-        short_ratio = item.get("券資比(%)", 0)
+        short_ratio = float(item.get("券資比(%)", 0))
         risk_level = "⚠️ 嚴禁摸頂 (極高軋空)" if short_ratio >= 30 else ("🟡 觀察開盤 (中度風險)" if short_ratio >= 15 else "🟢 適合短空 (低軋空風險)")
         action_guide = "主力可能連續鎖漲停，切勿放空！" if short_ratio >= 30 else "隔日沖出貨機率極高，順勢切入。"
             
@@ -425,11 +425,7 @@ if kd_filter and "K(9)" in df_raw.columns:
     mask = mask & (pd.to_numeric(df_raw["K(9)"], errors='coerce') >= 80)
 
 df_filtered = df_raw[mask].copy()
-
-if df_filtered.empty:
-    df_display = df_raw.copy()
-else:
-    df_display = df_filtered.copy()
+df_display = df_filtered if not df_filtered.empty else df_raw.copy()
 
 # 頂部統計指標
 c1, c2, c3, c4 = st.columns(4)
@@ -463,14 +459,14 @@ with left_side:
     
     stock_list_options = []
     for _, r in df_display.iterrows():
-        c_sym = "+" if r.get('漲跌', 0) > 0 else ""
+        c_sym = "+" if float(r.get('漲跌', 0)) > 0 else ""
         opt_str = f"{r['股票代號']} {r['股票名稱']}  ({r['現價']} | {c_sym}{r.get('漲跌幅(%)', 0)}%)"
         stock_list_options.append(opt_str)
 
-    if "selected_stock_code" not in st.session_state or st.session_state["selected_stock_code"] not in df_display["股票代號"].values:
+    if "selected_stock_code" not in st.session_state or str(st.session_state["selected_stock_code"]) not in [str(x) for x in df_display["股票代號"].values]:
         st.session_state["selected_stock_code"] = str(df_display.iloc[0]["股票代號"])
 
-    current_code = st.session_state["selected_stock_code"]
+    current_code = str(st.session_state["selected_stock_code"])
     current_idx = 0
     for i, opt in enumerate(stock_list_options):
         if opt.startswith(current_code):
@@ -519,9 +515,10 @@ with right_side:
     with c_tf2:
         k_count = st.number_input("K 棒根數：", min_value=10, max_value=300, value=60, step=10)
 
+    # 取得 K 線數據
     stock_k_df = fetch_kline_data(target_code, interval=selected_interval)
 
-    if not stock_k_df.empty and len(stock_k_df) > 0:
+    if stock_k_df is not None and not stock_k_df.empty and len(stock_k_df) > 0:
         display_k_df = stock_k_df.tail(int(k_count)).reset_index(drop=True)
         fig = draw_pro_short_chart(display_k_df, target_code, target_name, b_cost, ah_val, selected_tf_label)
         st.plotly_chart(fig, use_container_width=True)
@@ -533,8 +530,8 @@ with right_side:
     # 緊湊型主力分點持倉損益看板
     st.markdown(f"#### 🏢 【{target_name} ({target_code})】各大主力分點持倉與損益明細")
     
-    p_tot_wan = target_row['主力合計獲利(萬)']
-    p_tot_rate = target_row['主力合計報酬率(%)']
+    p_tot_wan = float(target_row['主力合計獲利(萬)'])
+    p_tot_rate = float(target_row['主力合計報酬率(%)'])
     p_color_hex = "#FF4444" if p_tot_rate >= 0 else "#00CC66"
     p_sign = "+" if p_tot_rate > 0 else ""
     
