@@ -25,7 +25,7 @@ TARGET_BROKERS = [
 
 # 側邊欄：篩選條件
 st.sidebar.header("🔍 篩選與風控設定")
-min_ratio = st.sidebar.slider("隔日沖合計買超佔成交量比例 (%) 門檻：", min_value=5, max_value=40, value=8, step=1)
+min_ratio = st.sidebar.slider("隔日沖合計買超佔成交量比例 (%) 門檻：", min_value=1, max_value=30, value=5, step=1)
 selected_brokers = st.sidebar.multiselect("監控主力分點：", options=TARGET_BROKERS, default=TARGET_BROKERS)
 exclude_high_risk = st.sidebar.checkbox("自動過濾「高軋空風險」標的 (保護空單)", value=False)
 kd_filter = st.sidebar.checkbox("僅顯示 KD > 80 (高檔過熱區)", value=False)
@@ -326,7 +326,7 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
     
     return fig
 
-# 台灣證交所盤後數據爬蟲
+# 台灣證交所盤後數據核心
 @st.cache_data(ttl=1800)
 def crawl_real_twse_overnight_data():
     today_dt = datetime.date.today()
@@ -446,28 +446,34 @@ def crawl_real_twse_overnight_data():
 with st.spinner("正在連線證券伺服器計算短空指標與主力籌碼..."):
     df_raw, update_date = crawl_real_twse_overnight_data()
 
-# 資料過濾
-def broker_filter_match(broker_str):
-    for b in selected_brokers:
-        if b in broker_str:
-            return True
-    return False
+# 健壯過濾邏輯
+def check_broker_overlap(broker_str, selected_list):
+    if not selected_list:
+        return True
+    return any(b in broker_str for b in selected_list)
 
-df_filtered = df_raw[
-    (df_raw["主力合計佔比(%)"] >= min_ratio) & 
-    (df_raw["隔日沖分點清單"].apply(broker_filter_match))
-]
+# 依序過濾
+mask = (df_raw["主力合計佔比(%)"] >= min_ratio) & df_raw["隔日沖分點清單"].apply(lambda s: check_broker_overlap(s, selected_brokers))
 
-if exclude_high_risk and not df_filtered.empty:
-    df_filtered = df_filtered[~df_filtered["軋空風險評級"].str.contains("極高軋空")]
+if exclude_high_risk:
+    mask = mask & (~df_raw["軋空風險評級"].str.contains("極高軋空"))
 
-if kd_filter and not df_filtered.empty and "K(9)" in df_filtered.columns:
-    df_filtered = df_filtered[pd.to_numeric(df_filtered["K(9)"], errors='coerce') >= 80]
+if kd_filter and "K(9)" in df_raw.columns:
+    mask = mask & (pd.to_numeric(df_raw["K(9)"], errors='coerce') >= 80)
+
+df_filtered = df_raw[mask].copy()
+
+# 若條件過嚴被完全濾除，自動降級展示全部資料並發出提示
+has_filtered_data = not df_filtered.empty
+if not has_filtered_data:
+    df_display = df_raw.copy()
+else:
+    df_display = df_filtered.copy()
 
 # 頂部統計指標
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("📅 最新更新日期", update_date)
-c2.metric("🎯 鎖碼短空標的", f"{len(df_filtered)} 檔")
+c2.metric("🎯 鎖碼短空標的", f"{len(df_filtered)} 檔" if has_filtered_data else f"{len(df_raw)} 檔 (展示全庫)")
 c3.metric("📊 追蹤主力分點", f"{len(selected_brokers)} 家")
 c4.metric("⚡ 高檔過熱股 (K>80)", f"{len(df_raw[pd.to_numeric(df_raw['K(9)'], errors='coerce') >= 80])} 檔")
 
@@ -475,142 +481,136 @@ st.markdown("---")
 
 # 主表格
 st.subheader("📊 盤後隔日沖 × 主力成本 × 軋空風控決策表")
-if not df_filtered.empty:
-    preferred_cols = [
-        "股票代號", "股票名稱", "現價", "主力加權成本", "最高壓力(AH)", "近高壓力(NH)",
-        "券資比(%)", "軋空風險評級", "主力合計買超", "主力合計佔比(%)", "隔日沖分點清單", "實戰指引"
-    ]
-    actual_cols = [col for col in preferred_cols if col in df_filtered.columns]
-    st.dataframe(df_filtered[actual_cols], use_container_width=True)
-else:
-    st.warning("⚠️ 目前條件下無符合標的，請放寬側邊欄比例門檻或取消過濾條件。")
+if not has_filtered_data:
+    st.warning("⚠️ 目前篩選條件較嚴格（0檔符合），下方已自動為您展示完整監控清單，您亦可微調左側門檻。")
+
+preferred_cols = [
+    "股票代號", "股票名稱", "現價", "主力加權成本", "最高壓力(AH)", "近高壓力(NH)",
+    "券資比(%)", "軋空風險評級", "主力合計買超", "主力合計佔比(%)", "隔日沖分點清單", "實戰指引"
+]
+actual_cols = [col for col in preferred_cols if col in df_display.columns]
+st.dataframe(df_display[actual_cols], use_container_width=True)
 
 st.markdown("---")
 
-# 【核心雙欄佈局】：左側自選報價切換清單 + 右側技術線圖與主力損益
+# 操盤工作台 (左側極速清單 × 右側專業圖表)
 st.subheader("🖥️ 操盤工作台 (左側極速清單 × 右側專業圖表)")
 
-if not df_filtered.empty:
-    # 建立左右 1:3 雙欄
-    left_side, right_side = st.columns([1.1, 3.2], gap="medium")
+left_side, right_side = st.columns([1.1, 3.2], gap="medium")
 
-    # 【左欄：支援滑鼠點選與鍵盤 ↑ / ↓ 快速瀏覽清單】
-    with left_side:
-        st.markdown("### 📋 自選短空清單")
-        st.caption("💡 點選清單後可用鍵盤 **↑ / ↓ 鍵** 快速切換")
-        
-        # 組合股票清單項目格式：例如 "2492 華新科 (298.0 | +5.67%)"
-        stock_list_options = []
-        for _, r in df_filtered.iterrows():
-            c_sym = "+" if r.get('漲跌', 0) > 0 else ""
-            opt_str = f"{r['股票代號']} {r['股票名稱']}  ({r['現價']} | {c_sym}{r.get('漲跌幅(%)', 0)}%)"
-            stock_list_options.append(opt_str)
+# 【左欄：支援滑鼠點選與鍵盤 ↑ / ↓ 快速瀏覽清單】
+with left_side:
+    st.markdown("### 📋 自選短空清單")
+    st.caption("💡 點選清單後可用鍵盤 **↑ / ↓ 鍵** 快速切換")
+    
+    stock_list_options = []
+    for _, r in df_display.iterrows():
+        c_sym = "+" if r.get('漲跌', 0) > 0 else ""
+        opt_str = f"{r['股票代號']} {r['股票名稱']}  ({r['現價']} | {c_sym}{r.get('漲跌幅(%)', 0)}%)"
+        stock_list_options.append(opt_str)
 
-        # 找出當前選取項目的 index
-        current_code = st.session_state.get("selected_stock_code", str(df_filtered.iloc[0]["股票代號"]))
-        current_idx = 0
-        for i, opt in enumerate(stock_list_options):
-            if opt.startswith(current_code):
-                current_idx = i
-                break
+    if "selected_stock_code" not in st.session_state or st.session_state["selected_stock_code"] not in df_display["股票代號"].values:
+        st.session_state["selected_stock_code"] = str(df_display.iloc[0]["股票代號"])
 
-        # 原生 Radio 清單：支援滑鼠直接點選或鍵盤上下鍵秒切換
-        selected_option = st.radio(
-            "請選擇或以鍵盤上下鍵切換股票：",
-            options=stock_list_options,
-            index=current_idx,
-            label_visibility="collapsed",
-            key="stock_radio_selector"
-        )
-        
-        # 解析選中的股票代號
-        target_code = selected_option.split(" ")[0]
-        st.session_state["selected_stock_code"] = target_code
+    current_code = st.session_state["selected_stock_code"]
+    current_idx = 0
+    for i, opt in enumerate(stock_list_options):
+        if opt.startswith(current_code):
+            current_idx = i
+            break
 
-        # 左側輔助資訊：選中標的之主力簡評卡
-        target_row = df_filtered[df_filtered["股票代號"] == target_code].iloc[0]
-        st.markdown("---")
-        st.markdown(f"**📌 {target_row['股票名稱']} 快速摘要**")
-        st.markdown(f"- **現價**：`{target_row['現價']} 元`")
-        st.markdown(f"- **主力均價**：`{target_row['主力加權成本']} 元`")
-        st.markdown(f"- **最高壓力 (AH)**：`{target_row['最高壓力(AH)']} 元`")
-        st.markdown(f"- **券資比**：`{target_row['券資比(%)']}%`")
-        st.markdown(f"- **風控評級**：{target_row['軋空風險評級']}")
+    selected_option = st.radio(
+        "請選擇或以鍵盤上下鍵切換股票：",
+        options=stock_list_options,
+        index=current_idx,
+        label_visibility="collapsed",
+        key="stock_radio_selector"
+    )
+    
+    target_code = selected_option.split(" ")[0]
+    st.session_state["selected_stock_code"] = target_code
 
-    # 【右欄：多週期 K 線圖與分點損益儀表板】
-    with right_side:
-        target_name = target_row["股票名稱"]
-        b_cost = target_row.get("主力加權成本")
-        ah_val = target_row.get("最高壓力(AH)")
-        broker_list = target_row.get("各分點詳細清單", [])
+    target_row = df_display[df_display["股票代號"] == target_code].iloc[0]
+    st.markdown("---")
+    st.markdown(f"**📌 {target_row['股票名稱']} 快速摘要**")
+    st.markdown(f"- **現價**：`{target_row['現價']} 元`")
+    st.markdown(f"- **主力均價**：`{target_row['主力加權成本']} 元`")
+    st.markdown(f"- **最高壓力 (AH)**：`{target_row['最高壓力(AH)']} 元`")
+    st.markdown(f"- **券資比**：`{target_row['券資比(%)']}%`")
+    st.markdown(f"- **風控評級**：{target_row['軋空風險評級']}")
 
-        # 右側頂部控制列 (週期與根數)
-        c_tf1, c_tf2 = st.columns([1, 1])
-        with c_tf1:
-            timeframe_options = {
-                "5分K (主力出手關鍵)": "5m",
-                "1分K (極短線分線)": "1m",
-                "10分K": "10m",
-                "30分K": "30m",
-                "60分K": "60m",
-                "日線": "1d"
-            }
-            selected_tf_label = st.selectbox("週期切換：", list(timeframe_options.keys()), index=0)
-            selected_interval = timeframe_options[selected_tf_label]
-        with c_tf2:
-            k_count = st.number_input("K 棒根數：", min_value=10, max_value=300, value=60, step=10)
+# 【右欄：多週期 K 線圖與分點損益儀表板】
+with right_side:
+    target_name = target_row["股票名稱"]
+    b_cost = target_row.get("主力加權成本")
+    ah_val = target_row.get("最高壓力(AH)")
+    broker_list = target_row.get("各分點詳細清單", [])
 
-        # 繪製 K 線圖
-        with st.spinner(f"正在載入 {target_name}({target_code}) 數據..."):
-            stock_k_df = fetch_kline_data(target_code, interval=selected_interval)
+    c_tf1, c_tf2 = st.columns([1, 1])
+    with c_tf1:
+        timeframe_options = {
+            "5分K (主力出手關鍵)": "5m",
+            "1分K (極短線分線)": "1m",
+            "10分K": "10m",
+            "30分K": "30m",
+            "60分K": "60m",
+            "日線": "1d"
+        }
+        selected_tf_label = st.selectbox("週期切換：", list(timeframe_options.keys()), index=0)
+        selected_interval = timeframe_options[selected_tf_label]
+    with c_tf2:
+        k_count = st.number_input("K 棒根數：", min_value=10, max_value=300, value=60, step=10)
 
-        if not stock_k_df.empty and len(stock_k_df) > 0:
-            display_k_df = stock_k_df.tail(int(k_count)).reset_index(drop=True)
-            fig = draw_pro_short_chart(display_k_df, target_code, target_name, b_cost, ah_val, selected_tf_label)
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("暫無此標的的走勢資料。")
+    with st.spinner(f"正在載入 {target_name}({target_code}) 數據..."):
+        stock_k_df = fetch_kline_data(target_code, interval=selected_interval)
 
-        st.markdown("---")
+    if not stock_k_df.empty and len(stock_k_df) > 0:
+        display_k_df = stock_k_df.tail(int(k_count)).reset_index(drop=True)
+        fig = draw_pro_short_chart(display_k_df, target_code, target_name, b_cost, ah_val, selected_tf_label)
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("暫無此標的的走勢資料。")
 
-        # 緊湊型主力分點持倉損益看板
-        st.markdown(f"#### 🏢 【{target_name} ({target_code})】各大主力分點持倉與損益明細")
-        
-        p_tot_wan = target_row['主力合計獲利(萬)']
-        p_tot_rate = target_row['主力合計報酬率(%)']
-        p_color_hex = "#FF4444" if p_tot_rate >= 0 else "#00CC66"
-        p_sign = "+" if p_tot_rate > 0 else ""
-        
-        summary_card_html = f"""
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px;">
-            <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #3399FF;">
-                <div style="color:#888; font-size:11px; margin-bottom:2px;">📦 主力合計買超</div>
-                <div style="color:#FFF; font-size:15px; font-weight:bold;">{target_row['主力合計買超']:,} 張</div>
-            </div>
-            <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #00E5FF;">
-                <div style="color:#888; font-size:11px; margin-bottom:2px;">🎯 主力加權均價</div>
-                <div style="color:#FFF; font-size:15px; font-weight:bold;">{target_row['主力加權成本']} 元</div>
-            </div>
-            <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid {p_color_hex};">
-                <div style="color:#888; font-size:11px; margin-bottom:2px;">💰 主力帳面損益</div>
-                <div style="color:{p_color_hex}; font-size:15px; font-weight:bold;">{p_sign}{p_tot_wan:,} 萬 ({p_sign}{p_tot_rate}%)</div>
-            </div>
-            <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #FFCC00;">
-                <div style="color:#888; font-size:11px; margin-bottom:2px;">🔥 鎖碼分點數</div>
-                <div style="color:#FFCC00; font-size:15px; font-weight:bold;">{len(broker_list)} 家分點</div>
-            </div>
+    st.markdown("---")
+
+    # 緊湊型主力分點持倉損益看板
+    st.markdown(f"#### 🏢 【{target_name} ({target_code})】各大主力分點持倉與損益明細")
+    
+    p_tot_wan = target_row['主力合計獲利(萬)']
+    p_tot_rate = target_row['主力合計報酬率(%)']
+    p_color_hex = "#FF4444" if p_tot_rate >= 0 else "#00CC66"
+    p_sign = "+" if p_tot_rate > 0 else ""
+    
+    summary_card_html = f"""
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px;">
+        <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #3399FF;">
+            <div style="color:#888; font-size:11px; margin-bottom:2px;">📦 主力合計買超</div>
+            <div style="color:#FFF; font-size:15px; font-weight:bold;">{target_row['主力合計買超']:,} 張</div>
         </div>
-        """
-        st.markdown(summary_card_html, unsafe_allow_html=True)
-        
-        if broker_list:
-            df_brokers = pd.DataFrame(broker_list)
-            df_brokers["買超張數"] = df_brokers["買超張數"].apply(lambda x: f"{x:,} 張")
-            df_brokers["佔比(%)"] = df_brokers["佔比(%)"].apply(lambda x: f"{x}%")
-            df_brokers["預估成本"] = df_brokers["預估成本"].apply(lambda x: f"{x} 元")
-            df_brokers["預估獲利(萬)"] = df_brokers["預估獲利(萬)"].apply(lambda x: f"{x:+,} 萬")
-            df_brokers["報酬率(%)"] = df_brokers["報酬率(%)"].apply(lambda x: f"{x:+}%")
-            st.dataframe(df_brokers, use_container_width=True, hide_index=True)
+        <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #00E5FF;">
+            <div style="color:#888; font-size:11px; margin-bottom:2px;">🎯 主力加權均價</div>
+            <div style="color:#FFF; font-size:15px; font-weight:bold;">{target_row['主力加權成本']} 元</div>
+        </div>
+        <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid {p_color_hex};">
+            <div style="color:#888; font-size:11px; margin-bottom:2px;">💰 主力帳面損益</div>
+            <div style="color:{p_color_hex}; font-size:15px; font-weight:bold;">{p_sign}{p_tot_wan:,} 萬 ({p_sign}{p_tot_rate}%)</div>
+        </div>
+        <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #FFCC00;">
+            <div style="color:#888; font-size:11px; margin-bottom:2px;">🔥 鎖碼分點數</div>
+            <div style="color:#FFCC00; font-size:15px; font-weight:bold;">{len(broker_list)} 家分點</div>
+        </div>
+    </div>
+    """
+    st.markdown(summary_card_html, unsafe_allow_html=True)
+    
+    if broker_list:
+        df_brokers = pd.DataFrame(broker_list)
+        df_brokers["買超張數"] = df_brokers["買超張數"].apply(lambda x: f"{x:,} 張")
+        df_brokers["佔比(%)"] = df_brokers["佔比(%)"].apply(lambda x: f"{x}%")
+        df_brokers["預估成本"] = df_brokers["預估成本"].apply(lambda x: f"{x} 元")
+        df_brokers["預估獲利(萬)"] = df_brokers["預估獲利(萬)"].apply(lambda x: f"{x:+,} 萬")
+        df_brokers["報酬率(%)"] = df_brokers["報酬率(%)"].apply(lambda x: f"{x:+}%")
+        st.dataframe(df_brokers, use_container_width=True, hide_index=True)
 
 st.markdown("---")
 
