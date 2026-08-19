@@ -197,7 +197,7 @@ def get_daily_tech_summary(stock_code):
         "K(9)": 50.0, "D(9)": 50.0, "均線狀態": "無資料"
     }
 
-# 繪製 1:1 專業看盤軟體技術線圖
+# 繪製 1:1 專業看盤軟體技術線圖 (錯開標籤位置，避免重疊)
 def draw_pro_terminal_chart(df_k, stock_code, stock_name, broker_cost, ah_res, timeframe_label):
     last = df_k.iloc[-1]
     prev_close = df_k["收盤"].iloc[-2] if len(df_k) > 1 else last["收盤"]
@@ -271,13 +271,27 @@ def draw_pro_terminal_chart(df_k, stock_code, stock_name, broker_cost, ah_res, t
     if '72MA' in df_k.columns:
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['72MA'], line=dict(color='#FF66CC', width=1.5), name='72MA'), row=1, col=1)
 
-    # 標註主力成本線與最高壓力位 AH
-    if isinstance(broker_cost, (int, float)):
-        fig.add_hline(y=broker_cost, line=dict(color="#FFFFFF", width=1.2, dash="dash"), 
-                      annotation_text=f"主力成本: {broker_cost}", annotation_position="top left", row=1, col=1)
+    # 標註最高壓力位 (左側顯示) 與 主力成本線 (右側顯示，徹底防重疊)
     if isinstance(ah_res, (int, float)):
-        fig.add_hline(y=ah_res, line=dict(color="#FF3333", width=1.2, dash="dot"), 
-                      annotation_text=f"最高壓力(AH): {ah_res}", annotation_position="bottom left", row=1, col=1)
+        fig.add_hline(
+            y=ah_res, 
+            line=dict(color="#FF3333", width=1.2, dash="dot"), 
+            annotation_text=f" 最高壓力(AH): {ah_res} ", 
+            annotation_position="top left",
+            annotation_font=dict(color="#FF6666", size=11),
+            annotation_bgcolor="rgba(0,0,0,0.7)",
+            row=1, col=1
+        )
+    if isinstance(broker_cost, (int, float)):
+        fig.add_hline(
+            y=broker_cost, 
+            line=dict(color="#00E5FF", width=1.2, dash="dash"), 
+            annotation_text=f" 主力成本: {broker_cost} ", 
+            annotation_position="top right", 
+            annotation_font=dict(color="#00E5FF", size=11),
+            annotation_bgcolor="rgba(0,0,0,0.7)",
+            row=1, col=1
+        )
 
     # 2. 成交量
     vol_colors = ['#FF3333' if c >= o else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
@@ -397,7 +411,7 @@ else:
 
 st.markdown("---")
 
-# 專業看盤 K 線圖專區 (支援 5分K 等完整週期)
+# 專業看盤 K 線圖專區
 st.subheader("🖥️ 專業技術線圖 (自訂週期與 K 棒數量)")
 
 if not df_filtered.empty:
