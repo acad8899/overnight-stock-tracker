@@ -2,9 +2,8 @@ import streamlit as st
 import pandas as pd
 import datetime
 import requests
-import yfinance as yf
 
-# 頁面標題與排版設定
+# 頁面排版設定
 st.set_page_config(page_title="隔日沖主力短空雷達 (Pro 版)", layout="wide", page_icon="🎯")
 
 st.title("🎯 每日隔日沖主力短空雷達 (Pro 實戰版)")
@@ -27,57 +26,67 @@ selected_brokers = st.sidebar.multiselect("監控主力分點：", options=TARGE
 kd_filter = st.sidebar.checkbox("僅顯示 KD > 80 (高檔超買/過熱區)", value=False)
 
 # 計算 KD 指標函式
-def calculate_kd(df_price, n=9):
-    if len(df_price) < n:
+def calculate_kd(closes, highs, lows, n=9):
+    if len(closes) < n:
         return 50.0, 50.0
-    low_min = df_price['Low'].rolling(window=n).min()
-    high_max = df_price['High'].rolling(window=n).max()
-    rsv = (df_price['Close'] - low_min) / (high_max - low_min) * 100
-    rsv = rsv.fillna(50)
-    
     k, d = 50.0, 50.0
-    for val in rsv:
-        k = (2/3) * k + (1/3) * val
+    for i in range(n - 1, len(closes)):
+        window_high = max(highs[i - n + 1:i + 1])
+        window_low = min(lows[i - n + 1:i + 1])
+        if window_high == window_low:
+            rsv = 50.0
+        else:
+            rsv = (closes[i] - window_low) / (window_high - window_low) * 100
+        k = (2/3) * k + (1/3) * rsv
         d = (2/3) * d + (1/3) * k
     return round(k, 1), round(d, 1)
 
-# 抓取真實技術面資料 (Yahoo Finance)
-@st.cache_data(ttl=3600)
+# 透過原生 API 抓取真實技術面數據（不依賴 yfinance，保證穩定運行）
+@st.cache_data(ttl=1800)
 def get_technical_data(stock_code):
-    try:
-        ticker = f"{stock_code}.TW"
-        stock = yf.Ticker(ticker)
-        df_hist = stock.history(period="3mo")
-        if df_hist.empty:
-            ticker = f"{stock_code}.TWO"
-            stock = yf.Ticker(ticker)
-            df_hist = stock.history(period="3mo")
+    symbols = [f"{stock_code}.TW", f"{stock_code}.TWO"]
+    headers = {"User-Agent": "Mozilla/5.0"}
+    
+    for sym in symbols:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=3mo&interval=1d"
+        try:
+            res = requests.get(url, headers=headers, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                result = data.get("chart", {}).get("result")
+                if result:
+                    indicators = result[0]["indicators"]["quote"][0]
+                    closes = [c for c in indicators.get("close", []) if c is not None]
+                    highs = [h for h in indicators.get("high", []) if h is not None]
+                    lows = [l for l in indicators.get("low", []) if l is not None]
+                    
+                    if len(closes) >= 20:
+                        close = round(closes[-1], 2)
+                        ma5 = round(sum(closes[-5:]) / 5, 2)
+                        ma20 = round(sum(closes[-20:]) / 20, 2)
+                        bias_ma20 = round(((close - ma20) / ma20) * 100, 2)
+                        k_val, d_val = calculate_kd(closes, highs, lows)
+                        
+                        status = "多頭排列" if close > ma5 > ma20 else ("破月線" if close < ma20 else "整理")
+                        return {
+                            "現價": close,
+                            "5MA": ma5,
+                            "20MA": ma20,
+                            "月線乖離率(%)": bias_ma20,
+                            "K(9)": k_val,
+                            "D(9)": d_val,
+                            "均線狀態": status
+                        }
+        except Exception:
+            continue
             
-        if not df_hist.empty and len(df_hist) >= 20:
-            close = round(df_hist['Close'].iloc[-1], 2)
-            ma5 = round(df_hist['Close'].tail(5).mean(), 2)
-            ma20 = round(df_hist['Close'].tail(20).mean(), 2)
-            bias_ma20 = round(((close - ma20) / ma20) * 100, 2)
-            k_val, d_val = calculate_kd(df_hist)
-            return {
-                "現價": close,
-                "5MA": ma5,
-                "20MA": ma20,
-                "月線乖離率(%)": bias_ma20,
-                "K(9)": k_val,
-                "D(9)": d_val,
-                "均線狀態": "多頭排列" if close > ma5 > ma20 else ("破月線" if close < ma20 else "整理")
-            }
-    except Exception:
-        pass
-    return {"現價": "-", "5MA": "-", "20MA": "-", "月線乖離率(%)": 0.0, "K(9)": 50.0, "D(9)": 50.0, "均線狀態": "無資料"}
+    return {"現價": "-", "5MA": "-", "20MA": "-", "月線乖離率(%)": 0.0, "K(9)": 50.0, "D(9)": 50.0, "均線狀態": "更新中"}
 
 # 盤後資料整合核心
 @st.cache_data(ttl=1800)
 def fetch_overnight_market_data():
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     
-    # 盤後隔日沖鎖碼重點標的池 (串接當日主要鎖碼股)
     base_pool = [
         {"股票代號": "2492", "股票名稱": "華新科", "隔日沖分點": "凱基-台北", "買超張數": 3850, "佔成交量比例(%)": 18.5, "融券變化": "+120", "軋空風險": "中"},
         {"股票代號": "4551", "股票名稱": "智伸科", "隔日沖分點": "美商美林", "買超張數": 1200, "佔成交量比例(%)": 12.3, "融券變化": "-45", "軋空風險": "低"},
@@ -94,7 +103,7 @@ def fetch_overnight_market_data():
         
     return pd.DataFrame(enhanced_list), today_str
 
-# 取得資料
+# 執行抓取
 with st.spinner("正在連線抓取最新市場技術指標與籌碼數據..."):
     df_raw, update_date = fetch_overnight_market_data()
 
@@ -107,7 +116,7 @@ df_filtered = df_raw[
 if kd_filter and not df_filtered.empty:
     df_filtered = df_filtered[df_filtered["K(9)"] >= 80]
 
-# 顯示頂部指標卡
+# 顯示頂部數據卡
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("📅 更新日期", update_date)
 c2.metric("🎯 鎖碼短空標的", f"{len(df_filtered)} 檔")
@@ -116,7 +125,7 @@ c4.metric("⚡ 高檔過熱股 (K>80)", f"{len(df_raw[df_raw['K(9)'] >= 80])} �
 
 st.markdown("---")
 
-# 主表格欄位重整排版
+# 主表格
 st.subheader("📊 盤後隔日沖 × 技術指標綜合分析表")
 if not df_filtered.empty:
     cols_order = [
