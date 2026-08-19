@@ -6,11 +6,7 @@ import json
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# 頁面排版設定
 st.set_page_config(page_title="隔日沖主力短空雷達", layout="wide", page_icon="🎯")
-
-st.title("🎯 每日隔日沖主力短空雷達 (專業看盤版)")
-st.caption("即時整合「隔日沖分點鎖碼籌碼」、「技術指標」與「專業雙層蠟燭 K 線／成交量圖」。")
 
 # 知名隔日沖主力分點清單
 TARGET_BROKERS = [
@@ -28,20 +24,59 @@ min_ratio = st.sidebar.slider("隔日沖買超佔成交量比例 (%) 門檻：",
 selected_brokers = st.sidebar.multiselect("監控主力分點：", options=TARGET_BROKERS, default=TARGET_BROKERS)
 kd_filter = st.sidebar.checkbox("僅顯示 KD > 80 (高檔過熱區)", value=False)
 
-# 計算 KD 指標函式
-def calculate_kd(closes, highs, lows, n=9):
-    if len(closes) < n:
-        return 50.0, 50.0
+# 計算指標函式 (KD, MACD, 威廉指標)
+def calculate_indicators(df):
+    closes = df["收盤"].tolist()
+    highs = df["最高"].tolist()
+    lows = df["最低"].tolist()
+    
+    # 1. 均線計算
+    df["5MA"] = df["收盤"].rolling(5, min_periods=1).mean().round(2)
+    df["12MA"] = df["收盤"].rolling(12, min_periods=1).mean().round(2)
+    df["24MA"] = df["收盤"].rolling(24, min_periods=1).mean().round(2)
+    df["72MA"] = df["收盤"].rolling(72, min_periods=1).mean().round(2)
+    df["VOL_5MA"] = df["成交量"].rolling(5, min_periods=1).mean().round(0)
+
+    # 2. KD (9, 3, 3)
     k, d = 50.0, 50.0
-    for i in range(n - 1, len(closes)):
-        window_high = max(highs[i - n + 1:i + 1])
-        window_low = min(lows[i - n + 1:i + 1])
-        rsv = 50.0 if window_high == window_low else (closes[i] - window_low) / (window_high - window_low) * 100
+    k_list, d_list = [], []
+    for i in range(len(df)):
+        if i < 8:
+            k_list.append(50.0)
+            d_list.append(50.0)
+            continue
+        w_high = max(highs[i-8:i+1])
+        w_low = min(lows[i-8:i+1])
+        rsv = 50.0 if w_high == w_low else (closes[i] - w_low) / (w_high - w_low) * 100
         k = (2/3) * k + (1/3) * rsv
         d = (2/3) * d + (1/3) * k
-    return round(k, 1), round(d, 1)
+        k_list.append(round(k, 1))
+        d_list.append(round(d, 1))
+    df["K"] = k_list
+    df["D"] = d_list
 
-# 抓取技術面與完整日 K 數據
+    # 3. 威廉指標 W%R (14)
+    wr_list = []
+    for i in range(len(df)):
+        if i < 13:
+            wr_list.append(-50.0)
+            continue
+        w_high = max(highs[i-13:i+1])
+        w_low = min(lows[i-13:i+1])
+        wr = -50.0 if w_high == w_low else ((w_high - closes[i]) / (w_high - w_low)) * -100
+        wr_list.append(round(wr, 2))
+    df["WR"] = wr_list
+
+    # 4. MACD (12, 26, 9)
+    exp12 = df["收盤"].ewm(span=12, adjust=False).mean()
+    exp26 = df["收盤"].ewm(span=26, adjust=False).mean()
+    df["DIF"] = (exp12 - exp26).round(3)
+    df["MACD"] = df["DIF"].ewm(span=9, adjust=False).mean().round(3)
+    df["OSC"] = (df["DIF"] - df["MACD"]).round(3)
+    
+    return df
+
+# 抓取技術面與歷史 K 線數據
 @st.cache_data(ttl=1800)
 def get_stock_data(stock_code):
     symbols = [f"{stock_code}.TW", f"{stock_code}.TWO"]
@@ -66,102 +101,131 @@ def get_stock_data(stock_code):
                     records = []
                     for t, o, h, l, c, v in zip(timestamps, opens, highs, lows, closes, volumes):
                         if None not in (o, h, l, c) and c > 0:
-                            date_str = datetime.datetime.fromtimestamp(t).strftime('%Y-%m-%d')
+                            date_str = datetime.datetime.fromtimestamp(t).strftime('%Y/%m/%d')
                             records.append({
                                 "日期": date_str, 
                                 "開盤": round(o, 2), 
                                 "最高": round(h, 2), 
                                 "最低": round(l, 2), 
                                 "收盤": round(c, 2), 
-                                "成交量": v if (v is not None) else 0
+                                "成交量": int(v) if v is not None else 0
                             })
                     
                     df_k = pd.DataFrame(records)
                     if len(df_k) >= 5:
-                        df_k["5MA"] = df_k["收盤"].rolling(5, min_periods=1).mean().round(2)
-                        df_k["10MA"] = df_k["收盤"].rolling(10, min_periods=1).mean().round(2)
-                        df_k["20MA"] = df_k["收盤"].rolling(20, min_periods=1).mean().round(2)
-                        df_k["60MA"] = df_k["收盤"].rolling(60, min_periods=1).mean().round(2)
-                        
+                        df_k = calculate_indicators(df_k)
                         close = df_k["收盤"].iloc[-1]
                         ma5 = df_k["5MA"].iloc[-1]
-                        ma20 = df_k["20MA"].iloc[-1]
-                        bias_ma20 = round(((close - ma20) / ma20) * 100, 2)
-                        k_val, d_val = calculate_kd(df_k["收盤"].tolist(), df_k["最高"].tolist(), df_k["最低"].tolist())
+                        ma24 = df_k["24MA"].iloc[-1]
+                        bias_ma24 = round(((close - ma24) / ma24) * 100, 2)
                         
-                        status = "多頭排列" if close > ma5 > ma20 else ("破月線" if close < ma20 else "整理")
                         tech_info = {
                             "現價": close,
                             "5MA": ma5,
-                            "20MA": ma20,
-                            "月線乖離率(%)": bias_ma20,
-                            "K(9)": k_val,
-                            "D(9)": d_val,
-                            "均線狀態": status
+                            "24MA": ma24,
+                            "月線乖離率(%)": bias_ma24,
+                            "K(9)": df_k["K"].iloc[-1],
+                            "D(9)": df_k["D"].iloc[-1],
+                            "均線狀態": "多頭排列" if close > ma5 > ma24 else ("破月線" if close < ma24 else "整理")
                         }
                         return tech_info, df_k
         except Exception:
             continue
             
-    default_info = {"現價": "-", "5MA": "-", "20MA": "-", "月線乖離率(%)": 0.0, "K(9)": 50.0, "D(9)": 50.0, "均線狀態": "無資料"}
+    default_info = {"現價": "-", "5MA": "-", "24MA": "-", "月線乖離率(%)": 0.0, "K(9)": 50.0, "D(9)": 50.0, "均線狀態": "無資料"}
     return default_info, pd.DataFrame()
 
-# 繪製台股看盤軟體風格的專業 K 線圖 (黑底、紅漲綠跌、成交量分層)
-def draw_pro_candlestick(df_k, stock_title):
+# 繪製 1:1 專業看盤軟體技術線圖
+def draw_pro_terminal_chart(df_k, stock_code, stock_name):
+    last = df_k.iloc[-1]
+    prev_close = df_k["收盤"].iloc[-2] if len(df_k) > 1 else last["收盤"]
+    change = round(last["收盤"] - prev_close, 2)
+    change_pct = round((change / prev_close) * 100, 2)
+    
+    # 頂部看盤風格資訊抬頭 HTML
+    chg_color = "#FF3333" if change >= 0 else "#00CC00"
+    chg_symbol = "↑" if change >= 0 else "↓"
+    chg_text = f"+{change}" if change > 0 else f"{change}"
+    
+    header_html = f"""
+    <div style="background-color: #000000; padding: 8px 12px; font-family: monospace; border: 1px solid #333; font-size: 13px; margin-bottom: 2px;">
+        <div style="text-align: center; color: #FFFFFF; font-size: 15px; font-weight: bold; margin-bottom: 4px;">
+            {stock_code} {stock_name} 歷史走勢圖
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+            <span style="color: #FFFF00;">日線 {last['日期']}</span>
+            <span style="color: #00CC00;">開 <span style="color:#FFF;">{last['開盤']}</span></span>
+            <span style="color: #FF3333;">高 <span style="color:#FFF;">{last['最高']}</span></span>
+            <span style="color: #00CC00;">低 <span style="color:#FFF;">{last['最低']}</span></span>
+            <span style="color: {chg_color};">收 {last['收盤']}</span>
+            <span style="color: {chg_color}; font-weight: bold;">漲跌 {chg_symbol} {chg_text} ({change_pct}%)</span>
+            <span style="color: #FFFF00;">均價5: {last['5MA']}</span>
+            <span style="color: #00FF00;">均價12: {last['12MA']}</span>
+            <span style="color: #33CCFF;">均價24: {last['24MA']}</span>
+            <span style="color: #FF66CC;">均價72: {last['72MA']}</span>
+        </div>
+    </div>
+    """
+    st.markdown(header_html, unsafe_allow_html=True)
+    
+    # 建立四層專業子圖
     fig = make_subplots(
-        rows=2, cols=1, 
+        rows=4, cols=1, 
         shared_xaxes=True, 
-        vertical_spacing=0.03, 
-        subplot_titles=(f"{stock_title} 日K技術線圖", "成交量 (張)"), 
-        row_heights=[0.7, 0.3]
+        vertical_spacing=0.015, 
+        row_heights=[0.50, 0.18, 0.16, 0.16],
+        subplot_titles=(
+            "",
+            f"<span style='color:#FF3333; font-size:12px;'>成交量 {int(last['成交量'])}</span> <span style='color:#FFFF00; font-size:12px;'>均量5 {int(last['VOL_5MA'])}</span>",
+            f"<span style='color:#FFFF00; font-size:12px;'>威廉指標(14) {last['WR']}</span>",
+            f"<span style='color:#FF3333; font-size:12px;'>OSC {last['OSC']}</span> <span style='color:#FFFF00; font-size:12px;'>DIF {last['DIF']}</span> <span style='color:#FF6666; font-size:12px;'>MACD {last['MACD']}</span>"
+        )
     )
     
-    # 1. 蠟燭 K 線 (台股紅漲綠跌)
+    # 【第 1 層：K 線 + 4條均線】
     fig.add_trace(go.Candlestick(
-        x=df_k['日期'],
-        open=df_k['開盤'],
-        high=df_k['最高'],
-        low=df_k['最低'],
-        close=df_k['收盤'],
-        name='日K線',
-        increasing_line_color='#FF3333', 
-        increasing_fillcolor='#FF3333',
-        decreasing_line_color='#00CC00', 
-        decreasing_fillcolor='#00CC00'
+        x=df_k['日期'], open=df_k['開盤'], high=df_k['最高'], low=df_k['最低'], close=df_k['收盤'],
+        name='日K',
+        increasing_line_color='#FF3333', increasing_fillcolor='#FF3333',
+        decreasing_line_color='#00CC00', decreasing_fillcolor='#00CC00'
     ), row=1, col=1)
     
-    # 2. 均線系統 (安全讀取)
-    if '5MA' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFCC00', width=1.5), name='5MA (黃)'), row=1, col=1)
-    if '10MA' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['10MA'], line=dict(color='#33CCFF', width=1.5), name='10MA (藍)'), row=1, col=1)
-    if '20MA' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['20MA'], line=dict(color='#FF66CC', width=1.5), name='20MA (粉)'), row=1, col=1)
-    if '60MA' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['60MA'], line=dict(color='#33FF33', width=1.5), name='60MA (綠)'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFFF00', width=1), name='5MA'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['12MA'], line=dict(color='#00FF00', width=1), name='12MA'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['24MA'], line=dict(color='#33CCFF', width=1.2), name='24MA'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['72MA'], line=dict(color='#FF66CC', width=1.5), name='72MA'), row=1, col=1)
 
-    # 3. 成交量柱狀圖
+    # 【第 2 層：成交量 + 5MA 均量線】
     vol_colors = ['#FF3333' if c >= o else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
-    fig.add_trace(go.Bar(
-        x=df_k['日期'], 
-        y=df_k['成交量'] / 1000,
-        marker_color=vol_colors, 
-        name='成交量 (張)'
-    ), row=2, col=1)
-    
-    # 4. 版面黑色配置
+    fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['成交量'], marker_color=vol_colors, name='成交量'), row=2, col=1)
+    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), name='5MA均量'), row=2, col=1)
+
+    # 【第 3 層：威廉指標 W%R】
+    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['WR'], line=dict(color='#FF9900', width=1.2), name='WR'), row=3, col=1)
+    # 輔助參考線
+    for y_val in [-20, -50, -80]:
+        fig.add_hline(y=y_val, line=dict(color="#444", width=0.8, dash="dot"), row=3, col=1)
+
+    # 【第 4 層：MACD】
+    osc_colors = ['#FF3333' if v >= 0 else '#00CC00' for v in df_k['OSC']]
+    fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['OSC'], marker_color=osc_colors, name='OSC柱狀'), row=4, col=1)
+    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['DIF'], line=dict(color='#FFFF00', width=1), name='DIF'), row=4, col=1)
+    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['MACD'], line=dict(color='#FF3333', width=1), name='MACD'), row=4, col=1)
+
+    # 4 層純黑看盤軟體佈局設定
     fig.update_layout(
         template="plotly_dark",
-        plot_bgcolor="#0A0A0A",
-        paper_bgcolor="#121212",
+        plot_bgcolor="#000000",
+        paper_bgcolor="#000000",
         xaxis_rangeslider_visible=False,
-        height=650,
-        margin=dict(l=30, r=30, t=40, b=30),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        showlegend=False,
+        height=750,
+        margin=dict(l=40, r=40, t=15, b=20)
     )
     
-    fig.update_xaxes(type='category', gridcolor="#262626")
-    fig.update_yaxes(gridcolor="#262626")
+    # 格線與座標設定
+    fig.update_xaxes(type='category', gridcolor="#222222", showgrid=True, tickangle=0)
+    fig.update_yaxes(gridcolor="#222222", showgrid=True, side="right")
     
     return fig
 
@@ -211,7 +275,7 @@ st.markdown("---")
 st.subheader("📊 盤後隔日沖 × 技術指標綜合分析表")
 if not df_filtered.empty:
     cols_order = [
-        "股票代號", "股票名稱", "現價", "5MA", "20MA", "月線乖離率(%)", 
+        "股票代號", "股票名稱", "現價", "5MA", "24MA", "月線乖離率(%)", 
         "K(9)", "D(9)", "均線狀態", "隔日沖分點", "買超張數", 
         "佔成交量比例(%)", "融券變化", "軋空風險"
     ]
@@ -221,17 +285,17 @@ else:
 
 st.markdown("---")
 
-# 專業 K 線圖專區
-st.subheader("🖥️ 專業個股日 K 線與成交量圖 (黑底專業版)")
+# 專業看盤 K 線圖專區
+st.subheader("🖥️ 專業技術線圖 (看盤軟體 1:1 版面)")
 if not df_filtered.empty:
     stock_options = [f"{r['股票代號']} {r['股票名稱']}" for _, r in df_filtered.iterrows()]
     selected_stock = st.selectbox("請選擇要調閱走勢圖的股票：", stock_options)
     
-    code = selected_stock.split(" ")[0]
+    code, name = selected_stock.split(" ")
     stock_k_df = k_dict.get(code, pd.DataFrame())
     
     if not stock_k_df.empty and len(stock_k_df) > 0:
-        fig = draw_pro_candlestick(stock_k_df, selected_stock)
+        fig = draw_pro_terminal_chart(stock_k_df, code, name)
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("暫無此標的的歷史走勢資料。")
