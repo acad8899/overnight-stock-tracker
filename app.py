@@ -9,7 +9,7 @@ from plotly.subplots import make_subplots
 # 頁面排版設定
 st.set_page_config(page_title="隔日沖主力短空雷達 (多週期實戰版)", layout="wide", page_icon="🎯")
 
-st.title("🎯 每日隔日沖主力短空雷達 (多週期實戰版)")
+st.title("🎯 每日隔日沖主力短空雷達 (極速操盤版)")
 st.caption("即時整合「隔日沖主力成本」、「關鍵壓力位 (CDP/AH)」、「券資比軋空預警」與「多週期自訂 K 線分析」。")
 
 # 知名隔日沖主力分點清單
@@ -22,6 +22,10 @@ TARGET_BROKERS = [
     "統一-敦南"
 ]
 
+# 初始化目前選取股票 (預設第一檔)
+if "selected_stock_code" not in st.session_state:
+    st.session_state["selected_stock_code"] = "2492"
+
 # 側邊欄：篩選條件
 st.sidebar.header("🔍 篩選與風控設定")
 min_ratio = st.sidebar.slider("隔日沖買超佔成交量比例 (%) 門檻：", min_value=5, max_value=40, value=10, step=1)
@@ -29,7 +33,7 @@ selected_brokers = st.sidebar.multiselect("監控主力分點：", options=TARGE
 exclude_high_risk = st.sidebar.checkbox("自動過濾「高軋空風險」標的 (保護空單)", value=False)
 kd_filter = st.sidebar.checkbox("僅顯示 KD > 80 (高檔過熱區)", value=False)
 
-# 計算指標函式 (KD, MACD, 威廉指標)
+# 計算指標函式
 def calculate_indicators(df):
     if len(df) == 0:
         return df
@@ -38,14 +42,12 @@ def calculate_indicators(df):
     highs = df["最高"].tolist()
     lows = df["最低"].tolist()
     
-    # 1. 均線計算 (以當前週期為主)
     df["5MA"] = df["收盤"].rolling(5, min_periods=1).mean().round(2)
     df["12MA"] = df["收盤"].rolling(12, min_periods=1).mean().round(2)
     df["24MA"] = df["收盤"].rolling(24, min_periods=1).mean().round(2)
     df["72MA"] = df["收盤"].rolling(72, min_periods=1).mean().round(2)
     df["VOL_5MA"] = df["成交量"].rolling(5, min_periods=1).mean().round(0)
 
-    # 2. KD (9, 3, 3)
     k, d = 50.0, 50.0
     k_list, d_list = [], []
     for i in range(len(df)):
@@ -63,7 +65,6 @@ def calculate_indicators(df):
     df["K"] = k_list
     df["D"] = d_list
 
-    # 3. 威廉指標 W%R (14)
     wr_list = []
     for i in range(len(df)):
         if i < 13:
@@ -75,7 +76,6 @@ def calculate_indicators(df):
         wr_list.append(round(wr, 2))
     df["WR"] = wr_list
 
-    # 4. MACD (12, 26, 9)
     exp12 = df["收盤"].ewm(span=12, adjust=False).mean()
     exp26 = df["收盤"].ewm(span=26, adjust=False).mean()
     df["DIF"] = (exp12 - exp26).round(3)
@@ -84,7 +84,7 @@ def calculate_indicators(df):
     
     return df
 
-# 抓取多週期 K 線數據函式
+# 抓取多週期 K 線數據
 @st.cache_data(ttl=600)
 def fetch_kline_data(stock_code, interval="1d"):
     range_map = {
@@ -136,8 +136,6 @@ def fetch_kline_data(stock_code, interval="1d"):
                             })
                     
                     df_k = pd.DataFrame(records)
-                    
-                    # 10分K 重組
                     if interval == "10m" and len(df_k) >= 2:
                         resampled = []
                         for i in range(0, len(df_k), 2):
@@ -160,7 +158,7 @@ def fetch_kline_data(stock_code, interval="1d"):
             
     return pd.DataFrame()
 
-# 抓取技術面基礎日線資料 (供主表格使用)
+# 抓取技術面基礎日線資料
 @st.cache_data(ttl=1800)
 def get_daily_tech_summary(stock_code):
     df_k = fetch_kline_data(stock_code, interval="1d")
@@ -197,7 +195,7 @@ def get_daily_tech_summary(stock_code):
         "K(9)": 50.0, "D(9)": 50.0, "均線狀態": "無資料"
     }
 
-# 繪製 1:1 專業看盤軟體技術線圖 (錯開標籤位置，避免重疊)
+# 繪製 1:1 專業看盤軟體技術線圖
 def draw_pro_terminal_chart(df_k, stock_code, stock_name, broker_cost, ah_res, timeframe_label):
     last = df_k.iloc[-1]
     prev_close = df_k["收盤"].iloc[-2] if len(df_k) > 1 else last["收盤"]
@@ -271,7 +269,7 @@ def draw_pro_terminal_chart(df_k, stock_code, stock_name, broker_cost, ah_res, t
     if '72MA' in df_k.columns:
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['72MA'], line=dict(color='#FF66CC', width=1.5), name='72MA'), row=1, col=1)
 
-    # 標註最高壓力位 (左側顯示) 與 主力成本線 (右側顯示，徹底防重疊)
+    # 標註最高壓力位與主力成本線
     if isinstance(ah_res, (int, float)):
         fig.add_hline(
             y=ah_res, 
@@ -397,31 +395,63 @@ c4.metric("⚡ 高檔過熱股 (K>80)", f"{len(df_raw[pd.to_numeric(df_raw['K(9)
 
 st.markdown("---")
 
-# 主表格
-st.subheader("📊 盤後隔日沖 × 主力成本 × 軋空風控決策表")
+# 主表格 (支援點擊選取行)
+st.subheader("📊 盤後隔日沖 × 主力成本 × 軋空風控決策表 (可直接點擊表格選取股票)")
 if not df_filtered.empty:
     preferred_cols = [
         "股票代號", "股票名稱", "現價", "主力預估成本", "最高壓力(AH)", "近高壓力(NH)",
         "券資比(%)", "軋空風險評級", "隔日沖分點", "買超張數", "佔成交量比例(%)", "實戰指引"
     ]
     actual_cols = [col for col in preferred_cols if col in df_filtered.columns]
-    st.dataframe(df_filtered[actual_cols], use_container_width=True)
+    
+    # 支援單選行 (Single row selection)
+    event = st.dataframe(
+        df_filtered[actual_cols], 
+        use_container_width=True,
+        on_select="rerun",
+        selection_mode="single-row"
+    )
+    
+    # 若在表格中點擊了某一行，立即更新當前股票
+    if event and "rows" in event.selection and len(event.selection["rows"]) > 0:
+        selected_index = event.selection["rows"][0]
+        st.session_state["selected_stock_code"] = str(df_filtered.iloc[selected_index]["股票代號"])
 else:
     st.warning("⚠️ 目前條件下無符合標的，請放寬側邊欄比例門檻或取消過濾條件。")
 
 st.markdown("---")
 
-# 專業看盤 K 線圖專區
-st.subheader("🖥️ 專業技術線圖 (自訂週期與 K 棒數量)")
+# 專業看盤 K 線圖專區 (一鍵極速快選按鈕列)
+st.subheader("🖥️ 專業技術線圖 (極速一鍵切換)")
 
 if not df_filtered.empty:
-    col_sel1, col_sel2, col_sel3 = st.columns([2, 1, 1])
-    
-    with col_sel1:
-        stock_options = [f"{r['股票代號']} {r['股票名稱']}" for _, r in df_filtered.iterrows()]
-        selected_stock = st.selectbox("請選擇要調閱走勢圖的股票：", stock_options)
-    
-    with col_sel2:
+    # 1. 產生實體標籤快選按鈕列
+    st.markdown("**⚡ 標的極速切換鍵：**")
+    btn_cols = st.columns(len(df_filtered))
+    for idx, (_, r) in enumerate(df_filtered.iterrows()):
+        code_str = str(r['股票代號'])
+        name_str = r['股票名稱']
+        # 當前選取的股票按鈕給予高亮提示
+        is_active = (st.session_state["selected_stock_code"] == code_str)
+        btn_label = f"👉 {code_str} {name_str}" if is_active else f"{code_str} {name_str}"
+        
+        if btn_cols[idx].button(btn_label, key=f"quick_btn_{code_str}", use_container_width=True):
+            st.session_state["selected_stock_code"] = code_str
+            st.rerun()
+
+    # 確保當前選中的股票存在於目前過濾後的清單中
+    if st.session_state["selected_stock_code"] not in df_filtered["股票代號"].values:
+        st.session_state["selected_stock_code"] = str(df_filtered.iloc[0]["股票代號"])
+
+    target_code = st.session_state["selected_stock_code"]
+    target_row = df_filtered[df_filtered["股票代號"] == target_code].iloc[0]
+    target_name = target_row["股票名稱"]
+    b_cost = target_row.get("主力預估成本")
+    ah_val = target_row.get("最高壓力(AH)")
+
+    # 2. 週期與 K 棒數量控制列
+    col_c1, col_c2 = st.columns([1, 1])
+    with col_c1:
         timeframe_options = {
             "日線": "1d",
             "60分K": "60m",
@@ -433,21 +463,16 @@ if not df_filtered.empty:
         selected_tf_label = st.selectbox("週期選擇：", list(timeframe_options.keys()), index=0)
         selected_interval = timeframe_options[selected_tf_label]
         
-    with col_sel3:
+    with col_c2:
         k_count = st.number_input("顯示 K 棒數量 (根)：", min_value=10, max_value=300, value=60, step=10)
 
-    code, name = selected_stock.split(" ")
-    
-    with st.spinner(f"正在載入 {name} 的 {selected_tf_label} 數據..."):
-        stock_k_df = fetch_kline_data(code, interval=selected_interval)
-    
-    selected_row = df_filtered[df_filtered["股票代號"] == code].iloc[0]
-    b_cost = selected_row.get("主力預估成本")
-    ah_val = selected_row.get("最高壓力(AH)")
-    
+    # 3. 繪圖
+    with st.spinner(f"正在載入 {target_name}({target_code}) 的 {selected_tf_label} 數據..."):
+        stock_k_df = fetch_kline_data(target_code, interval=selected_interval)
+
     if not stock_k_df.empty and len(stock_k_df) > 0:
         display_k_df = stock_k_df.tail(int(k_count)).reset_index(drop=True)
-        fig = draw_pro_terminal_chart(display_k_df, code, name, b_cost, ah_val, selected_tf_label)
+        fig = draw_pro_terminal_chart(display_k_df, target_code, target_name, b_cost, ah_val, selected_tf_label)
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("暫無此標的的走勢資料，可能非交易時段或該週期暫無成交數據。")
@@ -457,11 +482,7 @@ st.markdown("---")
 # 短空操作 SOP 實戰防守心法
 st.subheader("💡 隔日早盤短空 SOP 紀律提醒")
 st.info("""
-1. **週期搭配口訣**：
-   * **日線**：看大趨勢、主力成本與月線乖離率（找超買與壓力）。
-   * **30分/60分K**：觀察前波高點或盤整平台是否假突破。
-   * **5分K**：觀察 09:00~09:15 前 3 根 K 棒是否形成「開高走低出貨吞噬黑 K」。
-   * **1分K**：精確抓取跌破當日開盤價與均價線 (VWAP) 的進場瞬間。
-2. **最高壓力 (AH) 防守**：開盤若往上衝撞 **最高壓力位 (AH)** 遇阻收長上影線黑 K，跌破開盤價即是高勝率空點。
+1. **極速看盤技巧**：直接點擊上方決策表中的股票行，或點選實體按鈕，即可瞬間在多檔個股間切換，適合 09:00~09:15 快速巡視各檔開盤表現。
+2. **最高壓力 (AH) 防守**：開盤若衝撞 **最高壓力位 (AH)** 遇阻收長上影線黑 K，跌破開盤價即是高勝率空點。
 3. **券資比 > 30% 嚴禁放空**：標註「⚠️ 嚴禁摸頂 (極高軋空)」之標的，大戶常趁空單套牢連續鎖漲停軋空，切勿逆勢摸頂！
 """)
