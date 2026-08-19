@@ -6,11 +6,19 @@ import json
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# 頁面排版設定
-st.set_page_config(page_title="隔日沖主力短空雷達 (經典看盤雙欄版)", layout="wide", page_icon="🎯")
+# 頁面排版設定：全寬展開
+st.set_page_config(page_title="隔日沖主力短空雷達 (全螢幕專業版)", layout="wide", page_icon="🎯", initial_sidebar_state="collapsed")
 
-st.title("🎯 每日隔日沖主力短空雷達 (經典看盤雙欄版)")
-st.caption("專為短空當沖設計：左側鍵盤/滑鼠快速選股清單 × 右側 4 層實戰 K 線圖（VWAP + KDJ + 主力籌碼）。")
+# 頂部抬頭列與重新整理按鈕
+head_col1, head_col2 = st.columns([4, 1])
+with head_col1:
+    st.title("🎯 每日隔日沖主力短空雷達 (全螢幕專業版)")
+    st.caption("專為短空當沖設計：整合「VWAP 均價線」、「KDJ 敏銳反轉」、「主力買賣超分層圖」與「多分點損益明細」。")
+with head_col2:
+    st.write("")
+    if st.button("🔄 強制重新整理數據", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
 TARGET_BROKERS = [
     "凱基-台北", 
@@ -22,18 +30,21 @@ TARGET_BROKERS = [
     "摩根大通"
 ]
 
-# 側邊欄：篩選條件
-st.sidebar.header("🔍 篩選與風控設定")
-min_ratio = st.sidebar.slider("隔日沖合計買超佔成交量比例 (%) 門檻：", min_value=1, max_value=30, value=5, step=1)
-selected_brokers = st.sidebar.multiselect("監控主力分點：", options=TARGET_BROKERS, default=TARGET_BROKERS)
-exclude_high_risk = st.sidebar.checkbox("自動過濾「高軋空風險」標的 (保護空單)", value=False)
-kd_filter = st.sidebar.checkbox("僅顯示 KD > 80 (高檔過熱區)", value=False)
+# 【頂部橫向折疊式設定面板】：完全釋放左側空間
+with st.expander("⚙️ 點此展開／收合【篩選條件與風控設定】", expanded=False):
+    f_col1, f_col2, f_col3, f_col4 = st.columns([1.2, 1.8, 1, 1])
+    with f_col1:
+        min_ratio = st.slider("主力買超佔比 (%) 門檻：", min_value=1, max_value=30, value=5, step=1)
+    with f_col2:
+        selected_brokers = st.multiselect("監控主力分點：", options=TARGET_BROKERS, default=TARGET_BROKERS)
+    with f_col3:
+        st.write("")
+        exclude_high_risk = st.checkbox("自動過濾「高軋空風險」", value=False)
+    with f_col4:
+        st.write("")
+        kd_filter = st.checkbox("僅顯示 KD > 80 (過熱區)", value=False)
 
-if st.sidebar.button("🔄 手動強制重新整理"):
-    st.cache_data.clear()
-    st.rerun()
-
-# 穩健計算短空指標 (均線, VWAP, KDJ)
+# 計算實戰短空指標 (均線, VWAP, KDJ)
 def calculate_pro_short_indicators(df):
     if df is None or df.empty:
         return pd.DataFrame()
@@ -54,7 +65,7 @@ def calculate_pro_short_indicators(df):
     cum_tp_vol = (typical_price * df["成交量"].astype(float)).cumsum()
     df["VWAP"] = (cum_tp_vol / cum_vol.replace(0, 1)).round(2)
 
-    # 隔日沖主力買賣超
+    # 隔日沖主力買賣超模擬
     df["主力買賣超"] = [
         int(v * 0.15 * (1 if c >= o else -0.85)) 
         for v, c, o in zip(volumes, df["收盤"], df["開盤"])
@@ -62,7 +73,7 @@ def calculate_pro_short_indicators(df):
 
     # KDJ (9, 3, 3)
     k, d = 50.0, 50.0
-    k_list, d_list, j_list = [], [], []
+    k_list, d_list, j_list = [], []
     for i in range(len(df)):
         if i < 8:
             k_list.append(50.0)
@@ -85,7 +96,7 @@ def calculate_pro_short_indicators(df):
     
     return df
 
-# 建立乾淨的合成走勢資料 (確保永不中斷)
+# 建立備援走勢資料
 def generate_fallback_kline(stock_code, base_price=298.0, count=60):
     rows = []
     p = float(base_price) * 0.88
@@ -194,10 +205,10 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
     
     header_html = f"""
     <div style="background-color: #000000; padding: 6px 10px; font-family: monospace; border: 1px solid #333; font-size: 13px; margin-bottom: 2px;">
-        <div style="text-align: center; color: #FFFFFF; font-size: 14px; font-weight: bold; margin-bottom: 3px;">
+        <div style="text-align: center; color: #FFFFFF; font-size: 15px; font-weight: bold; margin-bottom: 3px;">
             {stock_code} {stock_name} 短空決策線圖 [{timeframe_label}]
         </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; font-size: 12px;">
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; font-size: 12px;">
             <span style="color: #FFFF00;">{timeframe_label} {last['日期']}</span>
             <span style="color: #00CC00;">開 <span style="color:#FFF;">{last['開盤']}</span></span>
             <span style="color: #FF3333;">高 <span style="color:#FFF;">{last['最高']}</span></span>
@@ -432,7 +443,7 @@ if kd_filter and "K(9)" in df_raw.columns:
 df_filtered = df_raw[mask].copy()
 df_display = df_filtered if not df_filtered.empty else df_raw.copy()
 
-# 頂部統計指標
+# 頂部 4 大統計指標
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("📅 最新更新日期", update_date)
 c2.metric("🎯 鎖碼短空標的", f"{len(df_filtered)} 檔" if not df_filtered.empty else f"{len(df_raw)} 檔 (展示全庫)")
@@ -441,7 +452,7 @@ c4.metric("⚡ 高檔過熱股 (K>80)", f"{len(df_raw[pd.to_numeric(df_raw['K(9)
 
 st.markdown("---")
 
-# 主表格
+# 主表格 (全螢幕展開)
 st.subheader("📊 盤後隔日沖 × 主力成本 × 軋空風控決策表")
 preferred_cols = [
     "股票代號", "股票名稱", "現價", "主力加權成本", "最高壓力(AH)", "近高壓力(NH)",
@@ -452,10 +463,10 @@ st.dataframe(df_display[actual_cols], use_container_width=True)
 
 st.markdown("---")
 
-# 操盤工作台 (左側極速清單 × 右側專業圖表)
-st.subheader("🖥️ 操盤工作台 (左側極速清單 × 右側專業圖表)")
+# 操盤工作台 (左側極速清單 1.1 × 右側專業寬幅圖表 3.9)
+st.subheader("🖥️ 操盤工作台 (全寬大視窗)")
 
-left_side, right_side = st.columns([1.1, 3.2], gap="medium")
+left_side, right_side = st.columns([1.1, 3.9], gap="medium")
 
 # 【左欄：支援滑鼠點選與鍵盤 ↑ / ↓ 快速瀏覽清單】
 with left_side:
@@ -520,6 +531,7 @@ with right_side:
     with c_tf2:
         k_count = st.number_input("K 棒根數：", min_value=10, max_value=300, value=60, step=10)
 
+    # 取得 K 線數據
     stock_k_df = fetch_kline_data(target_code, interval=selected_interval)
 
     if stock_k_df is not None and not stock_k_df.empty:
