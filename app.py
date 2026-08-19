@@ -3,12 +3,14 @@ import pandas as pd
 import datetime
 import urllib.request
 import json
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # 頁面排版設定
 st.set_page_config(page_title="隔日沖主力短空雷達", layout="wide", page_icon="🎯")
 
-st.title("🎯 每日隔日沖主力短空雷達 (含 K 線分析)")
-st.caption("即時整合「隔日沖分點鎖碼籌碼」、「KD、均線指標」與「互動式 K 線圖」的短空決策系統。")
+st.title("🎯 每日隔日沖主力短空雷達 (專業看盤版)")
+st.caption("即時整合「隔日沖分點鎖碼籌碼」、「技術指標」與「專業雙層蠟燭 K 線／成交量圖」。")
 
 # 知名隔日沖主力分點清單
 TARGET_BROKERS = [
@@ -39,14 +41,14 @@ def calculate_kd(closes, highs, lows, n=9):
         d = (2/3) * d + (1/3) * k
     return round(k, 1), round(d, 1)
 
-# 抓取技術面與歷史 K 線數據
+# 抓取技術面與完整日 K 數據
 @st.cache_data(ttl=1800)
 def get_stock_data(stock_code):
     symbols = [f"{stock_code}.TW", f"{stock_code}.TWO"]
     headers = {"User-Agent": "Mozilla/5.0"}
     
     for sym in symbols:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=3mo&interval=1d"
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=6mo&interval=1d"
         try:
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=5) as response:
@@ -61,17 +63,25 @@ def get_stock_data(stock_code):
                     opens = indicators.get("open", [])
                     volumes = indicators.get("volume", [])
                     
-                    # 整理成 DataFrame
                     records = []
                     for t, o, h, l, c, v in zip(timestamps, opens, highs, lows, closes, volumes):
                         if None not in (o, h, l, c):
                             date_str = datetime.datetime.fromtimestamp(t).strftime('%Y-%m-%d')
-                            records.append({"日期": date_str, "開盤": o, "最高": h, "最低": l, "收盤": round(c, 2), "成交量": v})
+                            records.append({
+                                "日期": date_str, 
+                                "開盤": round(o, 2), 
+                                "最高": round(h, 2), 
+                                "最低": round(l, 2), 
+                                "收盤": round(c, 2), 
+                                "成交量": v if v is not None else 0
+                            })
                     
                     df_k = pd.DataFrame(records)
                     if len(df_k) >= 20:
                         df_k["5MA"] = df_k["收盤"].rolling(5).mean().round(2)
+                        df_k["10MA"] = df_k["收盤"].rolling(10).mean().round(2)
                         df_k["20MA"] = df_k["收盤"].rolling(20).mean().round(2)
+                        df_k["60MA"] = df_k["收盤"].rolling(60).mean().round(2)
                         
                         close = df_k["收盤"].iloc[-1]
                         ma5 = df_k["5MA"].iloc[-1]
@@ -95,6 +105,63 @@ def get_stock_data(stock_code):
             
     default_info = {"現價": "-", "5MA": "-", "20MA": "-", "月線乖離率(%)": 0.0, "K(9)": 50.0, "D(9)": 50.0, "均線狀態": "無資料"}
     return default_info, pd.DataFrame()
+
+# 繪製台股看盤軟體風格的專業 K 線圖 (黑底、紅漲綠跌、成交量分層)
+def draw_pro_candlestick(df_k, stock_title):
+    # 建立雙層子圖 (上層: K線+均線, 下層: 成交量)
+    fig = make_subplots(
+        rows=2, cols=1, 
+        shared_xaxes=True, 
+        vertical_spacing=0.03, 
+        subplot_titles=(f"{stock_title} 日K技術線圖", "成交量 (張)"), 
+        row_heights=[0.7, 0.3]
+    )
+    
+    # 1. 蠟燭 K 線 (台股習慣：上漲為紅，下跌為綠)
+    fig.add_trace(go.Candlestick(
+        x=df_k['日期'],
+        open=df_k['開盤'],
+        high=df_k['最高'],
+        low=df_k['最低'],
+        close=df_k['收盤'],
+        name='日K線',
+        increasing_line_color='#FF3333', 
+        increasing_fillcolor='#FF3333',
+        decreasing_line_color='#00CC00', 
+        decreasing_fillcolor='#00CC00'
+    ), row=1, col=1)
+    
+    # 2. 均線系統 (5MA, 10MA, 20MA, 60MA)
+    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFCC00', width=1.5), name='5MA (黃)'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['10MA'], line=dict(color='#33CCFF', width=1.5), name='10MA (藍)'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['20MA'], line=dict(color='#FF66CC', width=1.5), name='20MA (粉)'), row=1, col=1)
+    if '60MA' in df_k.columns and not df_k['60MA'].isna().all():
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['60MA'], line=dict(color='#33FF33', width=1.5), name='60MA (綠)'), row=1, col=1)
+
+    # 3. 成交量柱狀圖 (配合漲跌著色)
+    vol_colors = ['#FF3333' if c >= o else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
+    fig.add_trace(go.Bar(
+        x=df_k['日期'], 
+        y=df_k['成交量'] / 1000, # 轉為千張/張數
+        marker_color=vol_colors, 
+        name='成交量 (張)'
+    ), row=2, col=1)
+    
+    # 4. 版面黑色看盤軟體風格配置
+    fig.update_layout(
+        template="plotly_dark",
+        plot_bgcolor="#0A0A0A",
+        paper_bgcolor="#121212",
+        xaxis_rangeslider_visible=False,
+        height=650,
+        margin=dict(l=30, r=30, t=40, b=30),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    
+    fig.update_xaxes(type='category', gridcolor="#262626")
+    fig.update_yaxes(gridcolor="#262626")
+    
+    return fig
 
 # 盤後資料整合核心
 @st.cache_data(ttl=1800)
@@ -152,22 +219,18 @@ else:
 
 st.markdown("---")
 
-# K 線與均線趨勢圖專區
-st.subheader("📈 個股近 3 個月 K 線與均線走勢圖")
+# 專業 K 線圖專區
+st.subheader("🖥️ 專業個股日 K 線與成交量圖 (黑底專業版)")
 if not df_filtered.empty:
     stock_options = [f"{r['股票代號']} {r['股票名稱']}" for _, r in df_filtered.iterrows()]
-    selected_stock = st.selectbox("選擇要檢視 K 線與均線走勢的標的：", stock_options)
+    selected_stock = st.selectbox("請選擇要調閱走勢圖的股票：", stock_options)
     
     code = selected_stock.split(" ")[0]
     stock_k_df = k_dict.get(code, pd.DataFrame())
     
     if not stock_k_df.empty:
-        chart_data = stock_k_df.set_index("日期")[["收盤", "5MA", "20MA"]]
-        st.line_chart(chart_data)
-        
-        # 顯示最近 5 個交易日明細
-        with st.expander("🔍 檢視近 5 日收盤與均線數據"):
-            st.dataframe(stock_k_df.tail(5), use_container_width=True)
+        fig = draw_pro_candlestick(stock_k_df, selected_stock)
+        st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("暫無此標的的歷史走勢資料。")
 
