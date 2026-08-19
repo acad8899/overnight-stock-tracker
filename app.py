@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import requests
+import urllib.request
+import json
 
 # 頁面排版設定
 st.set_page_config(page_title="隔日沖主力短空雷達", layout="wide", page_icon="🎯")
@@ -38,7 +39,7 @@ def calculate_kd(closes, highs, lows, n=9):
         d = (2/3) * d + (1/3) * k
     return round(k, 1), round(d, 1)
 
-# 透過原生 API 抓取技術面數據
+# 透過 Python 內建 urllib 抓取技術面（不需安裝任何套件）
 @st.cache_data(ttl=1800)
 def get_technical_data(stock_code):
     symbols = [f"{stock_code}.TW", f"{stock_code}.TWO"]
@@ -47,9 +48,9 @@ def get_technical_data(stock_code):
     for sym in symbols:
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=3mo&interval=1d"
         try:
-            res = requests.get(url, headers=headers, timeout=5)
-            if res.status_code == 200:
-                data = res.json()
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=5) as response:
+                data = json.loads(response.read().decode('utf-8'))
                 result = data.get("chart", {}).get("result")
                 if result:
                     indicators = result[0]["indicators"]["quote"][0]
@@ -100,8 +101,7 @@ def fetch_overnight_market_data():
     return pd.DataFrame(enhanced_list), today_str
 
 # 執行抓取
-with st.spinner("正在連線抓取最新市場技術指標與籌碼數據..."):
-    df_raw, update_date = fetch_overnight_market_data()
+df_raw, update_date = fetch_overnight_market_data()
 
 # 資料過濾
 df_filtered = df_raw[
@@ -112,7 +112,7 @@ df_filtered = df_raw[
 if kd_filter and not df_filtered.empty:
     df_filtered = df_filtered[df_filtered["K(9)"] >= 80]
 
-# 顯示頂部指標卡
+# 頂部統計指標
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("📅 更新日期", update_date)
 c2.metric("🎯 鎖碼短空標的", f"{len(df_filtered)} 檔")
@@ -130,7 +130,7 @@ if not df_filtered.empty:
         "佔成交量比例(%)", "融券變化", "軋空風險"
     ]
     st.dataframe(
-        df_filtered[cols_order].style.highlight_max(axis=0, subset=["佔成交量比例(%)", "月線乖離率(%)"], color="#ffcdd2"),
+        df_filtered[cols_order],
         use_container_width=True
     )
 else:
@@ -138,7 +138,7 @@ else:
 
 st.markdown("---")
 
-# 短空操作 SOP 提示卡
+# 短空操作 SOP
 st.subheader("💡 隔日早盤短空 SOP 紀律提醒")
 st.info("""
 1. **09:00~09:15 觀察開盤**：開高見紅後若 5 分 K 跌破開盤價，且摜破分時均價線（VWAP），為標準切入點。
