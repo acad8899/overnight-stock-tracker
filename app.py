@@ -44,7 +44,7 @@ with st.expander("⚙️ 點此展開／收合【篩選條件與風控設定】"
         st.write("")
         kd_filter = st.checkbox("僅顯示 KD > 80 (過熱區)", value=False)
 
-# 計算實戰短空指標 (均線, VWAP, KDJ)
+# 計算實戰短空指標 (均線, VWAP, KDJ) - 已修復變數解包錯誤
 def calculate_pro_short_indicators(df):
     if df is None or df.empty:
         return pd.DataFrame()
@@ -54,6 +54,7 @@ def calculate_pro_short_indicators(df):
     highs = [float(x) for x in df["最高"]]
     lows = [float(x) for x in df["最低"]]
     volumes = [float(x) for x in df["成交量"]]
+    opens = [float(x) for x in df["開盤"]]
     
     df["5MA"] = df["收盤"].rolling(5, min_periods=1).mean().round(2)
     df["20MA"] = df["收盤"].rolling(20, min_periods=1).mean().round(2)
@@ -68,12 +69,15 @@ def calculate_pro_short_indicators(df):
     # 隔日沖主力買賣超模擬
     df["主力買賣超"] = [
         int(v * 0.15 * (1 if c >= o else -0.85)) 
-        for v, c, o in zip(volumes, df["收盤"], df["開盤"])
+        for v, c, o in zip(volumes, closes, opens)
     ]
 
-    # KDJ (9, 3, 3)
+    # KDJ (9, 3, 3) - 正確宣告 3 個列表
     k, d = 50.0, 50.0
-    k_list, d_list, j_list = [], []
+    k_list = []
+    d_list = []
+    j_list = []
+    
     for i in range(len(df)):
         if i < 8:
             k_list.append(50.0)
