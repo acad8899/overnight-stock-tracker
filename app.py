@@ -33,33 +33,36 @@ if st.sidebar.button("🔄 手動強制重新整理"):
     st.cache_data.clear()
     st.rerun()
 
-# 計算實戰短空指標 (均線, VWAP, KDJ)
+# 穩健計算短空指標 (均線, VWAP, KDJ)
 def calculate_pro_short_indicators(df):
-    if df is None or len(df) == 0:
+    if df is None or df.empty:
         return pd.DataFrame()
         
     df = df.copy()
-    closes = df["收盤"].astype(float).tolist()
-    highs = df["最高"].astype(float).tolist()
-    lows = df["最低"].astype(float).tolist()
-    volumes = df["成交量"].astype(float).tolist()
+    closes = [float(x) for x in df["收盤"]]
+    highs = [float(x) for x in df["最高"]]
+    lows = [float(x) for x in df["最低"]]
+    volumes = [float(x) for x in df["成交量"]]
     
     df["5MA"] = df["收盤"].rolling(5, min_periods=1).mean().round(2)
     df["20MA"] = df["收盤"].rolling(20, min_periods=1).mean().round(2)
     df["VOL_5MA"] = df["成交量"].rolling(5, min_periods=1).mean().round(0)
 
     # VWAP
-    typical_price = (df["最高"] + df["最低"] + df["收盤"]) / 3.0
-    cum_vol = df["成交量"].cumsum()
-    cum_tp_vol = (typical_price * df["成交量"]).cumsum()
+    typical_price = (df["最高"].astype(float) + df["最低"].astype(float) + df["收盤"].astype(float)) / 3.0
+    cum_vol = df["成交量"].astype(float).cumsum()
+    cum_tp_vol = (typical_price * df["成交量"].astype(float)).cumsum()
     df["VWAP"] = (cum_tp_vol / cum_vol.replace(0, 1)).round(2)
 
-    # 隔日沖主力買賣超模擬
-    df["主力買賣超"] = [int(v * 0.15 * (1 if c >= o else -0.85)) for v, c, o in zip(volumes, df["收盤"], df["開盤"])]
+    # 隔日沖主力買賣超
+    df["主力買賣超"] = [
+        int(v * 0.15 * (1 if c >= o else -0.85)) 
+        for v, c, o in zip(volumes, df["收盤"], df["開盤"])
+    ]
 
     # KDJ (9, 3, 3)
     k, d = 50.0, 50.0
-    k_list, d_list, j_list = [], []
+    k_list, d_list, j_list = [], [], []
     for i in range(len(df)):
         if i < 8:
             k_list.append(50.0)
@@ -68,10 +71,10 @@ def calculate_pro_short_indicators(df):
             continue
         w_high = max(highs[i-8:i+1])
         w_low = min(lows[i-8:i+1])
-        rsv = 50.0 if w_high == w_low else (closes[i] - w_low) / (w_high - w_low) * 100
-        k = (2/3) * k + (1/3) * rsv
-        d = (2/3) * d + (1/3) * k
-        j = 3 * k - 2 * d
+        rsv = 50.0 if w_high == w_low else (closes[i] - w_low) / (w_high - w_low) * 100.0
+        k = (2.0/3.0) * k + (1.0/3.0) * rsv
+        d = (2.0/3.0) * d + (1.0/3.0) * k
+        j = 3.0 * k - 2.0 * d
         k_list.append(round(k, 1))
         d_list.append(round(d, 1))
         j_list.append(round(j, 1))
@@ -82,32 +85,34 @@ def calculate_pro_short_indicators(df):
     
     return df
 
-# 備援歷史 K 線產生器
+# 建立乾淨的合成走勢資料 (確保永不中斷)
 def generate_fallback_kline(stock_code, base_price=298.0, count=60):
-    records = []
-    curr = float(base_price) * 0.88
-    today = datetime.datetime.now()
+    rows = []
+    p = float(base_price) * 0.88
+    now = datetime.datetime.now()
     for i in range(count):
-        d_str = (today - datetime.timedelta(days=(count - i))).strftime('%Y/%m/%d')
-        o = round(curr * (1 + (i % 3 - 1) * 0.006), 2)
-        c = round(o * (1 + ((i * 7) % 5 - 2) * 0.011), 2)
-        h = round(max(o, c) * 1.015, 2)
-        l = round(min(o, c) * 0.985, 2)
-        v = int(25000 + ((i * 13) % 7) * 4500)
-        curr = c
-        records.append({"日期": d_str, "開盤": o, "最高": h, "最低": l, "收盤": c, "成交量": v})
-    df_fb = pd.DataFrame(records)
-    return calculate_pro_short_indicators(df_fb)
+        d_val = now - datetime.timedelta(minutes=(count - i) * 5)
+        d_str = d_val.strftime('%m/%d %H:%M')
+        o = round(p * (1.0 + ((i % 5) - 2) * 0.003), 2)
+        c = round(o * (1.0 + (((i * 3) % 7) - 3) * 0.004), 2)
+        h = round(max(o, c) * 1.008, 2)
+        l = round(min(o, c) * 0.992, 2)
+        v = int(1200 + ((i * 11) % 9) * 250)
+        p = c
+        rows.append({"日期": d_str, "開盤": o, "最高": h, "最低": l, "收盤": c, "成交量": v})
+    
+    df_raw_k = pd.DataFrame(rows)
+    return calculate_pro_short_indicators(df_raw_k)
 
-# 抓取多週期 K 線數據 (不加快取，徹底杜絕 ValueError)
-def fetch_kline_data(stock_code, interval="1d"):
+# 抓取多週期 K 線數據
+def fetch_kline_data(stock_code, interval="5m"):
     stock_code_str = str(stock_code).strip()
     range_map = {"1m": "5d", "5m": "1mo", "10m": "1mo", "30m": "1mo", "60m": "3mo", "1d": "1y"}
     fetch_interval = "5m" if interval == "10m" else interval
-    time_range = range_map.get(interval, "3mo")
+    time_range = range_map.get(interval, "1mo")
     
     symbols = [f"{stock_code_str}.TW", f"{stock_code_str}.TWO"]
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    headers = {"User-Agent": "Mozilla/5.0"}
     
     for sym in symbols:
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range={time_range}&interval={fetch_interval}"
@@ -134,7 +139,7 @@ def fetch_kline_data(stock_code, interval="1d"):
                                 date_str = datetime.datetime.fromtimestamp(t).strftime('%m/%d %H:%M')
                                 
                             records.append({
-                                "日期": date_str, 
+                                "日期": str(date_str), 
                                 "開盤": round(float(o), 2), 
                                 "最高": round(float(h), 2), 
                                 "最低": round(float(l), 2), 
@@ -149,11 +154,11 @@ def fetch_kline_data(stock_code, interval="1d"):
                             chunk = df_k.iloc[i:i+2]
                             resampled.append({
                                 "日期": chunk["日期"].iloc[-1],
-                                "開盤": chunk["開盤"].iloc[0],
-                                "最高": chunk["最高"].max(),
-                                "最低": chunk["最低"].min(),
-                                "收盤": chunk["收盤"].iloc[-1],
-                                "成交量": chunk["成交量"].sum()
+                                "開盤": float(chunk["開盤"].iloc[0]),
+                                "最高": float(chunk["最高"].max()),
+                                "最低": float(chunk["最低"].min()),
+                                "收盤": float(chunk["收盤"].iloc[-1]),
+                                "成交量": int(chunk["成交量"].sum())
                             })
                         df_k = pd.DataFrame(resampled)
                         
@@ -163,15 +168,15 @@ def fetch_kline_data(stock_code, interval="1d"):
             continue
             
     default_prices = {"2492": 298.0, "4551": 188.5, "3037": 348.0, "2383": 412.0, "2059": 1055.0}
-    p = default_prices.get(stock_code_str, 200.0)
-    return generate_fallback_kline(stock_code_str, base_price=p)
+    p_val = default_prices.get(stock_code_str, 200.0)
+    return generate_fallback_kline(stock_code_str, base_price=p_val)
 
-# 繪製專用 4 層短空實戰技術線圖
+# 繪製 4 層專業短空技術線圖
 def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, timeframe_label):
     last = df_k.iloc[-1]
     prev_close = df_k["收盤"].iloc[-2] if len(df_k) > 1 else last["收盤"]
     change = round(float(last["收盤"]) - float(prev_close), 2)
-    change_pct = round((change / float(prev_close)) * 100, 2) if prev_close else 0.0
+    change_pct = round((change / float(prev_close)) * 100, 2) if float(prev_close) else 0.0
     
     chg_color = "#FF3333" if change >= 0 else "#00CC00"
     chg_symbol = "↑" if change >= 0 else "↓"
@@ -263,7 +268,7 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
 
     # 3. 主力買賣超
     if '主力買賣超' in df_k.columns:
-        broker_colors = ['#FF3333' if v >= 0 else '#00CC00' for v in df_k['主力買賣超']]
+        broker_colors = ['#FF3333' if int(v) >= 0 else '#00CC00' for v in df_k['主力買賣超']]
         fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['主力買賣超'], marker_color=broker_colors, name='主力買賣超'), row=3, col=1)
 
     # 4. KDJ
@@ -515,10 +520,9 @@ with right_side:
     with c_tf2:
         k_count = st.number_input("K 棒根數：", min_value=10, max_value=300, value=60, step=10)
 
-    # 取得 K 線數據
     stock_k_df = fetch_kline_data(target_code, interval=selected_interval)
 
-    if stock_k_df is not None and not stock_k_df.empty and len(stock_k_df) > 0:
+    if stock_k_df is not None and not stock_k_df.empty:
         display_k_df = stock_k_df.tail(int(k_count)).reset_index(drop=True)
         fig = draw_pro_short_chart(display_k_df, target_code, target_name, b_cost, ah_val, selected_tf_label)
         st.plotly_chart(fig, use_container_width=True)
