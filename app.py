@@ -87,16 +87,15 @@ def calculate_indicators(df):
 # 抓取多週期 K 線數據函式
 @st.cache_data(ttl=600)
 def fetch_kline_data(stock_code, interval="1d"):
-    # 根據不同週期設定最佳抓取時間跨度
     range_map = {
         "1m": "5d",
-        "10m": "1mo", # 透過 5m 重組或直接抓取 15m 區間
+        "5m": "1mo",
+        "10m": "1mo",
         "30m": "1mo",
         "60m": "3mo",
         "1d": "1y"
     }
     
-    # 支援的 Yahoo 介面 interval
     fetch_interval = "5m" if interval == "10m" else interval
     time_range = range_map.get(interval, "3mo")
     
@@ -122,7 +121,6 @@ def fetch_kline_data(stock_code, interval="1d"):
                     records = []
                     for t, o, h, l, c, v in zip(timestamps, opens, highs, lows, closes, volumes):
                         if None not in (o, h, l, c) and c > 0:
-                            # 格式化日期與時間
                             if interval == "1d":
                                 date_str = datetime.datetime.fromtimestamp(t).strftime('%Y/%m/%d')
                             else:
@@ -139,7 +137,7 @@ def fetch_kline_data(stock_code, interval="1d"):
                     
                     df_k = pd.DataFrame(records)
                     
-                    # 若為 10分K，將 5m 資料兩兩合併
+                    # 10分K 重組
                     if interval == "10m" and len(df_k) >= 2:
                         resampled = []
                         for i in range(0, len(df_k), 2):
@@ -273,7 +271,7 @@ def draw_pro_terminal_chart(df_k, stock_code, stock_name, broker_cost, ah_res, t
     if '72MA' in df_k.columns:
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['72MA'], line=dict(color='#FF66CC', width=1.5), name='72MA'), row=1, col=1)
 
-    # 標註主力成本線 (白虛線) 與 最高壓力位 AH (紅點線)
+    # 標註主力成本線與最高壓力位 AH
     if isinstance(broker_cost, (int, float)):
         fig.add_hline(y=broker_cost, line=dict(color="#FFFFFF", width=1.2, dash="dash"), 
                       annotation_text=f"主力成本: {broker_cost}", annotation_position="top left", row=1, col=1)
@@ -399,7 +397,7 @@ else:
 
 st.markdown("---")
 
-# 專業看盤 K 線圖專區 (支援彈性多週期與 K 棒數量自訂)
+# 專業看盤 K 線圖專區 (支援 5分K 等完整週期)
 st.subheader("🖥️ 專業技術線圖 (自訂週期與 K 棒數量)")
 
 if not df_filtered.empty:
@@ -410,34 +408,30 @@ if not df_filtered.empty:
         selected_stock = st.selectbox("請選擇要調閱走勢圖的股票：", stock_options)
     
     with col_sel2:
-        # 1. 彈性選擇分線、10分、30分、60分、日線
         timeframe_options = {
             "日線": "1d",
             "60分K": "60m",
             "30分K": "30m",
             "10分K": "10m",
-            "1分K (分線)": "1m"
+            "5分K (主力出手關鍵)": "5m",
+            "1分K (極短線分線)": "1m"
         }
         selected_tf_label = st.selectbox("週期選擇：", list(timeframe_options.keys()), index=0)
         selected_interval = timeframe_options[selected_tf_label]
         
     with col_sel3:
-        # 2. K 棒數量預設 60 根，可自行輸入修改
         k_count = st.number_input("顯示 K 棒數量 (根)：", min_value=10, max_value=300, value=60, step=10)
 
     code, name = selected_stock.split(" ")
     
-    # 抓取該週期資料
     with st.spinner(f"正在載入 {name} 的 {selected_tf_label} 數據..."):
         stock_k_df = fetch_kline_data(code, interval=selected_interval)
     
-    # 取得該標的主力成本與壓力
     selected_row = df_filtered[df_filtered["股票代號"] == code].iloc[0]
     b_cost = selected_row.get("主力預估成本")
     ah_val = selected_row.get("最高壓力(AH)")
     
     if not stock_k_df.empty and len(stock_k_df) > 0:
-        # 依使用者設定擷取最後 N 根 K 棒
         display_k_df = stock_k_df.tail(int(k_count)).reset_index(drop=True)
         fig = draw_pro_terminal_chart(display_k_df, code, name, b_cost, ah_val, selected_tf_label)
         st.plotly_chart(fig, use_container_width=True)
@@ -452,7 +446,8 @@ st.info("""
 1. **週期搭配口訣**：
    * **日線**：看大趨勢、主力成本與月線乖離率（找超買與壓力）。
    * **30分/60分K**：觀察前波高點或盤整平台是否假突破。
-   * **1分/10分K**：早盤 09:00~09:15 抓第一根爆量長黑摜破開盤價的**精確進場空點**。
+   * **5分K**：觀察 09:00~09:15 前 3 根 K 棒是否形成「開高走低出貨吞噬黑 K」。
+   * **1分K**：精確抓取跌破當日開盤價與均價線 (VWAP) 的進場瞬間。
 2. **最高壓力 (AH) 防守**：開盤若往上衝撞 **最高壓力位 (AH)** 遇阻收長上影線黑 K，跌破開盤價即是高勝率空點。
 3. **券資比 > 30% 嚴禁放空**：標註「⚠️ 嚴禁摸頂 (極高軋空)」之標的，大戶常趁空單套牢連續鎖漲停軋空，切勿逆勢摸頂！
 """)
