@@ -132,7 +132,15 @@ def get_stock_data(stock_code):
         except Exception:
             continue
             
-    default_info = {"現價": "-", "5MA": "-", "24MA": "-", "月線乖離率(%)": 0.0, "K(9)": 50.0, "D(9)": 50.0, "均線狀態": "無資料"}
+    default_info = {
+        "現價": "-", 
+        "5MA": "-", 
+        "24MA": "-", 
+        "月線乖離率(%)": 0.0, 
+        "K(9)": 50.0, 
+        "D(9)": 50.0, 
+        "均線狀態": "無資料"
+    }
     return default_info, pd.DataFrame()
 
 # 繪製 1:1 專業看盤軟體技術線圖
@@ -142,7 +150,6 @@ def draw_pro_terminal_chart(df_k, stock_code, stock_name):
     change = round(last["收盤"] - prev_close, 2)
     change_pct = round((change / prev_close) * 100, 2)
     
-    # 頂部看盤風格資訊抬頭 HTML
     chg_color = "#FF3333" if change >= 0 else "#00CC00"
     chg_symbol = "↑" if change >= 0 else "↓"
     chg_text = f"+{change}" if change > 0 else f"{change}"
@@ -168,7 +175,6 @@ def draw_pro_terminal_chart(df_k, stock_code, stock_name):
     """
     st.markdown(header_html, unsafe_allow_html=True)
     
-    # 建立四層專業子圖
     fig = make_subplots(
         rows=4, cols=1, 
         shared_xaxes=True, 
@@ -182,7 +188,7 @@ def draw_pro_terminal_chart(df_k, stock_code, stock_name):
         )
     )
     
-    # 【第 1 層：K 線 + 4條均線】
+    # 1. K 線
     fig.add_trace(go.Candlestick(
         x=df_k['日期'], open=df_k['開盤'], high=df_k['最高'], low=df_k['最低'], close=df_k['收盤'],
         name='日K',
@@ -190,29 +196,28 @@ def draw_pro_terminal_chart(df_k, stock_code, stock_name):
         decreasing_line_color='#00CC00', decreasing_fillcolor='#00CC00'
     ), row=1, col=1)
     
+    # 均線
     fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFFF00', width=1), name='5MA'), row=1, col=1)
     fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['12MA'], line=dict(color='#00FF00', width=1), name='12MA'), row=1, col=1)
     fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['24MA'], line=dict(color='#33CCFF', width=1.2), name='24MA'), row=1, col=1)
     fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['72MA'], line=dict(color='#FF66CC', width=1.5), name='72MA'), row=1, col=1)
 
-    # 【第 2 層：成交量 + 5MA 均量線】
+    # 2. 成交量
     vol_colors = ['#FF3333' if c >= o else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
     fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['成交量'], marker_color=vol_colors, name='成交量'), row=2, col=1)
     fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), name='5MA均量'), row=2, col=1)
 
-    # 【第 3 層：威廉指標 W%R】
+    # 3. 威廉指標
     fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['WR'], line=dict(color='#FF9900', width=1.2), name='WR'), row=3, col=1)
-    # 輔助參考線
     for y_val in [-20, -50, -80]:
         fig.add_hline(y=y_val, line=dict(color="#444", width=0.8, dash="dot"), row=3, col=1)
 
-    # 【第 4 層：MACD】
+    # 4. MACD
     osc_colors = ['#FF3333' if v >= 0 else '#00CC00' for v in df_k['OSC']]
     fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['OSC'], marker_color=osc_colors, name='OSC柱狀'), row=4, col=1)
     fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['DIF'], line=dict(color='#FFFF00', width=1), name='DIF'), row=4, col=1)
     fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['MACD'], line=dict(color='#FF3333', width=1), name='MACD'), row=4, col=1)
 
-    # 4 層純黑看盤軟體佈局設定
     fig.update_layout(
         template="plotly_dark",
         plot_bgcolor="#000000",
@@ -223,7 +228,6 @@ def draw_pro_terminal_chart(df_k, stock_code, stock_name):
         margin=dict(l=40, r=40, t=15, b=20)
     )
     
-    # 格線與座標設定
     fig.update_xaxes(type='category', gridcolor="#222222", showgrid=True, tickangle=0)
     fig.update_yaxes(gridcolor="#222222", showgrid=True, side="right")
     
@@ -259,27 +263,29 @@ df_filtered = df_raw[
     (df_raw["隔日沖分點"].isin(selected_brokers))
 ]
 
-if kd_filter and not df_filtered.empty:
-    df_filtered = df_filtered[df_filtered["K(9)"] >= 80]
+if kd_filter and not df_filtered.empty and "K(9)" in df_filtered.columns:
+    df_filtered = df_filtered[pd.to_numeric(df_filtered["K(9)"], errors='coerce') >= 80]
 
 # 頂部統計指標
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("📅 更新日期", update_date)
 c2.metric("🎯 鎖碼短空標的", f"{len(df_filtered)} 檔")
 c3.metric("📊 追蹤隔日沖分點", f"{len(selected_brokers)} 家")
-c4.metric("⚡ 高檔過熱股 (K>80)", f"{len(df_raw[df_raw['K(9)'] >= 80])} 檔")
+c4.metric("⚡ 高檔過熱股 (K>80)", f"{len(df_raw[pd.to_numeric(df_raw['K(9)'], errors='coerce') >= 80])} 檔")
 
 st.markdown("---")
 
-# 主表格
+# 主表格 (安全動態過濾可用欄位)
 st.subheader("📊 盤後隔日沖 × 技術指標綜合分析表")
 if not df_filtered.empty:
-    cols_order = [
+    preferred_cols = [
         "股票代號", "股票名稱", "現價", "5MA", "24MA", "月線乖離率(%)", 
         "K(9)", "D(9)", "均線狀態", "隔日沖分點", "買超張數", 
         "佔成交量比例(%)", "融券變化", "軋空風險"
     ]
-    st.dataframe(df_filtered[cols_order], use_container_width=True)
+    # 只顯示 DataFrame 中實際存在的欄位，避免 KeyError
+    actual_cols = [col for col in preferred_cols if col in df_filtered.columns]
+    st.dataframe(df_filtered[actual_cols], use_container_width=True)
 else:
     st.warning("⚠️ 目前條件下無符合標的，請放寬側邊欄比例門檻或取消過濾條件。")
 
