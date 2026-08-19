@@ -35,7 +35,7 @@ with head_col2:
 with st.expander("⚙️ 點此展開／收合【全市場篩選條件與風控設定】", expanded=False):
     f_col1, f_col2, f_col3, f_col4 = st.columns([1.2, 1.8, 1, 1])
     with f_col1:
-        min_ratio = st.slider("主力合計佔比 (%) 門檻：", min_value=1, max_value=30, value=5, step=1)
+        min_ratio = st.slider("主力合計佔比 (%) 門檻：", min_value=1, max_value=30, value=10, step=1)
     with f_col2:
         selected_brokers = st.multiselect("監控主力分點：", options=TARGET_BROKERS, default=TARGET_BROKERS)
     with f_col3:
@@ -182,16 +182,140 @@ def fetch_kline_data(stock_code, interval="5m"):
             
     return generate_fallback_kline(stock_code_str, base_price=100.0)
 
-# 【全新升級】：全市場自動掃描與隔日沖主力鎖碼分析核心
+# 繪製 4 層專業短空技術線圖 (已確認所有變數完全對齊)
+def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, timeframe_label):
+    last = df_k.iloc[-1]
+    prev_close = df_k["收盤"].iloc[-2] if len(df_k) > 1 else last["收盤"]
+    change = round(float(last["收盤"]) - float(prev_close), 2)
+    change_pct = round((change / float(prev_close)) * 100, 2) if float(prev_close) else 0.0
+    
+    chg_color = "#FF3333" if change >= 0 else "#00CC00"
+    chg_symbol = "↑" if change >= 0 else "↓"
+    chg_text = f"+{change}" if change > 0 else f"{change}"
+    
+    val_5ma = last.get("5MA", "-")
+    val_20ma = last.get("20MA", "-")
+    val_vwap = last.get("VWAP", "-")
+    val_vol = int(last.get("成交量", 0))
+    val_vol5ma = int(last.get("VOL_5MA", 0))
+    val_broker_net = int(last.get("主力買賣超", 0))
+    val_k = last.get("K", 50)
+    val_d = last.get("D", 50)
+    val_j = last.get("J", 50)
+    
+    header_html = f"""
+    <div style="background-color: #000000; padding: 6px 10px; font-family: monospace; border: 1px solid #333; font-size: 13px; margin-bottom: 2px;">
+        <div style="text-align: center; color: #FFFFFF; font-size: 15px; font-weight: bold; margin-bottom: 3px;">
+            {stock_code} {stock_name} 短空決策線圖 [{timeframe_label}]
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; font-size: 12px;">
+            <span style="color: #FFFF00;">{timeframe_label} {last['日期']}</span>
+            <span style="color: #00CC00;">開 <span style="color:#FFF;">{last['開盤']}</span></span>
+            <span style="color: #FF3333;">高 <span style="color:#FFF;">{last['最高']}</span></span>
+            <span style="color: #00CC00;">低 <span style="color:#FFF;">{last['最低']}</span></span>
+            <span style="color: {chg_color}; font-weight:bold;">收 {last['收盤']} {chg_symbol}{chg_text} ({change_pct}%)</span>
+            <span style="color: #FFCC00;">5MA: {val_5ma}</span>
+            <span style="color: #33CCFF;">20MA: {val_20ma}</span>
+            <span style="color: #FF00FF; font-weight:bold;">VWAP: {val_vwap}</span>
+        </div>
+    </div>
+    """
+    st.markdown(header_html, unsafe_allow_html=True)
+    
+    fig = make_subplots(
+        rows=4, cols=1, 
+        shared_xaxes=True, 
+        vertical_spacing=0.02, 
+        row_heights=[0.50, 0.16, 0.16, 0.18],
+        subplot_titles=(
+            "",
+            f"<span style='color:#FF3333; font-size:11px;'>成交量: {val_vol} 張</span> <span style='color:#FFFF00; font-size:11px;'>5日均量: {val_vol5ma}</span>",
+            f"<span style='color:#00E5FF; font-size:11px;'>主力分點買賣超: {val_broker_net} 張 (紅買/綠倒貨)</span>",
+            f"<span style='color:#FFFF00; font-size:11px;'>K: {val_k}</span> <span style='color:#33CCFF; font-size:11px;'>D: {val_d}</span> <span style='color:#FF33FF; font-size:11px; font-weight:bold;'>J: {val_j}</span>"
+        )
+    )
+    
+    # 1. 主圖
+    fig.add_trace(go.Candlestick(
+        x=df_k['日期'], open=df_k['開盤'], high=df_k['最高'], low=df_k['最低'], close=df_k['收盤'],
+        name='K線',
+        increasing_line_color='#FF3333', increasing_fillcolor='#FF3333',
+        decreasing_line_color='#00CC00', decreasing_fillcolor='#00CC00'
+    ), row=1, col=1)
+    
+    if '5MA' in df_k.columns:
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFCC00', width=1.2), name='5MA'), row=1, col=1)
+    if '20MA' in df_k.columns:
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['20MA'], line=dict(color='#33CCFF', width=1.5), name='20MA'), row=1, col=1)
+    if 'VWAP' in df_k.columns:
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VWAP'], line=dict(color='#FF00FF', width=1.8), name='VWAP均價線'), row=1, col=1)
+
+    if isinstance(ah_res, (int, float)):
+        fig.add_hline(
+            y=float(ah_res), 
+            line=dict(color="#FF3333", width=1.2, dash="dot"), 
+            annotation_text=f" 最高壓力(AH): {ah_res} ", 
+            annotation_position="top left",
+            annotation_font=dict(color="#FF6666", size=10),
+            annotation_bgcolor="rgba(0,0,0,0.7)",
+            row=1, col=1
+        )
+    if isinstance(broker_cost, (int, float)):
+        fig.add_hline(
+            y=float(broker_cost), 
+            line=dict(color="#00E5FF", width=1.2, dash="dash"), 
+            annotation_text=f" 主力均價: {broker_cost} ", 
+            annotation_position="top right", 
+            annotation_font=dict(color="#00E5FF", size=10),
+            annotation_bgcolor="rgba(0,0,0,0.7)",
+            row=1, col=1
+        )
+
+    # 2. 成交量
+    vol_colors = ['#FF3333' if float(c) >= float(o) else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
+    fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['成交量'], marker_color=vol_colors, name='成交量'), row=2, col=1)
+    if 'VOL_5MA' in df_k.columns:
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), name='5MA均量'), row=2, col=1)
+
+    # 3. 主力買賣超
+    if '主力買賣超' in df_k.columns:
+        broker_colors = ['#FF3333' if int(v) >= 0 else '#00CC00' for v in df_k['主力買賣超']]
+        fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['主力買賣超'], marker_color=broker_colors, name='主力買賣超'), row=3, col=1)
+
+    # 4. KDJ
+    if 'K' in df_k.columns and 'D' in df_k.columns and 'J' in df_k.columns:
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['K'], line=dict(color='#FFFF00', width=1.2), name='K值'), row=4, col=1)
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['D'], line=dict(color='#33CCFF', width=1.2), name='D值'), row=4, col=1)
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['J'], line=dict(color='#FF33FF', width=1.8), name='J值'), row=4, col=1)
+        fig.add_hline(y=100, line=dict(color="#FF3333", width=0.8, dash="dot"), row=4, col=1)
+        fig.add_hline(y=80, line=dict(color="#888888", width=0.8, dash="dot"), row=4, col=1)
+        fig.add_hline(y=20, line=dict(color="#888888", width=0.8, dash="dot"), row=4, col=1)
+
+    fig.update_layout(
+        template="plotly_dark",
+        plot_bgcolor="#000000",
+        paper_bgcolor="#000000",
+        xaxis_rangeslider_visible=False,
+        showlegend=False,
+        height=780,
+        margin=dict(l=35, r=35, t=10, b=15)
+    )
+    
+    fig.update_xaxes(type='category', gridcolor="#222222", showgrid=True, tickangle=0)
+    fig.update_yaxes(gridcolor="#222222", showgrid=True, side="right")
+    
+    return fig
+
+# 全市場自動掃描核心
 @st.cache_data(ttl=1800)
 def scan_full_market_overnight_radar():
     today_dt = datetime.date.today()
     today_str = today_dt.strftime("%Y-%m-%d")
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    headers = {"User-Agent": "Mozilla/5.0"}
     
     scanned_candidates = []
     
-    # 1. 向 TWSE 證交所 API 抓取全市場當日收盤行情
+    # 向 TWSE 證交所 API 請求
     try:
         url_twse = "https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY_ALL?response=json"
         req = urllib.request.Request(url_twse, headers=headers)
@@ -199,7 +323,6 @@ def scan_full_market_overnight_radar():
             data = json.loads(resp.read().decode('utf-8'))
             if data.get("stat") == "OK" and "data" in data:
                 raw_rows = data["data"]
-                # 掃描條件：4碼普通股、成交量 > 2,000張、當日漲幅 >= 3.5%
                 qualified_stocks = []
                 for row in raw_rows:
                     try:
@@ -207,7 +330,7 @@ def scan_full_market_overnight_radar():
                         name = row[1].strip()
                         if len(code) == 4 and not code.startswith("0"):
                             vol_shares = int(row[2].replace(",", ""))
-                            vol_lots = vol_shares // 1000  # 轉成張數
+                            vol_lots = vol_shares // 1000
                             close_p = float(row[7].replace(",", ""))
                             change_str = row[8].replace(",", "").replace("+", "").replace("X", "").strip()
                             change_p = float(change_str) if change_str else 0.0
@@ -227,10 +350,8 @@ def scan_full_market_overnight_radar():
                     except Exception:
                         continue
                 
-                # 依漲幅與成交量排序，選取前 10 檔最具隔日沖爆發力的強勢標的
                 qualified_stocks = sorted(qualified_stocks, key=lambda x: (x["漲跌幅(%)"], x["成交量"]), reverse=True)[:10]
                 
-                # 分配隔日沖主力鎖碼特徵
                 broker_pool = [
                     [{"分點": "凱基-台北", "比率": 0.165}, {"分點": "美商美林", "比率": 0.082}],
                     [{"分點": "元大-土城永寧", "比率": 0.142}, {"分點": "摩根大通", "比率": 0.075}],
@@ -254,7 +375,6 @@ def scan_full_market_overnight_radar():
     except Exception:
         pass
         
-    # 若在盤後維護時段，平滑使用精選標的池進行全自動動態分析
     if not scanned_candidates:
         fallback_pool = [
             {"股票代號": "2492", "股票名稱": "華新科", "現價": 298.0, "漲跌": 16.0, "漲跌幅(%)": 5.67, "成交量": 21000, "券資比(%)": 16.5, "融券變化": "+120", "主力名單": [{"分點": "凱基-台北", "買超張數": 3850, "佔比(%)": 18.5, "成本折讓": 0.985}, {"分點": "美商美林", "買超張數": 1820, "佔比(%)": 8.7, "成本折讓": 0.988}]},
@@ -267,15 +387,14 @@ def scan_full_market_overnight_radar():
         ]
         scanned_candidates = fallback_pool
 
-    # 綜合運算 CDP 壓力與主力持倉損益
     enhanced_list = []
     for item in scanned_candidates:
         close_price = float(item["現價"])
         high_est = round(close_price * 1.035, 2)
         low_est = round(close_price * 0.975, 2)
-        cdp = round((high_est + low_est + 2 * close_price) / 4.0, 2)
+        cdp = round((high_est + low_est + 2.0 * close_price) / 4.0, 2)
         ah_res = round(cdp + (high_est - low_est), 2)
-        nh_res = round(2 * cdp - low_est, 2)
+        nh_res = round(2.0 * cdp - low_est, 2)
         
         detailed_brokers = []
         total_buy_shares = 0
@@ -484,6 +603,7 @@ with right_side:
 
     if stock_k_df is not None and not stock_k_df.empty:
         display_k_df = stock_k_df.tail(int(k_count)).reset_index(drop=True)
+        # 完全對齊參數呼叫
         fig = draw_pro_short_chart(display_k_df, target_code, target_name, b_cost, ah_val, selected_tf_label)
         st.plotly_chart(fig, use_container_width=True)
     else:
