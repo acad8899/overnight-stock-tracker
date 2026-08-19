@@ -7,8 +7,8 @@ import json
 # 頁面排版設定
 st.set_page_config(page_title="隔日沖主力短空雷達", layout="wide", page_icon="🎯")
 
-st.title("🎯 每日隔日沖主力短空雷達")
-st.caption("即時整合「隔日沖分點鎖碼籌碼」與「KD、5MA/20MA 技術指標」的短空決策系統。")
+st.title("🎯 每日隔日沖主力短空雷達 (含 K 線分析)")
+st.caption("即時整合「隔日沖分點鎖碼籌碼」、「KD、均線指標」與「互動式 K 線圖」的短空決策系統。")
 
 # 知名隔日沖主力分點清單
 TARGET_BROKERS = [
@@ -39,9 +39,9 @@ def calculate_kd(closes, highs, lows, n=9):
         d = (2/3) * d + (1/3) * k
     return round(k, 1), round(d, 1)
 
-# 透過 Python 內建 urllib 抓取技術面（不需安裝任何套件）
+# 抓取技術面與歷史 K 線數據
 @st.cache_data(ttl=1800)
-def get_technical_data(stock_code):
+def get_stock_data(stock_code):
     symbols = [f"{stock_code}.TW", f"{stock_code}.TWO"]
     headers = {"User-Agent": "Mozilla/5.0"}
     
@@ -53,20 +53,34 @@ def get_technical_data(stock_code):
                 data = json.loads(response.read().decode('utf-8'))
                 result = data.get("chart", {}).get("result")
                 if result:
+                    timestamps = result[0].get("timestamp", [])
                     indicators = result[0]["indicators"]["quote"][0]
-                    closes = [c for c in indicators.get("close", []) if c is not None]
-                    highs = [h for h in indicators.get("high", []) if h is not None]
-                    lows = [l for l in indicators.get("low", []) if l is not None]
+                    closes = indicators.get("close", [])
+                    highs = indicators.get("high", [])
+                    lows = indicators.get("low", [])
+                    opens = indicators.get("open", [])
+                    volumes = indicators.get("volume", [])
                     
-                    if len(closes) >= 20:
-                        close = round(closes[-1], 2)
-                        ma5 = round(sum(closes[-5:]) / 5, 2)
-                        ma20 = round(sum(closes[-20:]) / 20, 2)
+                    # 整理成 DataFrame
+                    records = []
+                    for t, o, h, l, c, v in zip(timestamps, opens, highs, lows, closes, volumes):
+                        if None not in (o, h, l, c):
+                            date_str = datetime.datetime.fromtimestamp(t).strftime('%Y-%m-%d')
+                            records.append({"日期": date_str, "開盤": o, "最高": h, "最低": l, "收盤": round(c, 2), "成交量": v})
+                    
+                    df_k = pd.DataFrame(records)
+                    if len(df_k) >= 20:
+                        df_k["5MA"] = df_k["收盤"].rolling(5).mean().round(2)
+                        df_k["20MA"] = df_k["收盤"].rolling(20).mean().round(2)
+                        
+                        close = df_k["收盤"].iloc[-1]
+                        ma5 = df_k["5MA"].iloc[-1]
+                        ma20 = df_k["20MA"].iloc[-1]
                         bias_ma20 = round(((close - ma20) / ma20) * 100, 2)
-                        k_val, d_val = calculate_kd(closes, highs, lows)
+                        k_val, d_val = calculate_kd(df_k["收盤"].tolist(), df_k["最高"].tolist(), df_k["最低"].tolist())
                         
                         status = "多頭排列" if close > ma5 > ma20 else ("破月線" if close < ma20 else "整理")
-                        return {
+                        tech_info = {
                             "現價": close,
                             "5MA": ma5,
                             "20MA": ma20,
@@ -75,16 +89,17 @@ def get_technical_data(stock_code):
                             "D(9)": d_val,
                             "均線狀態": status
                         }
+                        return tech_info, df_k
         except Exception:
             continue
             
-    return {"現價": "-", "5MA": "-", "20MA": "-", "月線乖離率(%)": 0.0, "K(9)": 50.0, "D(9)": 50.0, "均線狀態": "無資料"}
+    default_info = {"現價": "-", "5MA": "-", "20MA": "-", "月線乖離率(%)": 0.0, "K(9)": 50.0, "D(9)": 50.0, "均線狀態": "無資料"}
+    return default_info, pd.DataFrame()
 
 # 盤後資料整合核心
 @st.cache_data(ttl=1800)
 def fetch_overnight_market_data():
     today_str = datetime.date.today().strftime("%Y-%m-%d")
-    
     base_pool = [
         {"股票代號": "2492", "股票名稱": "華新科", "隔日沖分點": "凱基-台北", "買超張數": 3850, "佔成交量比例(%)": 18.5, "融券變化": "+120", "軋空風險": "中"},
         {"股票代號": "4551", "股票名稱": "智伸科", "隔日沖分點": "美商美林", "買超張數": 1200, "佔成交量比例(%)": 12.3, "融券變化": "-45", "軋空風險": "低"},
@@ -94,14 +109,16 @@ def fetch_overnight_market_data():
     ]
     
     enhanced_list = []
+    k_data_dict = {}
     for item in base_pool:
-        tech = get_technical_data(item["股票代號"])
+        tech, df_k = get_stock_data(item["股票代號"])
         enhanced_list.append({**item, **tech})
+        k_data_dict[item["股票代號"]] = df_k
         
-    return pd.DataFrame(enhanced_list), today_str
+    return pd.DataFrame(enhanced_list), k_data_dict, today_str
 
 # 執行抓取
-df_raw, update_date = fetch_overnight_market_data()
+df_raw, k_dict, update_date = fetch_overnight_market_data()
 
 # 資料過濾
 df_filtered = df_raw[
@@ -129,12 +146,30 @@ if not df_filtered.empty:
         "K(9)", "D(9)", "均線狀態", "隔日沖分點", "買超張數", 
         "佔成交量比例(%)", "融券變化", "軋空風險"
     ]
-    st.dataframe(
-        df_filtered[cols_order],
-        use_container_width=True
-    )
+    st.dataframe(df_filtered[cols_order], use_container_width=True)
 else:
     st.warning("⚠️ 目前條件下無符合標的，請放寬側邊欄比例門檻或取消過濾條件。")
+
+st.markdown("---")
+
+# K 線與均線趨勢圖專區
+st.subheader("📈 個股近 3 個月 K 線與均線走勢圖")
+if not df_filtered.empty:
+    stock_options = [f"{r['股票代號']} {r['股票名稱']}" for _, r in df_filtered.iterrows()]
+    selected_stock = st.selectbox("選擇要檢視 K 線與均線走勢的標的：", stock_options)
+    
+    code = selected_stock.split(" ")[0]
+    stock_k_df = k_dict.get(code, pd.DataFrame())
+    
+    if not stock_k_df.empty:
+        chart_data = stock_k_df.set_index("日期")[["收盤", "5MA", "20MA"]]
+        st.line_chart(chart_data)
+        
+        # 顯示最近 5 個交易日明細
+        with st.expander("🔍 檢視近 5 日收盤與均線數據"):
+            st.dataframe(stock_k_df.tail(5), use_container_width=True)
+    else:
+        st.info("暫無此標的的歷史走勢資料。")
 
 st.markdown("---")
 
