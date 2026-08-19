@@ -65,7 +65,7 @@ def get_stock_data(stock_code):
                     
                     records = []
                     for t, o, h, l, c, v in zip(timestamps, opens, highs, lows, closes, volumes):
-                        if None not in (o, h, l, c):
+                        if None not in (o, h, l, c) and c > 0:
                             date_str = datetime.datetime.fromtimestamp(t).strftime('%Y-%m-%d')
                             records.append({
                                 "日期": date_str, 
@@ -73,15 +73,15 @@ def get_stock_data(stock_code):
                                 "最高": round(h, 2), 
                                 "最低": round(l, 2), 
                                 "收盤": round(c, 2), 
-                                "成交量": v if v is not None else 0
+                                "成交量": v if (v is not None) else 0
                             })
                     
                     df_k = pd.DataFrame(records)
-                    if len(df_k) >= 20:
-                        df_k["5MA"] = df_k["收盤"].rolling(5).mean().round(2)
-                        df_k["10MA"] = df_k["收盤"].rolling(10).mean().round(2)
-                        df_k["20MA"] = df_k["收盤"].rolling(20).mean().round(2)
-                        df_k["60MA"] = df_k["收盤"].rolling(60).mean().round(2)
+                    if len(df_k) >= 5:
+                        df_k["5MA"] = df_k["收盤"].rolling(5, min_periods=1).mean().round(2)
+                        df_k["10MA"] = df_k["收盤"].rolling(10, min_periods=1).mean().round(2)
+                        df_k["20MA"] = df_k["收盤"].rolling(20, min_periods=1).mean().round(2)
+                        df_k["60MA"] = df_k["收盤"].rolling(60, min_periods=1).mean().round(2)
                         
                         close = df_k["收盤"].iloc[-1]
                         ma5 = df_k["5MA"].iloc[-1]
@@ -108,7 +108,6 @@ def get_stock_data(stock_code):
 
 # 繪製台股看盤軟體風格的專業 K 線圖 (黑底、紅漲綠跌、成交量分層)
 def draw_pro_candlestick(df_k, stock_title):
-    # 建立雙層子圖 (上層: K線+均線, 下層: 成交量)
     fig = make_subplots(
         rows=2, cols=1, 
         shared_xaxes=True, 
@@ -117,7 +116,7 @@ def draw_pro_candlestick(df_k, stock_title):
         row_heights=[0.7, 0.3]
     )
     
-    # 1. 蠟燭 K 線 (台股習慣：上漲為紅，下跌為綠)
+    # 1. 蠟燭 K 線 (台股紅漲綠跌)
     fig.add_trace(go.Candlestick(
         x=df_k['日期'],
         open=df_k['開盤'],
@@ -131,23 +130,26 @@ def draw_pro_candlestick(df_k, stock_title):
         decreasing_fillcolor='#00CC00'
     ), row=1, col=1)
     
-    # 2. 均線系統 (5MA, 10MA, 20MA, 60MA)
-    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFCC00', width=1.5), name='5MA (黃)'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['10MA'], line=dict(color='#33CCFF', width=1.5), name='10MA (藍)'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['20MA'], line=dict(color='#FF66CC', width=1.5), name='20MA (粉)'), row=1, col=1)
-    if '60MA' in df_k.columns and not df_k['60MA'].isna().all():
+    # 2. 均線系統 (安全讀取)
+    if '5MA' in df_k.columns:
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFCC00', width=1.5), name='5MA (黃)'), row=1, col=1)
+    if '10MA' in df_k.columns:
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['10MA'], line=dict(color='#33CCFF', width=1.5), name='10MA (藍)'), row=1, col=1)
+    if '20MA' in df_k.columns:
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['20MA'], line=dict(color='#FF66CC', width=1.5), name='20MA (粉)'), row=1, col=1)
+    if '60MA' in df_k.columns:
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['60MA'], line=dict(color='#33FF33', width=1.5), name='60MA (綠)'), row=1, col=1)
 
-    # 3. 成交量柱狀圖 (配合漲跌著色)
+    # 3. 成交量柱狀圖
     vol_colors = ['#FF3333' if c >= o else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
     fig.add_trace(go.Bar(
         x=df_k['日期'], 
-        y=df_k['成交量'] / 1000, # 轉為千張/張數
+        y=df_k['成交量'] / 1000,
         marker_color=vol_colors, 
         name='成交量 (張)'
     ), row=2, col=1)
     
-    # 4. 版面黑色看盤軟體風格配置
+    # 4. 版面黑色配置
     fig.update_layout(
         template="plotly_dark",
         plot_bgcolor="#0A0A0A",
@@ -228,7 +230,7 @@ if not df_filtered.empty:
     code = selected_stock.split(" ")[0]
     stock_k_df = k_dict.get(code, pd.DataFrame())
     
-    if not stock_k_df.empty:
+    if not stock_k_df.empty and len(stock_k_df) > 0:
         fig = draw_pro_candlestick(stock_k_df, selected_stock)
         st.plotly_chart(fig, use_container_width=True)
     else:
