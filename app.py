@@ -7,10 +7,10 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # 頁面排版設定
-st.set_page_config(page_title="隔日沖主力短空雷達 (實戰專業版)", layout="wide", page_icon="🎯")
+st.set_page_config(page_title="隔日沖主力短空雷達 (多週期實戰版)", layout="wide", page_icon="🎯")
 
-st.title("🎯 每日隔日沖主力短空雷達 (Pro 實戰版)")
-st.caption("即時整合「隔日沖主力成本」、「關鍵壓力位 (CDP/AH)」、「券資比軋空預警」與「專業 4 層技術線圖」。")
+st.title("🎯 每日隔日沖主力短空雷達 (多週期實戰版)")
+st.caption("即時整合「隔日沖主力成本」、「關鍵壓力位 (CDP/AH)」、「券資比軋空預警」與「多週期自訂 K 線分析」。")
 
 # 知名隔日沖主力分點清單
 TARGET_BROKERS = [
@@ -38,7 +38,7 @@ def calculate_indicators(df):
     highs = df["最高"].tolist()
     lows = df["最低"].tolist()
     
-    # 1. 均線計算
+    # 1. 均線計算 (以當前週期為主)
     df["5MA"] = df["收盤"].rolling(5, min_periods=1).mean().round(2)
     df["12MA"] = df["收盤"].rolling(12, min_periods=1).mean().round(2)
     df["24MA"] = df["收盤"].rolling(24, min_periods=1).mean().round(2)
@@ -84,14 +84,27 @@ def calculate_indicators(df):
     
     return df
 
-# 抓取技術面與歷史 K 線數據並計算 CDP 壓力位
-@st.cache_data(ttl=1800)
-def get_stock_data(stock_code):
+# 抓取多週期 K 線數據函式
+@st.cache_data(ttl=600)
+def fetch_kline_data(stock_code, interval="1d"):
+    # 根據不同週期設定最佳抓取時間跨度
+    range_map = {
+        "1m": "5d",
+        "10m": "1mo", # 透過 5m 重組或直接抓取 15m 區間
+        "30m": "1mo",
+        "60m": "3mo",
+        "1d": "1y"
+    }
+    
+    # 支援的 Yahoo 介面 interval
+    fetch_interval = "5m" if interval == "10m" else interval
+    time_range = range_map.get(interval, "3mo")
+    
     symbols = [f"{stock_code}.TW", f"{stock_code}.TWO"]
     headers = {"User-Agent": "Mozilla/5.0"}
     
     for sym in symbols:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=6mo&interval=1d"
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range={time_range}&interval={fetch_interval}"
         try:
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=5) as response:
@@ -109,7 +122,12 @@ def get_stock_data(stock_code):
                     records = []
                     for t, o, h, l, c, v in zip(timestamps, opens, highs, lows, closes, volumes):
                         if None not in (o, h, l, c) and c > 0:
-                            date_str = datetime.datetime.fromtimestamp(t).strftime('%Y/%m/%d')
+                            # 格式化日期與時間
+                            if interval == "1d":
+                                date_str = datetime.datetime.fromtimestamp(t).strftime('%Y/%m/%d')
+                            else:
+                                date_str = datetime.datetime.fromtimestamp(t).strftime('%m/%d %H:%M')
+                                
                             records.append({
                                 "日期": date_str, 
                                 "開盤": round(o, 2), 
@@ -120,47 +138,69 @@ def get_stock_data(stock_code):
                             })
                     
                     df_k = pd.DataFrame(records)
+                    
+                    # 若為 10分K，將 5m 資料兩兩合併
+                    if interval == "10m" and len(df_k) >= 2:
+                        resampled = []
+                        for i in range(0, len(df_k), 2):
+                            chunk = df_k.iloc[i:i+2]
+                            resampled.append({
+                                "日期": chunk["日期"].iloc[-1],
+                                "開盤": chunk["開盤"].iloc[0],
+                                "最高": chunk["最高"].max(),
+                                "最低": chunk["最低"].min(),
+                                "收盤": chunk["收盤"].iloc[-1],
+                                "成交量": chunk["成交量"].sum()
+                            })
+                        df_k = pd.DataFrame(resampled)
+                        
                     if len(df_k) >= 5:
                         df_k = calculate_indicators(df_k)
-                        last_row = df_k.iloc[-1]
-                        close = last_row["收盤"]
-                        high = last_row["最高"]
-                        low = last_row["最低"]
-                        ma5 = last_row["5MA"] if "5MA" in df_k.columns else close
-                        ma24 = last_row["24MA"] if "24MA" in df_k.columns else close
-                        bias_ma24 = round(((close - ma24) / ma24) * 100, 2) if ma24 else 0.0
-                        
-                        # 計算 CDP 逆勢作業指標 (隔日關鍵多空點與最高壓力 AH)
-                        cdp = round((high + low + 2 * close) / 4, 2)
-                        ah_resistance = round(cdp + (high - low), 2) # 最高壓力位 (AH)
-                        nh_resistance = round(2 * cdp - low, 2)      # 近高壓力位 (NH)
-                        
-                        tech_info = {
-                            "現價": close,
-                            "前高": high,
-                            "5MA": ma5,
-                            "24MA": ma24,
-                            "月線乖離率(%)": bias_ma24,
-                            "CDP多空值": cdp,
-                            "最高壓力(AH)": ah_resistance,
-                            "近高壓力(NH)": nh_resistance,
-                            "K(9)": df_k["K"].iloc[-1] if "K" in df_k.columns else 50.0,
-                            "D(9)": df_k["D"].iloc[-1] if "D" in df_k.columns else 50.0,
-                            "均線狀態": "多頭排列" if close > ma5 > ma24 else ("破月線" if close < ma24 else "整理")
-                        }
-                        return tech_info, df_k
+                        return df_k
         except Exception:
             continue
             
-    default_info = {
+    return pd.DataFrame()
+
+# 抓取技術面基礎日線資料 (供主表格使用)
+@st.cache_data(ttl=1800)
+def get_daily_tech_summary(stock_code):
+    df_k = fetch_kline_data(stock_code, interval="1d")
+    if not df_k.empty and len(df_k) >= 5:
+        last_row = df_k.iloc[-1]
+        close = last_row["收盤"]
+        high = last_row["最高"]
+        low = last_row["最低"]
+        ma5 = last_row.get("5MA", close)
+        ma24 = last_row.get("24MA", close)
+        bias_ma24 = round(((close - ma24) / ma24) * 100, 2) if ma24 else 0.0
+        
+        cdp = round((high + low + 2 * close) / 4, 2)
+        ah_res = round(cdp + (high - low), 2)
+        nh_res = round(2 * cdp - low, 2)
+        
+        return {
+            "現價": close,
+            "前高": high,
+            "5MA": ma5,
+            "24MA": ma24,
+            "月線乖離率(%)": bias_ma24,
+            "CDP多空值": cdp,
+            "最高壓力(AH)": ah_res,
+            "近高壓力(NH)": nh_res,
+            "K(9)": last_row.get("K", 50.0),
+            "D(9)": last_row.get("D", 50.0),
+            "均線狀態": "多頭排列" if close > ma5 > ma24 else ("破月線" if close < ma24 else "整理")
+        }
+        
+    return {
         "現價": "-", "前高": "-", "5MA": "-", "24MA": "-", "月線乖離率(%)": 0.0, 
         "CDP多空值": "-", "最高壓力(AH)": "-", "近高壓力(NH)": "-", 
         "K(9)": 50.0, "D(9)": 50.0, "均線狀態": "無資料"
     }
-    return default_info, pd.DataFrame()
 
-# 繪製 1:1 專業看盤軟體技術線圖 (含主力成本線與 CDP 壓力線)
-def draw_pro_terminal_chart(df_k, stock_code, stock_name, broker_cost, ah_res):
+# 繪製 1:1 專業看盤軟體技術線圖
+def draw_pro_terminal_chart(df_k, stock_code, stock_name, broker_cost, ah_res, timeframe_label):
     last = df_k.iloc[-1]
     prev_close = df_k["收盤"].iloc[-2] if len(df_k) > 1 else last["收盤"]
     change = round(last["收盤"] - prev_close, 2)
@@ -184,10 +224,10 @@ def draw_pro_terminal_chart(df_k, stock_code, stock_name, broker_cost, ah_res):
     header_html = f"""
     <div style="background-color: #000000; padding: 8px 12px; font-family: monospace; border: 1px solid #333; font-size: 13px; margin-bottom: 2px;">
         <div style="text-align: center; color: #FFFFFF; font-size: 15px; font-weight: bold; margin-bottom: 4px;">
-            {stock_code} {stock_name} 歷史走勢圖
+            {stock_code} {stock_name} 歷史走勢圖 [{timeframe_label}]
         </div>
         <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
-            <span style="color: #FFFF00;">日線 {last['日期']}</span>
+            <span style="color: #FFFF00;">{timeframe_label} {last['日期']}</span>
             <span style="color: #00CC00;">開 <span style="color:#FFF;">{last['開盤']}</span></span>
             <span style="color: #FF3333;">高 <span style="color:#FFF;">{last['最高']}</span></span>
             <span style="color: #00CC00;">低 <span style="color:#FFF;">{last['最低']}</span></span>
@@ -218,7 +258,7 @@ def draw_pro_terminal_chart(df_k, stock_code, stock_name, broker_cost, ah_res):
     # 1. K 線
     fig.add_trace(go.Candlestick(
         x=df_k['日期'], open=df_k['開盤'], high=df_k['最高'], low=df_k['最低'], close=df_k['收盤'],
-        name='日K',
+        name='K線',
         increasing_line_color='#FF3333', increasing_fillcolor='#FF3333',
         decreasing_line_color='#00CC00', decreasing_fillcolor='#00CC00'
     ), row=1, col=1)
@@ -277,7 +317,7 @@ def draw_pro_terminal_chart(df_k, stock_code, stock_name, broker_cost, ah_res):
     
     return fig
 
-# 盤後資料整合核心 (加入主力成本推算與券資比計算)
+# 盤後資料整合核心
 @st.cache_data(ttl=1800)
 def fetch_overnight_market_data():
     today_str = datetime.date.today().strftime("%Y-%m-%d")
@@ -290,18 +330,15 @@ def fetch_overnight_market_data():
     ]
     
     enhanced_list = []
-    k_data_dict = {}
     for item in base_pool:
-        tech, df_k = get_stock_data(item["股票代號"])
+        tech = get_daily_tech_summary(item["股票代號"])
         
-        # 1. 自動推算隔日沖主力買進成本 (大戶多在漲停前 1~2 檔敲進，約為昨收或前高下緣)
         close_price = tech.get("現價")
         if isinstance(close_price, (int, float)):
-            est_cost = round(close_price * 0.985, 2) # 預估平均成本價
+            est_cost = round(close_price * 0.985, 2)
         else:
             est_cost = "-"
             
-        # 2. 智慧評估軋空風險等級
         short_ratio = item.get("券資比(%)", 0)
         if short_ratio >= 30:
             risk_level = "⚠️ 嚴禁摸頂 (極高軋空)"
@@ -321,12 +358,11 @@ def fetch_overnight_market_data():
             "實戰指引": action_guide
         }
         enhanced_list.append(item_full)
-        k_data_dict[item["股票代號"]] = df_k
         
-    return pd.DataFrame(enhanced_list), k_data_dict, today_str
+    return pd.DataFrame(enhanced_list), today_str
 
 # 執行抓取
-df_raw, k_dict, update_date = fetch_overnight_market_data()
+df_raw, update_date = fetch_overnight_market_data()
 
 # 資料過濾
 df_filtered = df_raw[
@@ -349,7 +385,7 @@ c4.metric("⚡ 高檔過熱股 (K>80)", f"{len(df_raw[pd.to_numeric(df_raw['K(9)
 
 st.markdown("---")
 
-# 主表格 (新增主力成本、CDP壓力與券資比風控欄位)
+# 主表格
 st.subheader("📊 盤後隔日沖 × 主力成本 × 軋空風控決策表")
 if not df_filtered.empty:
     preferred_cols = [
@@ -357,40 +393,66 @@ if not df_filtered.empty:
         "券資比(%)", "軋空風險評級", "隔日沖分點", "買超張數", "佔成交量比例(%)", "實戰指引"
     ]
     actual_cols = [col for col in preferred_cols if col in df_filtered.columns]
-    
-    # 標記高風險行
     st.dataframe(df_filtered[actual_cols], use_container_width=True)
 else:
     st.warning("⚠️ 目前條件下無符合標的，請放寬側邊欄比例門檻或取消過濾條件。")
 
 st.markdown("---")
 
-# 專業看盤 K 線圖專區
-st.subheader("🖥️ 專業技術線圖 (含主力成本線與最高壓力位 AH)")
+# 專業看盤 K 線圖專區 (支援彈性多週期與 K 棒數量自訂)
+st.subheader("🖥️ 專業技術線圖 (自訂週期與 K 棒數量)")
+
 if not df_filtered.empty:
-    stock_options = [f"{r['股票代號']} {r['股票名稱']}" for _, r in df_filtered.iterrows()]
-    selected_stock = st.selectbox("請選擇要調閱走勢圖的股票：", stock_options)
+    col_sel1, col_sel2, col_sel3 = st.columns([2, 1, 1])
     
+    with col_sel1:
+        stock_options = [f"{r['股票代號']} {r['股票名稱']}" for _, r in df_filtered.iterrows()]
+        selected_stock = st.selectbox("請選擇要調閱走勢圖的股票：", stock_options)
+    
+    with col_sel2:
+        # 1. 彈性選擇分線、10分、30分、60分、日線
+        timeframe_options = {
+            "日線": "1d",
+            "60分K": "60m",
+            "30分K": "30m",
+            "10分K": "10m",
+            "1分K (分線)": "1m"
+        }
+        selected_tf_label = st.selectbox("週期選擇：", list(timeframe_options.keys()), index=0)
+        selected_interval = timeframe_options[selected_tf_label]
+        
+    with col_sel3:
+        # 2. K 棒數量預設 60 根，可自行輸入修改
+        k_count = st.number_input("顯示 K 棒數量 (根)：", min_value=10, max_value=300, value=60, step=10)
+
     code, name = selected_stock.split(" ")
-    stock_k_df = k_dict.get(code, pd.DataFrame())
     
-    # 取得該標的之主力成本與壓力值
+    # 抓取該週期資料
+    with st.spinner(f"正在載入 {name} 的 {selected_tf_label} 數據..."):
+        stock_k_df = fetch_kline_data(code, interval=selected_interval)
+    
+    # 取得該標的主力成本與壓力
     selected_row = df_filtered[df_filtered["股票代號"] == code].iloc[0]
     b_cost = selected_row.get("主力預估成本")
     ah_val = selected_row.get("最高壓力(AH)")
     
     if not stock_k_df.empty and len(stock_k_df) > 0:
-        fig = draw_pro_terminal_chart(stock_k_df, code, name, b_cost, ah_val)
+        # 依使用者設定擷取最後 N 根 K 棒
+        display_k_df = stock_k_df.tail(int(k_count)).reset_index(drop=True)
+        fig = draw_pro_terminal_chart(display_k_df, code, name, b_cost, ah_val, selected_tf_label)
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("暫無此標的的歷史走勢資料。")
+        st.info("暫無此標的的走勢資料，可能非交易時段或該週期暫無成交數據。")
 
 st.markdown("---")
 
 # 短空操作 SOP 實戰防守心法
 st.subheader("💡 隔日早盤短空 SOP 紀律提醒")
 st.info("""
-1. **主力成本倒貨點**：若隔日早盤開高且超過「主力預估成本 +3%」以上，隔日沖大戶獲利了結倒貨意願最強。
+1. **週期搭配口訣**：
+   * **日線**：看大趨勢、主力成本與月線乖離率（找超買與壓力）。
+   * **30分/60分K**：觀察前波高點或盤整平台是否假突破。
+   * **1分/10分K**：早盤 09:00~09:15 抓第一根爆量長黑摜破開盤價的**精確進場空點**。
 2. **最高壓力 (AH) 防守**：開盤若往上衝撞 **最高壓力位 (AH)** 遇阻收長上影線黑 K，跌破開盤價即是高勝率空點。
 3. **券資比 > 30% 嚴禁放空**：標註「⚠️ 嚴禁摸頂 (極高軋空)」之標的，大戶常趁空單套牢連續鎖漲停軋空，切勿逆勢摸頂！
 """)
