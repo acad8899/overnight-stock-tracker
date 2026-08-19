@@ -7,10 +7,10 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # 頁面排版設定
-st.set_page_config(page_title="隔日沖主力短空雷達 (實戰短空指標版)", layout="wide", page_icon="🎯")
+st.set_page_config(page_title="隔日沖主力短空雷達 (經典看盤雙欄版)", layout="wide", page_icon="🎯")
 
-st.title("🎯 每日隔日沖主力短空雷達 (實戰短空指標版)")
-st.caption("專為短空當沖設計：整合「VWAP 均價線」、「KDJ 敏銳反轉指標」、「主力買賣超」與「爆量出貨監控」。")
+st.title("🎯 每日隔日沖主力短空雷達 (經典看盤雙欄版)")
+st.caption("專為短空當沖設計：左側鍵盤/滑鼠快速選股清單 × 右側 4 層實戰 K 線圖（VWAP + KDJ + 主力籌碼）。")
 
 # 知名隔日沖主力分點清單
 TARGET_BROKERS = [
@@ -22,9 +22,6 @@ TARGET_BROKERS = [
     "統一-敦南",
     "摩根大通"
 ]
-
-if "selected_stock_code" not in st.session_state:
-    st.session_state["selected_stock_code"] = "2492"
 
 # 側邊欄：篩選條件
 st.sidebar.header("🔍 篩選與風控設定")
@@ -47,23 +44,23 @@ def calculate_pro_short_indicators(df):
     lows = df["最低"].tolist()
     volumes = df["成交量"].tolist()
     
-    # 1. 均線系統
+    # 均線系統
     df["5MA"] = df["收盤"].rolling(5, min_periods=1).mean().round(2)
     df["20MA"] = df["收盤"].rolling(20, min_periods=1).mean().round(2)
     df["VOL_5MA"] = df["成交量"].rolling(5, min_periods=1).mean().round(0)
 
-    # 2. VWAP (成交量加權平均價)
+    # VWAP
     typical_price = (df["最高"] + df["最低"] + df["收盤"]) / 3.0
     cum_vol = df["成交量"].cumsum()
     cum_tp_vol = (typical_price * df["成交量"]).cumsum()
     df["VWAP"] = (cum_tp_vol / cum_vol.replace(0, 1)).round(2)
 
-    # 3. 隔日沖主力買賣超模擬/推估
+    # 隔日沖主力買賣超模擬
     df["主力買賣超"] = [int(v * 0.15 * (1 if c >= o else -0.85)) for v, c, o in zip(volumes, df["收盤"], df["開盤"])]
 
-    # 4. KDJ 敏銳擺動指標 (9, 3, 3) 含 J 值 (J = 3K - 2D)
+    # KDJ (9, 3, 3)
     k, d = 50.0, 50.0
-    k_list, d_list, j_list = [], [], []
+    k_list, d_list, j_list = [], []
     for i in range(len(df)):
         if i < 8:
             k_list.append(50.0)
@@ -166,7 +163,12 @@ def get_daily_tech_summary(stock_code):
     df_k = fetch_kline_data(stock_code, interval="1d")
     if not df_k.empty and len(df_k) >= 5:
         last_row = df_k.iloc[-1]
+        prev_row = df_k.iloc[-2] if len(df_k) > 1 else last_row
         close = last_row["收盤"]
+        prev_close = prev_row["收盤"]
+        change = round(close - prev_close, 2)
+        change_pct = round((change / prev_close) * 100, 2) if prev_close else 0.0
+        
         high = last_row["最高"]
         low = last_row["最低"]
         ma5 = last_row.get("5MA", close)
@@ -179,6 +181,8 @@ def get_daily_tech_summary(stock_code):
         
         return {
             "現價": close,
+            "漲跌": change,
+            "漲跌幅(%)": change_pct,
             "前高": high,
             "5MA": ma5,
             "20MA": ma20,
@@ -193,8 +197,8 @@ def get_daily_tech_summary(stock_code):
         }
         
     return {
-        "現價": "-", "前高": "-", "5MA": "-", "20MA": "-", "月線乖離率(%)": 0.0, 
-        "CDP多空值": "-", "最高壓力(AH)": "-", "近高壓力(NH)": "-", 
+        "現價": "-", "漲跌": 0.0, "漲跌幅(%)": 0.0, "前高": "-", "5MA": "-", "20MA": "-", 
+        "月線乖離率(%)": 0.0, "CDP多空值": "-", "最高壓力(AH)": "-", "近高壓力(NH)": "-", 
         "K(9)": 50.0, "D(9)": 50.0, "J(9)": 50.0, "均線狀態": "無資料"
     }
 
@@ -220,11 +224,11 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
     val_j = last.get("J", 50)
     
     header_html = f"""
-    <div style="background-color: #000000; padding: 8px 12px; font-family: monospace; border: 1px solid #333; font-size: 13px; margin-bottom: 2px;">
-        <div style="text-align: center; color: #FFFFFF; font-size: 15px; font-weight: bold; margin-bottom: 4px;">
+    <div style="background-color: #000000; padding: 6px 10px; font-family: monospace; border: 1px solid #333; font-size: 13px; margin-bottom: 2px;">
+        <div style="text-align: center; color: #FFFFFF; font-size: 14px; font-weight: bold; margin-bottom: 3px;">
             {stock_code} {stock_name} 短空決策線圖 [{timeframe_label}]
         </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; font-size: 12px;">
             <span style="color: #FFFF00;">{timeframe_label} {last['日期']}</span>
             <span style="color: #00CC00;">開 <span style="color:#FFF;">{last['開盤']}</span></span>
             <span style="color: #FF3333;">高 <span style="color:#FFF;">{last['最高']}</span></span>
@@ -232,13 +236,12 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
             <span style="color: {chg_color}; font-weight:bold;">收 {last['收盤']} {chg_symbol}{chg_text} ({change_pct}%)</span>
             <span style="color: #FFCC00;">5MA: {val_5ma}</span>
             <span style="color: #33CCFF;">20MA: {val_20ma}</span>
-            <span style="color: #FF00FF; font-weight:bold;">VWAP(均價): {val_vwap}</span>
+            <span style="color: #FF00FF; font-weight:bold;">VWAP: {val_vwap}</span>
         </div>
     </div>
     """
     st.markdown(header_html, unsafe_allow_html=True)
     
-    # 建立 4 層短空核心子圖
     fig = make_subplots(
         rows=4, cols=1, 
         shared_xaxes=True, 
@@ -246,13 +249,13 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
         row_heights=[0.50, 0.16, 0.16, 0.18],
         subplot_titles=(
             "",
-            f"<span style='color:#FF3333; font-size:12px;'>成交量: {val_vol} 張</span> <span style='color:#FFFF00; font-size:12px;'>5日均量: {val_vol5ma}</span>",
-            f"<span style='color:#00E5FF; font-size:12px;'>主力分點買賣超: {val_broker_net} 張 (紅買/綠倒貨)</span>",
-            f"<span style='color:#FFFF00; font-size:12px;'>K: {val_k}</span> <span style='color:#33CCFF; font-size:12px;'>D: {val_d}</span> <span style='color:#FF33FF; font-size:12px; font-weight:bold;'>J(敏銳): {val_j}</span>"
+            f"<span style='color:#FF3333; font-size:11px;'>成交量: {val_vol} 張</span> <span style='color:#FFFF00; font-size:11px;'>5日均量: {val_vol5ma}</span>",
+            f"<span style='color:#00E5FF; font-size:11px;'>主力分點買賣超: {val_broker_net} 張 (紅買/綠倒貨)</span>",
+            f"<span style='color:#FFFF00; font-size:11px;'>K: {val_k}</span> <span style='color:#33CCFF; font-size:11px;'>D: {val_d}</span> <span style='color:#FF33FF; font-size:11px; font-weight:bold;'>J: {val_j}</span>"
         )
     )
     
-    # 【第一層：主圖 K 線 + 5MA + 20MA + VWAP 均價線】
+    # 1. 主圖
     fig.add_trace(go.Candlestick(
         x=df_k['日期'], open=df_k['開盤'], high=df_k['最高'], low=df_k['最低'], close=df_k['收盤'],
         name='K線',
@@ -265,16 +268,15 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
     if '20MA' in df_k.columns:
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['20MA'], line=dict(color='#33CCFF', width=1.5), name='20MA'), row=1, col=1)
     if 'VWAP' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VWAP'], line=dict(color='#FF00FF', width=1.8, dash="solid"), name='VWAP均價線'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VWAP'], line=dict(color='#FF00FF', width=1.8), name='VWAP均價線'), row=1, col=1)
 
-    # 標註最高壓力位 (左上) 與 主力成本線 (右上)
     if isinstance(ah_res, (int, float)):
         fig.add_hline(
             y=ah_res, 
             line=dict(color="#FF3333", width=1.2, dash="dot"), 
             annotation_text=f" 最高壓力(AH): {ah_res} ", 
             annotation_position="top left",
-            annotation_font=dict(color="#FF6666", size=11),
+            annotation_font=dict(color="#FF6666", size=10),
             annotation_bgcolor="rgba(0,0,0,0.7)",
             row=1, col=1
         )
@@ -284,28 +286,27 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
             line=dict(color="#00E5FF", width=1.2, dash="dash"), 
             annotation_text=f" 主力均價: {broker_cost} ", 
             annotation_position="top right", 
-            annotation_font=dict(color="#00E5FF", size=11),
+            annotation_font=dict(color="#00E5FF", size=10),
             annotation_bgcolor="rgba(0,0,0,0.7)",
             row=1, col=1
         )
 
-    # 【第二層：成交量 + 5MA 均量線】
+    # 2. 成交量
     vol_colors = ['#FF3333' if c >= o else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
     fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['成交量'], marker_color=vol_colors, name='成交量'), row=2, col=1)
     if 'VOL_5MA' in df_k.columns:
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), name='5MA均量'), row=2, col=1)
 
-    # 【第三層：主力買賣超 (紅買綠倒貨)】
+    # 3. 主力買賣超
     if '主力買賣超' in df_k.columns:
         broker_colors = ['#FF3333' if v >= 0 else '#00CC00' for v in df_k['主力買賣超']]
         fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['主力買賣超'], marker_color=broker_colors, name='主力買賣超'), row=3, col=1)
 
-    # 【第四層：KDJ 敏銳指標 (K 黃 / D 藍 / J 紫)】
+    # 4. KDJ
     if 'K' in df_k.columns and 'D' in df_k.columns and 'J' in df_k.columns:
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['K'], line=dict(color='#FFFF00', width=1.2), name='K值'), row=4, col=1)
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['D'], line=dict(color='#33CCFF', width=1.2), name='D值'), row=4, col=1)
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['J'], line=dict(color='#FF33FF', width=1.8), name='J值 (敏銳)'), row=4, col=1)
-        # 超買超賣參考線 (J > 100 極度超買, J < 0 超賣)
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['J'], line=dict(color='#FF33FF', width=1.8), name='J值'), row=4, col=1)
         fig.add_hline(y=100, line=dict(color="#FF3333", width=0.8, dash="dot"), row=4, col=1)
         fig.add_hline(y=80, line=dict(color="#888888", width=0.8, dash="dot"), row=4, col=1)
         fig.add_hline(y=20, line=dict(color="#888888", width=0.8, dash="dot"), row=4, col=1)
@@ -316,8 +317,8 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
         paper_bgcolor="#000000",
         xaxis_rangeslider_visible=False,
         showlegend=False,
-        height=820,
-        margin=dict(l=40, r=40, t=15, b=20)
+        height=780,
+        margin=dict(l=35, r=35, t=10, b=15)
     )
     
     fig.update_xaxes(type='category', gridcolor="#222222", showgrid=True, tickangle=0)
@@ -330,7 +331,6 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
 def crawl_real_twse_overnight_data():
     today_dt = datetime.date.today()
     today_str = today_dt.strftime("%Y-%m-%d")
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     
     real_candidates = [
         {
@@ -474,123 +474,143 @@ c4.metric("⚡ 高檔過熱股 (K>80)", f"{len(df_raw[pd.to_numeric(df_raw['K(9)
 st.markdown("---")
 
 # 主表格
-st.subheader("📊 盤後隔日沖 × 主力成本 × 軋空風控決策表 (可直接點擊表格選取股票)")
+st.subheader("📊 盤後隔日沖 × 主力成本 × 軋空風控決策表")
 if not df_filtered.empty:
     preferred_cols = [
         "股票代號", "股票名稱", "現價", "主力加權成本", "最高壓力(AH)", "近高壓力(NH)",
         "券資比(%)", "軋空風險評級", "主力合計買超", "主力合計佔比(%)", "隔日沖分點清單", "實戰指引"
     ]
     actual_cols = [col for col in preferred_cols if col in df_filtered.columns]
-    
-    event = st.dataframe(
-        df_filtered[actual_cols], 
-        use_container_width=True,
-        on_select="rerun",
-        selection_mode="single-row"
-    )
-    
-    if event and "rows" in event.selection and len(event.selection["rows"]) > 0:
-        selected_index = event.selection["rows"][0]
-        st.session_state["selected_stock_code"] = str(df_filtered.iloc[selected_index]["股票代號"])
+    st.dataframe(df_filtered[actual_cols], use_container_width=True)
 else:
     st.warning("⚠️ 目前條件下無符合標的，請放寬側邊欄比例門檻或取消過濾條件。")
 
 st.markdown("---")
 
-# 專業看盤 K 線圖專區 (短空實戰專用版)
-st.subheader("🖥️ 專業技術線圖 (VWAP + KDJ 敏銳短空專用版)")
+# 【核心雙欄佈局】：左側自選報價切換清單 + 右側技術線圖與主力損益
+st.subheader("🖥️ 操盤工作台 (左側極速清單 × 右側專業圖表)")
 
 if not df_filtered.empty:
-    st.markdown("**⚡ 標的極速切換鍵：**")
-    btn_cols = st.columns(len(df_filtered))
-    for idx, (_, r) in enumerate(df_filtered.iterrows()):
-        code_str = str(r['股票代號'])
-        name_str = r['股票名稱']
-        is_active = (st.session_state["selected_stock_code"] == code_str)
-        btn_label = f"👉 {code_str} {name_str}" if is_active else f"{code_str} {name_str}"
+    # 建立左右 1:3 雙欄
+    left_side, right_side = st.columns([1.1, 3.2], gap="medium")
+
+    # 【左欄：支援滑鼠點選與鍵盤 ↑ / ↓ 快速瀏覽清單】
+    with left_side:
+        st.markdown("### 📋 自選短空清單")
+        st.caption("💡 點選清單後可用鍵盤 **↑ / ↓ 鍵** 快速切換")
         
-        if btn_cols[idx].button(btn_label, key=f"quick_btn_{code_str}", use_container_width=True):
-            st.session_state["selected_stock_code"] = code_str
-            st.rerun()
+        # 組合股票清單項目格式：例如 "2492 華新科 (298.0 | +5.67%)"
+        stock_list_options = []
+        for _, r in df_filtered.iterrows():
+            c_sym = "+" if r.get('漲跌', 0) > 0 else ""
+            opt_str = f"{r['股票代號']} {r['股票名稱']}  ({r['現價']} | {c_sym}{r.get('漲跌幅(%)', 0)}%)"
+            stock_list_options.append(opt_str)
 
-    if st.session_state["selected_stock_code"] not in df_filtered["股票代號"].values:
-        st.session_state["selected_stock_code"] = str(df_filtered.iloc[0]["股票代號"])
+        # 找出當前選取項目的 index
+        current_code = st.session_state.get("selected_stock_code", str(df_filtered.iloc[0]["股票代號"]))
+        current_idx = 0
+        for i, opt in enumerate(stock_list_options):
+            if opt.startswith(current_code):
+                current_idx = i
+                break
 
-    target_code = st.session_state["selected_stock_code"]
-    target_row = df_filtered[df_filtered["股票代號"] == target_code].iloc[0]
-    target_name = target_row["股票名稱"]
-    b_cost = target_row.get("主力加權成本")
-    ah_val = target_row.get("最高壓力(AH)")
-    broker_list = target_row.get("各分點詳細清單", [])
-
-    col_c1, col_c2 = st.columns([1, 1])
-    with col_c1:
-        timeframe_options = {
-            "日線": "1d",
-            "60分K": "60m",
-            "30分K": "30m",
-            "10分K": "10m",
-            "5分K (主力出手關鍵)": "5m",
-            "1分K (極短線分線)": "1m"
-        }
-        selected_tf_label = st.selectbox("週期選擇：", list(timeframe_options.keys()), index=4) # 預設 5分K
-        selected_interval = timeframe_options[selected_tf_label]
+        # 原生 Radio 清單：支援滑鼠直接點選或鍵盤上下鍵秒切換
+        selected_option = st.radio(
+            "請選擇或以鍵盤上下鍵切換股票：",
+            options=stock_list_options,
+            index=current_idx,
+            label_visibility="collapsed",
+            key="stock_radio_selector"
+        )
         
-    with col_c2:
-        k_count = st.number_input("顯示 K 棒數量 (根)：", min_value=10, max_value=300, value=60, step=10)
+        # 解析選中的股票代號
+        target_code = selected_option.split(" ")[0]
+        st.session_state["selected_stock_code"] = target_code
 
-    with st.spinner(f"正在載入 {target_name}({target_code}) 的 {selected_tf_label} 數據..."):
-        stock_k_df = fetch_kline_data(target_code, interval=selected_interval)
+        # 左側輔助資訊：選中標的之主力簡評卡
+        target_row = df_filtered[df_filtered["股票代號"] == target_code].iloc[0]
+        st.markdown("---")
+        st.markdown(f"**📌 {target_row['股票名稱']} 快速摘要**")
+        st.markdown(f"- **現價**：`{target_row['現價']} 元`")
+        st.markdown(f"- **主力均價**：`{target_row['主力加權成本']} 元`")
+        st.markdown(f"- **最高壓力 (AH)**：`{target_row['最高壓力(AH)']} 元`")
+        st.markdown(f"- **券資比**：`{target_row['券資比(%)']}%`")
+        st.markdown(f"- **風控評級**：{target_row['軋空風險評級']}")
 
-    if not stock_k_df.empty and len(stock_k_df) > 0:
-        display_k_df = stock_k_df.tail(int(k_count)).reset_index(drop=True)
-        fig = draw_pro_short_chart(display_k_df, target_code, target_name, b_cost, ah_val, selected_tf_label)
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("暫無此標的的走勢資料，可能非交易時段或該週期暫無成交數據。")
+    # 【右欄：多週期 K 線圖與分點損益儀表板】
+    with right_side:
+        target_name = target_row["股票名稱"]
+        b_cost = target_row.get("主力加權成本")
+        ah_val = target_row.get("最高壓力(AH)")
+        broker_list = target_row.get("各分點詳細清單", [])
 
-    st.markdown("---")
+        # 右側頂部控制列 (週期與根數)
+        c_tf1, c_tf2 = st.columns([1, 1])
+        with c_tf1:
+            timeframe_options = {
+                "5分K (主力出手關鍵)": "5m",
+                "1分K (極短線分線)": "1m",
+                "10分K": "10m",
+                "30分K": "30m",
+                "60分K": "60m",
+                "日線": "1d"
+            }
+            selected_tf_label = st.selectbox("週期切換：", list(timeframe_options.keys()), index=0)
+            selected_interval = timeframe_options[selected_tf_label]
+        with c_tf2:
+            k_count = st.number_input("K 棒根數：", min_value=10, max_value=300, value=60, step=10)
 
-    # 緊湊型主力分點持倉損益看板
-    st.subheader(f"🏢 【{target_name} ({target_code})】各大主力分點持倉與損益明細")
-    
-    p_tot_wan = target_row['主力合計獲利(萬)']
-    p_tot_rate = target_row['主力合計報酬率(%)']
-    p_color_hex = "#FF4444" if p_tot_rate >= 0 else "#00CC66"
-    p_sign = "+" if p_tot_rate > 0 else ""
-    
-    summary_card_html = f"""
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px;">
-        <div style="background:#1E1E1E; padding:12px; border-radius:8px; border-left:4px solid #3399FF;">
-            <div style="color:#888; font-size:12px; margin-bottom:4px;">📦 主力合計買超</div>
-            <div style="color:#FFF; font-size:18px; font-weight:bold;">{target_row['主力合計買超']:,} 張 <span style="font-size:12px; color:#3399FF;">(佔{target_row['主力合計佔比(%)']}%)</span></div>
-        </div>
-        <div style="background:#1E1E1E; padding:12px; border-radius:8px; border-left:4px solid #00E5FF;">
-            <div style="color:#888; font-size:12px; margin-bottom:4px;">🎯 主力加權均價</div>
-            <div style="color:#FFF; font-size:18px; font-weight:bold;">{target_row['主力加權成本']} 元</div>
-        </div>
-        <div style="background:#1E1E1E; padding:12px; border-radius:8px; border-left:4px solid {p_color_hex};">
-            <div style="color:#888; font-size:12px; margin-bottom:4px;">💰 全體主力帳面損益</div>
-            <div style="color:{p_color_hex}; font-size:18px; font-weight:bold;">{p_sign}{p_tot_wan:,} 萬元 <span style="font-size:12px;">({p_sign}{p_tot_rate}%)</span></div>
-        </div>
-        <div style="background:#1E1E1E; padding:12px; border-radius:8px; border-left:4px solid #FFCC00;">
-            <div style="color:#888; font-size:12px; margin-bottom:4px;">🔥 鎖碼主力分點數</div>
-            <div style="color:#FFCC00; font-size:18px; font-weight:bold;">共 {len(broker_list)} 家分點鎖碼</div>
-        </div>
-    </div>
-    """
-    st.markdown(summary_card_html, unsafe_allow_html=True)
-    
-    st.markdown("**📋 各大隔日沖分點進出明細表：**")
-    if broker_list:
-        df_brokers = pd.DataFrame(broker_list)
-        df_brokers["買超張數"] = df_brokers["買超張數"].apply(lambda x: f"{x:,} 張")
-        df_brokers["佔比(%)"] = df_brokers["佔比(%)"].apply(lambda x: f"{x}%")
-        df_brokers["預估成本"] = df_brokers["預估成本"].apply(lambda x: f"{x} 元")
-        df_brokers["預估獲利(萬)"] = df_brokers["預估獲利(萬)"].apply(lambda x: f"{x:+,} 萬")
-        df_brokers["報酬率(%)"] = df_brokers["報酬率(%)"].apply(lambda x: f"{x:+}%")
+        # 繪製 K 線圖
+        with st.spinner(f"正在載入 {target_name}({target_code}) 數據..."):
+            stock_k_df = fetch_kline_data(target_code, interval=selected_interval)
+
+        if not stock_k_df.empty and len(stock_k_df) > 0:
+            display_k_df = stock_k_df.tail(int(k_count)).reset_index(drop=True)
+            fig = draw_pro_short_chart(display_k_df, target_code, target_name, b_cost, ah_val, selected_tf_label)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("暫無此標的的走勢資料。")
+
+        st.markdown("---")
+
+        # 緊湊型主力分點持倉損益看板
+        st.markdown(f"#### 🏢 【{target_name} ({target_code})】各大主力分點持倉與損益明細")
         
-        st.dataframe(df_brokers, use_container_width=True, hide_index=True)
+        p_tot_wan = target_row['主力合計獲利(萬)']
+        p_tot_rate = target_row['主力合計報酬率(%)']
+        p_color_hex = "#FF4444" if p_tot_rate >= 0 else "#00CC66"
+        p_sign = "+" if p_tot_rate > 0 else ""
+        
+        summary_card_html = f"""
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px;">
+            <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #3399FF;">
+                <div style="color:#888; font-size:11px; margin-bottom:2px;">📦 主力合計買超</div>
+                <div style="color:#FFF; font-size:15px; font-weight:bold;">{target_row['主力合計買超']:,} 張</div>
+            </div>
+            <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #00E5FF;">
+                <div style="color:#888; font-size:11px; margin-bottom:2px;">🎯 主力加權均價</div>
+                <div style="color:#FFF; font-size:15px; font-weight:bold;">{target_row['主力加權成本']} 元</div>
+            </div>
+            <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid {p_color_hex};">
+                <div style="color:#888; font-size:11px; margin-bottom:2px;">💰 主力帳面損益</div>
+                <div style="color:{p_color_hex}; font-size:15px; font-weight:bold;">{p_sign}{p_tot_wan:,} 萬 ({p_sign}{p_tot_rate}%)</div>
+            </div>
+            <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #FFCC00;">
+                <div style="color:#888; font-size:11px; margin-bottom:2px;">🔥 鎖碼分點數</div>
+                <div style="color:#FFCC00; font-size:15px; font-weight:bold;">{len(broker_list)} 家分點</div>
+            </div>
+        </div>
+        """
+        st.markdown(summary_card_html, unsafe_allow_html=True)
+        
+        if broker_list:
+            df_brokers = pd.DataFrame(broker_list)
+            df_brokers["買超張數"] = df_brokers["買超張數"].apply(lambda x: f"{x:,} 張")
+            df_brokers["佔比(%)"] = df_brokers["佔比(%)"].apply(lambda x: f"{x}%")
+            df_brokers["預估成本"] = df_brokers["預估成本"].apply(lambda x: f"{x} 元")
+            df_brokers["預估獲利(萬)"] = df_brokers["預估獲利(萬)"].apply(lambda x: f"{x:+,} 萬")
+            df_brokers["報酬率(%)"] = df_brokers["報酬率(%)"].apply(lambda x: f"{x:+}%")
+            st.dataframe(df_brokers, use_container_width=True, hide_index=True)
 
 st.markdown("---")
 
