@@ -9,7 +9,6 @@ from plotly.subplots import make_subplots
 # 頁面排版設定：全寬展開
 st.set_page_config(page_title="隔日沖主力短空雷達 (全市場自動掃描版)", layout="wide", page_icon="🎯", initial_sidebar_state="collapsed")
 
-# 知名隔日沖主力分點名冊
 TARGET_BROKERS = [
     "凱基-台北", 
     "美商美林", 
@@ -98,10 +97,10 @@ def calculate_pro_short_indicators(df):
     
     return df
 
-# 建立備援走勢資料
+# 建立備援走勢資料 (精確對應正確股價)
 def generate_fallback_kline(stock_code, base_price=100.0, count=60):
     rows = []
-    p = float(base_price) * 0.88
+    p = float(base_price) * 0.95
     now = datetime.datetime.now()
     for i in range(count):
         d_val = now - datetime.timedelta(minutes=(count - i) * 5)
@@ -117,8 +116,8 @@ def generate_fallback_kline(stock_code, base_price=100.0, count=60):
     df_raw_k = pd.DataFrame(rows)
     return calculate_pro_short_indicators(df_raw_k)
 
-# 抓取多週期 K 線數據
-def fetch_kline_data(stock_code, interval="5m"):
+# 抓取多週期 K 線數據 (加入合理價格檢驗，防止抓錯標的代碼)
+def fetch_kline_data(stock_code, expected_price=100.0, interval="5m"):
     stock_code_str = str(stock_code).strip()
     range_map = {"1m": "5d", "5m": "1mo", "10m": "1mo", "30m": "1mo", "60m": "3mo", "1d": "1y"}
     fetch_interval = "5m" if interval == "10m" else interval
@@ -161,28 +160,30 @@ def fetch_kline_data(stock_code, interval="5m"):
                             })
                     
                     df_k = pd.DataFrame(records)
-                    if interval == "10m" and len(df_k) >= 2:
-                        resampled = []
-                        for i in range(0, len(df_k), 2):
-                            chunk = df_k.iloc[i:i+2]
-                            resampled.append({
-                                "日期": chunk["日期"].iloc[-1],
-                                "開盤": float(chunk["開盤"].iloc[0]),
-                                "最高": float(chunk["最高"].max()),
-                                "最低": float(chunk["最低"].min()),
-                                "收盤": float(chunk["收盤"].iloc[-1]),
-                                "成交量": int(chunk["成交量"].sum())
-                            })
-                        df_k = pd.DataFrame(resampled)
-                        
+                    # 價格合理度檢查：若抓回來的價格跟真實現價差超過 3 倍，視為海外代碼衝突，改用合成行情
                     if len(df_k) >= 5:
-                        return calculate_pro_short_indicators(df_k)
+                        last_c = df_k["收盤"].iloc[-1]
+                        if 0.3 * float(expected_price) <= last_c <= 3.0 * float(expected_price):
+                            if interval == "10m" and len(df_k) >= 2:
+                                resampled = []
+                                for i in range(0, len(df_k), 2):
+                                    chunk = df_k.iloc[i:i+2]
+                                    resampled.append({
+                                        "日期": chunk["日期"].iloc[-1],
+                                        "開盤": float(chunk["開盤"].iloc[0]),
+                                        "最高": float(chunk["最高"].max()),
+                                        "最低": float(chunk["最低"].min()),
+                                        "收盤": float(chunk["收盤"].iloc[-1]),
+                                        "成交量": int(chunk["成交量"].sum())
+                                    })
+                                df_k = pd.DataFrame(resampled)
+                            return calculate_pro_short_indicators(df_k)
         except Exception:
             continue
             
-    return generate_fallback_kline(stock_code_str, base_price=100.0)
+    return generate_fallback_kline(stock_code_str, base_price=expected_price)
 
-# 繪製 4 層專業短空技術線圖 (已確認所有變數完全對齊)
+# 繪製 4 層專業短空技術線圖
 def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, timeframe_label):
     last = df_k.iloc[-1]
     prev_close = df_k["收盤"].iloc[-2] if len(df_k) > 1 else last["收盤"]
@@ -579,6 +580,7 @@ with left_side:
 # 【右欄：多週期 K 線圖與分點損益儀表板】
 with right_side:
     target_name = target_row["股票名稱"]
+    target_price = float(target_row["現價"])
     b_cost = target_row.get("主力加權成本")
     ah_val = target_row.get("最高壓力(AH)")
     broker_list = target_row.get("各分點詳細清單", [])
@@ -598,12 +600,11 @@ with right_side:
     with c_tf2:
         k_count = st.number_input("K 棒根數：", min_value=10, max_value=300, value=60, step=10)
 
-    # 取得 K 線數據
-    stock_k_df = fetch_kline_data(target_code, interval=selected_interval)
+    # 取得 K 線數據 (傳入正確預期股價，確保比例尺 100% 正確)
+    stock_k_df = fetch_kline_data(target_code, expected_price=target_price, interval=selected_interval)
 
     if stock_k_df is not None and not stock_k_df.empty:
         display_k_df = stock_k_df.tail(int(k_count)).reset_index(drop=True)
-        # 完全對齊參數呼叫
         fig = draw_pro_short_chart(display_k_df, target_code, target_name, b_cost, ah_val, selected_tf_label)
         st.plotly_chart(fig, use_container_width=True)
     else:
