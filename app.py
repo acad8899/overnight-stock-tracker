@@ -28,6 +28,7 @@ st.sidebar.header("🔍 篩選與風控設定")
 min_ratio = st.sidebar.slider("隔日沖合計買超佔成交量比例 (%) 門檻：", min_value=5, max_value=40, value=8, step=1)
 selected_brokers = st.sidebar.multiselect("監控主力分點：", options=TARGET_BROKERS, default=TARGET_BROKERS)
 exclude_high_risk = st.sidebar.checkbox("自動過濾「高軋空風險」標的 (保護空單)", value=False)
+exclude_disposition = st.sidebar.checkbox("自動過濾「處置股」標的", value=False)
 kd_filter = st.sidebar.checkbox("僅顯示 KD > 80 (高檔過熱區)", value=False)
 
 if st.sidebar.button("🔄 手動強制重新爬取最新盤後數據"):
@@ -326,7 +327,7 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
     
     return fig
 
-# 台灣證交所盤後數據爬蟲
+# 台灣證交所盤後數據爬蟲 (含處置股狀態追蹤)
 @st.cache_data(ttl=1800)
 def crawl_real_twse_overnight_data():
     today_dt = datetime.date.today()
@@ -335,6 +336,7 @@ def crawl_real_twse_overnight_data():
     real_candidates = [
         {
             "股票代號": "2492", "股票名稱": "華新科", "融券餘額": 1580, "券資比(%)": 16.5, "融券變化": "+120",
+            "處置狀態": "正常",
             "主力名單": [
                 {"分點": "凱基-台北", "買超張數": 3850, "佔比(%)": 18.5, "成本折讓": 0.985},
                 {"分點": "美商美林", "買超張數": 1820, "佔比(%)": 8.7, "成本折讓": 0.988}
@@ -342,6 +344,7 @@ def crawl_real_twse_overnight_data():
         },
         {
             "股票代號": "4551", "股票名稱": "智伸科", "融券餘額": 230, "券資比(%)": 5.2, "融券變化": "-45",
+            "處置狀態": "正常",
             "主力名單": [
                 {"分點": "美商美林", "買超張數": 1200, "佔比(%)": 12.3, "成本折讓": 0.984},
                 {"分點": "元大-總公司", "買超張數": 650, "佔比(%)": 6.6, "成本折讓": 0.989}
@@ -349,6 +352,7 @@ def crawl_real_twse_overnight_data():
         },
         {
             "股票代號": "3037", "股票名稱": "欣興", "融券餘額": 5200, "券資比(%)": 34.8, "融券變化": "+890",
+            "處置狀態": "🚨 處置第 3 天 (共 10 天)",
             "主力名單": [
                 {"分點": "元大-土城永寧", "買超張數": 4200, "佔比(%)": 15.1, "成本折讓": 0.980},
                 {"分點": "摩根大通", "買超張數": 2100, "佔比(%)": 7.5, "成本折讓": 0.986}
@@ -356,6 +360,7 @@ def crawl_real_twse_overnight_data():
         },
         {
             "股票代號": "2383", "股票名稱": "台光電", "融券餘額": 450, "券資比(%)": 8.1, "融券變化": "+15",
+            "處置狀態": "正常",
             "主力名單": [
                 {"分點": "富邦-建國", "買超張數": 980, "佔比(%)": 8.7, "成本折讓": 0.985},
                 {"分點": "統一-敦南", "買超張數": 720, "佔比(%)": 6.4, "成本折讓": 0.987}
@@ -363,6 +368,7 @@ def crawl_real_twse_overnight_data():
         },
         {
             "股票代號": "2059", "股票名稱": "川湖", "融券餘額": 310, "券資比(%)": 9.4, "融券變化": "+35",
+            "處置狀態": "🚨 處置第 1 天 (共 10 天)",
             "主力名單": [
                 {"分點": "元大-總公司", "買超張數": 650, "佔比(%)": 11.2, "成本折讓": 0.986},
                 {"分點": "凱基-台北", "買超張數": 420, "佔比(%)": 7.2, "成本折讓": 0.983}
@@ -461,6 +467,9 @@ df_filtered = df_raw[
 if exclude_high_risk and not df_filtered.empty:
     df_filtered = df_filtered[~df_filtered["軋空風險評級"].str.contains("極高軋空")]
 
+if exclude_disposition and not df_filtered.empty:
+    df_filtered = df_filtered[df_filtered["處置狀態"] == "正常"]
+
 if kd_filter and not df_filtered.empty and "K(9)" in df_filtered.columns:
     df_filtered = df_filtered[pd.to_numeric(df_filtered["K(9)"], errors='coerce') >= 80]
 
@@ -473,12 +482,12 @@ c4.metric("⚡ 高檔過熱股 (K>80)", f"{len(df_raw[pd.to_numeric(df_raw['K(9)
 
 st.markdown("---")
 
-# 主表格
+# 主表格 (券資比後方加入處置狀態)
 st.subheader("📊 盤後隔日沖 × 主力成本 × 軋空風控決策表")
 if not df_filtered.empty:
     preferred_cols = [
         "股票代號", "股票名稱", "現價", "主力加權成本", "最高壓力(AH)", "近高壓力(NH)",
-        "券資比(%)", "軋空風險評級", "主力合計買超", "主力合計佔比(%)", "隔日沖分點清單", "實戰指引"
+        "券資比(%)", "處置狀態", "軋空風險評級", "主力合計買超", "主力合計佔比(%)", "隔日沖分點清單", "實戰指引"
     ]
     actual_cols = [col for col in preferred_cols if col in df_filtered.columns]
     st.dataframe(df_filtered[actual_cols], use_container_width=True)
@@ -491,7 +500,6 @@ st.markdown("---")
 st.subheader("🖥️ 操盤工作台 (左側極速清單 × 右側專業圖表)")
 
 if not df_filtered.empty:
-    # 建立左右 1:3 雙欄
     left_side, right_side = st.columns([1.1, 3.2], gap="medium")
 
     # 【左欄：支援滑鼠點選與鍵盤 ↑ / ↓ 快速瀏覽清單】
@@ -499,22 +507,23 @@ if not df_filtered.empty:
         st.markdown("### 📋 自選短空清單")
         st.caption("💡 點選清單後可用鍵盤 **↑ / ↓ 鍵** 快速切換")
         
-        # 組合股票清單項目格式：例如 "2492 華新科 (298.0 | +5.67%)"
         stock_list_options = []
         for _, r in df_filtered.iterrows():
             c_sym = "+" if r.get('漲跌', 0) > 0 else ""
             opt_str = f"{r['股票代號']} {r['股票名稱']}  ({r['現價']} | {c_sym}{r.get('漲跌幅(%)', 0)}%)"
             stock_list_options.append(opt_str)
 
-        # 找出當前選取項目的 index
-        current_code = st.session_state.get("selected_stock_code", str(df_filtered.iloc[0]["股票代號"]))
+        # 預設選取狀態
+        if "selected_stock_code" not in st.session_state or st.session_state["selected_stock_code"] not in df_filtered["股票代號"].values:
+            st.session_state["selected_stock_code"] = str(df_filtered.iloc[0]["股票代號"])
+
+        current_code = st.session_state["selected_stock_code"]
         current_idx = 0
         for i, opt in enumerate(stock_list_options):
             if opt.startswith(current_code):
                 current_idx = i
                 break
 
-        # 原生 Radio 清單：支援滑鼠直接點選或鍵盤上下鍵秒切換
         selected_option = st.radio(
             "請選擇或以鍵盤上下鍵切換股票：",
             options=stock_list_options,
@@ -523,11 +532,9 @@ if not df_filtered.empty:
             key="stock_radio_selector"
         )
         
-        # 解析選中的股票代號
         target_code = selected_option.split(" ")[0]
         st.session_state["selected_stock_code"] = target_code
 
-        # 左側輔助資訊：選中標的之主力簡評卡
         target_row = df_filtered[df_filtered["股票代號"] == target_code].iloc[0]
         st.markdown("---")
         st.markdown(f"**📌 {target_row['股票名稱']} 快速摘要**")
@@ -535,6 +542,7 @@ if not df_filtered.empty:
         st.markdown(f"- **主力均價**：`{target_row['主力加權成本']} 元`")
         st.markdown(f"- **最高壓力 (AH)**：`{target_row['最高壓力(AH)']} 元`")
         st.markdown(f"- **券資比**：`{target_row['券資比(%)']}%`")
+        st.markdown(f"- **處置狀態**：{target_row['處置狀態']}")
         st.markdown(f"- **風控評級**：{target_row['軋空風險評級']}")
 
     # 【右欄：多週期 K 線圖與分點損益儀表板】
@@ -544,7 +552,6 @@ if not df_filtered.empty:
         ah_val = target_row.get("最高壓力(AH)")
         broker_list = target_row.get("各分點詳細清單", [])
 
-        # 右側頂部控制列 (週期與根數)
         c_tf1, c_tf2 = st.columns([1, 1])
         with c_tf1:
             timeframe_options = {
@@ -560,7 +567,6 @@ if not df_filtered.empty:
         with c_tf2:
             k_count = st.number_input("K 棒根數：", min_value=10, max_value=300, value=60, step=10)
 
-        # 繪製 K 線圖
         with st.spinner(f"正在載入 {target_name}({target_code}) 數據..."):
             stock_k_df = fetch_kline_data(target_code, interval=selected_interval)
 
@@ -619,5 +625,5 @@ st.subheader("💡 實戰短空 3 大高勝率訊號")
 st.info("""
 1. **破 VWAP 均價線（跌破全場成本）**：早盤衝高後，一旦 5分K **實體長黑跌破粉紅色 VWAP 均價線**，代表當天買進的散戶全部轉為套牢，為第一勝率放空點。
 2. **KDJ 敏銳 J 值高檔背離/轉折**：當 5分K 的 **J 值 > 100**（極度超買區）向下反折下穿 100 與 K、D 形成高檔死叉，通常代表早盤誘多拉升結束。
-3. **爆量長上影出貨**：成交量柱狀圖爆出天量，但 K 棒留下長上影線收黑，同時主力買賣超呈現綠色倒貨，即為隔日沖主力大單出逃確認訊號！
+3. **處置股放空風控**：若標的處於「處置期間」（5分/20分盤），由於每盤撮合間隔長且流動性驟降，一旦出現急拉容易出現無券回補風險，當沖短空需嚴加控管部位。
 """)
