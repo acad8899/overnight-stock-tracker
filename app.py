@@ -26,6 +26,9 @@ kd_filter = st.sidebar.checkbox("僅顯示 KD > 80 (高檔過熱區)", value=Fal
 
 # 計算指標函式 (KD, MACD, 威廉指標)
 def calculate_indicators(df):
+    if len(df) == 0:
+        return df
+        
     closes = df["收盤"].tolist()
     highs = df["最高"].tolist()
     lows = df["最低"].tolist()
@@ -108,24 +111,24 @@ def get_stock_data(stock_code):
                                 "最高": round(h, 2), 
                                 "最低": round(l, 2), 
                                 "收盤": round(c, 2), 
-                                "成交量": int(v) if v is not None else 0
+                                "成交量": int(v) if (v is not None) else 0
                             })
                     
                     df_k = pd.DataFrame(records)
                     if len(df_k) >= 5:
                         df_k = calculate_indicators(df_k)
                         close = df_k["收盤"].iloc[-1]
-                        ma5 = df_k["5MA"].iloc[-1]
-                        ma24 = df_k["24MA"].iloc[-1]
-                        bias_ma24 = round(((close - ma24) / ma24) * 100, 2)
+                        ma5 = df_k["5MA"].iloc[-1] if "5MA" in df_k.columns else close
+                        ma24 = df_k["24MA"].iloc[-1] if "24MA" in df_k.columns else close
+                        bias_ma24 = round(((close - ma24) / ma24) * 100, 2) if ma24 else 0.0
                         
                         tech_info = {
                             "現價": close,
                             "5MA": ma5,
                             "24MA": ma24,
                             "月線乖離率(%)": bias_ma24,
-                            "K(9)": df_k["K"].iloc[-1],
-                            "D(9)": df_k["D"].iloc[-1],
+                            "K(9)": df_k["K"].iloc[-1] if "K" in df_k.columns else 50.0,
+                            "D(9)": df_k["D"].iloc[-1] if "D" in df_k.columns else 50.0,
                             "均線狀態": "多頭排列" if close > ma5 > ma24 else ("破月線" if close < ma24 else "整理")
                         }
                         return tech_info, df_k
@@ -143,16 +146,27 @@ def get_stock_data(stock_code):
     }
     return default_info, pd.DataFrame()
 
-# 繪製 1:1 專業看盤軟體技術線圖
+# 繪製 1:1 專業看盤軟體技術線圖 (全面防護 KeyError)
 def draw_pro_terminal_chart(df_k, stock_code, stock_name):
     last = df_k.iloc[-1]
     prev_close = df_k["收盤"].iloc[-2] if len(df_k) > 1 else last["收盤"]
     change = round(last["收盤"] - prev_close, 2)
-    change_pct = round((change / prev_close) * 100, 2)
+    change_pct = round((change / prev_close) * 100, 2) if prev_close else 0.0
     
     chg_color = "#FF3333" if change >= 0 else "#00CC00"
     chg_symbol = "↑" if change >= 0 else "↓"
     chg_text = f"+{change}" if change > 0 else f"{change}"
+    
+    val_5ma = last.get("5MA", "-")
+    val_12ma = last.get("12MA", "-")
+    val_24ma = last.get("24MA", "-")
+    val_72ma = last.get("72MA", "-")
+    val_vol = int(last.get("成交量", 0))
+    val_vol5ma = int(last.get("VOL_5MA", 0))
+    val_wr = last.get("WR", "-")
+    val_osc = last.get("OSC", 0)
+    val_dif = last.get("DIF", 0)
+    val_macd = last.get("MACD", 0)
     
     header_html = f"""
     <div style="background-color: #000000; padding: 8px 12px; font-family: monospace; border: 1px solid #333; font-size: 13px; margin-bottom: 2px;">
@@ -166,10 +180,10 @@ def draw_pro_terminal_chart(df_k, stock_code, stock_name):
             <span style="color: #00CC00;">低 <span style="color:#FFF;">{last['最低']}</span></span>
             <span style="color: {chg_color};">收 {last['收盤']}</span>
             <span style="color: {chg_color}; font-weight: bold;">漲跌 {chg_symbol} {chg_text} ({change_pct}%)</span>
-            <span style="color: #FFFF00;">均價5: {last['5MA']}</span>
-            <span style="color: #00FF00;">均價12: {last['12MA']}</span>
-            <span style="color: #33CCFF;">均價24: {last['24MA']}</span>
-            <span style="color: #FF66CC;">均價72: {last['72MA']}</span>
+            <span style="color: #FFFF00;">均價5: {val_5ma}</span>
+            <span style="color: #00FF00;">均價12: {val_12ma}</span>
+            <span style="color: #33CCFF;">均價24: {val_24ma}</span>
+            <span style="color: #FF66CC;">均價72: {val_72ma}</span>
         </div>
     </div>
     """
@@ -182,9 +196,9 @@ def draw_pro_terminal_chart(df_k, stock_code, stock_name):
         row_heights=[0.50, 0.18, 0.16, 0.16],
         subplot_titles=(
             "",
-            f"<span style='color:#FF3333; font-size:12px;'>成交量 {int(last['成交量'])}</span> <span style='color:#FFFF00; font-size:12px;'>均量5 {int(last['VOL_5MA'])}</span>",
-            f"<span style='color:#FFFF00; font-size:12px;'>威廉指標(14) {last['WR']}</span>",
-            f"<span style='color:#FF3333; font-size:12px;'>OSC {last['OSC']}</span> <span style='color:#FFFF00; font-size:12px;'>DIF {last['DIF']}</span> <span style='color:#FF6666; font-size:12px;'>MACD {last['MACD']}</span>"
+            f"<span style='color:#FF3333; font-size:12px;'>成交量 {val_vol}</span> <span style='color:#FFFF00; font-size:12px;'>均量5 {val_vol5ma}</span>",
+            f"<span style='color:#FFFF00; font-size:12px;'>威廉指標(14) {val_wr}</span>",
+            f"<span style='color:#FF3333; font-size:12px;'>OSC {val_osc}</span> <span style='color:#FFFF00; font-size:12px;'>DIF {val_dif}</span> <span style='color:#FF6666; font-size:12px;'>MACD {val_macd}</span>"
         )
     )
     
@@ -196,27 +210,36 @@ def draw_pro_terminal_chart(df_k, stock_code, stock_name):
         decreasing_line_color='#00CC00', decreasing_fillcolor='#00CC00'
     ), row=1, col=1)
     
-    # 均線
-    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFFF00', width=1), name='5MA'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['12MA'], line=dict(color='#00FF00', width=1), name='12MA'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['24MA'], line=dict(color='#33CCFF', width=1.2), name='24MA'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['72MA'], line=dict(color='#FF66CC', width=1.5), name='72MA'), row=1, col=1)
+    # 均線安全載入
+    if '5MA' in df_k.columns:
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFFF00', width=1), name='5MA'), row=1, col=1)
+    if '12MA' in df_k.columns:
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['12MA'], line=dict(color='#00FF00', width=1), name='12MA'), row=1, col=1)
+    if '24MA' in df_k.columns:
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['24MA'], line=dict(color='#33CCFF', width=1.2), name='24MA'), row=1, col=1)
+    if '72MA' in df_k.columns:
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['72MA'], line=dict(color='#FF66CC', width=1.5), name='72MA'), row=1, col=1)
 
     # 2. 成交量
     vol_colors = ['#FF3333' if c >= o else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
     fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['成交量'], marker_color=vol_colors, name='成交量'), row=2, col=1)
-    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), name='5MA均量'), row=2, col=1)
+    if 'VOL_5MA' in df_k.columns:
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), name='5MA均量'), row=2, col=1)
 
     # 3. 威廉指標
-    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['WR'], line=dict(color='#FF9900', width=1.2), name='WR'), row=3, col=1)
-    for y_val in [-20, -50, -80]:
-        fig.add_hline(y=y_val, line=dict(color="#444", width=0.8, dash="dot"), row=3, col=1)
+    if 'WR' in df_k.columns:
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['WR'], line=dict(color='#FF9900', width=1.2), name='WR'), row=3, col=1)
+        for y_val in [-20, -50, -80]:
+            fig.add_hline(y=y_val, line=dict(color="#444", width=0.8, dash="dot"), row=3, col=1)
 
     # 4. MACD
-    osc_colors = ['#FF3333' if v >= 0 else '#00CC00' for v in df_k['OSC']]
-    fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['OSC'], marker_color=osc_colors, name='OSC柱狀'), row=4, col=1)
-    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['DIF'], line=dict(color='#FFFF00', width=1), name='DIF'), row=4, col=1)
-    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['MACD'], line=dict(color='#FF3333', width=1), name='MACD'), row=4, col=1)
+    if 'OSC' in df_k.columns:
+        osc_colors = ['#FF3333' if v >= 0 else '#00CC00' for v in df_k['OSC']]
+        fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['OSC'], marker_color=osc_colors, name='OSC柱狀'), row=4, col=1)
+    if 'DIF' in df_k.columns:
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['DIF'], line=dict(color='#FFFF00', width=1), name='DIF'), row=4, col=1)
+    if 'MACD' in df_k.columns:
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['MACD'], line=dict(color='#FF3333', width=1), name='MACD'), row=4, col=1)
 
     fig.update_layout(
         template="plotly_dark",
@@ -275,7 +298,7 @@ c4.metric("⚡ 高檔過熱股 (K>80)", f"{len(df_raw[pd.to_numeric(df_raw['K(9)
 
 st.markdown("---")
 
-# 主表格 (安全動態過濾可用欄位)
+# 主表格
 st.subheader("📊 盤後隔日沖 × 技術指標綜合分析表")
 if not df_filtered.empty:
     preferred_cols = [
@@ -283,7 +306,6 @@ if not df_filtered.empty:
         "K(9)", "D(9)", "均線狀態", "隔日沖分點", "買超張數", 
         "佔成交量比例(%)", "融券變化", "軋空風險"
     ]
-    # 只顯示 DataFrame 中實際存在的欄位，避免 KeyError
     actual_cols = [col for col in preferred_cols if col in df_filtered.columns]
     st.dataframe(df_filtered[actual_cols], use_container_width=True)
 else:
