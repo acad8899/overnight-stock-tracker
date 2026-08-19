@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # 頁面排版設定：全寬展開
-st.set_page_config(page_title="隔日沖主力短空雷達 (真實即時K線版)", layout="wide", page_icon="🎯", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="隔日沖主力短空雷達 (勝率智能排序版)", layout="wide", page_icon="🎯", initial_sidebar_state="collapsed")
 
 TARGET_BROKERS = [
     "凱基-台北", 
@@ -21,8 +21,8 @@ TARGET_BROKERS = [
 # 頂部抬頭列與重新整理按鈕
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
-    st.title("🎯 每日隔日沖主力短空雷達 (真實即時K線版)")
-    st.caption("🔥 100% 串接真實即時行情引擎：自動過濾 5000 元以上極端股/異常報價，呈現真實交易數據。")
+    st.title("🎯 每日隔日沖主力短空雷達 (勝率智能排序版)")
+    st.caption("🔥 依據「主力鎖碼佔比 × 倒貨獲利意願 × 低軋空風險 × KD高檔過熱」動態計算短空勝率，最高勝率標的自動置頂。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即重新整理最新行情", use_container_width=True):
@@ -33,7 +33,7 @@ with head_col2:
 with st.expander("⚙️ 點此展開／收合【篩選條件與風控設定】", expanded=False):
     f_col1, f_col2, f_col3, f_col4 = st.columns([1.2, 1.8, 1, 1])
     with f_col1:
-        min_ratio = st.slider("主力合計佔比 (%) 門檻：", min_value=1, max_value=30, value=10, step=1)
+        min_ratio = st.slider("主力合計佔比 (%) 門檻：", min_value=1, max_value=30, value=5, step=1)
     with f_col2:
         selected_brokers = st.multiselect("監控主力分點：", options=TARGET_BROKERS, default=TARGET_BROKERS)
     with f_col3:
@@ -97,7 +97,7 @@ def calculate_pro_short_indicators(df):
     
     return df
 
-# 使用 yfinance 抓取台股真實 K 線走勢
+# 抓取真實 K 線走勢
 @st.cache_data(ttl=300)
 def fetch_real_kline(stock_code, interval="5m"):
     stock_code_str = str(stock_code).strip()
@@ -113,7 +113,6 @@ def fetch_real_kline(stock_code, interval="5m"):
     
     fetch_interval = "5m" if interval == "10m" else interval
     period = period_map.get(interval, "5d")
-    
     symbols = [f"{stock_code_str}.TW", f"{stock_code_str}.TWO"]
     
     for sym in symbols:
@@ -137,7 +136,7 @@ def fetch_real_kline(stock_code, interval="5m"):
                     h = round(float(row["High"]), 2)
                     l = round(float(row["Low"]), 2)
                     c = round(float(row["Close"]), 2)
-                    v = int(row["Volume"]) // 1000  # 轉為張數
+                    v = int(row["Volume"]) // 1000
                     
                     if c > 0:
                         records.append({
@@ -300,19 +299,19 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, ah_res, time
     
     return fig
 
-# 取得真實最新行情與盤後雷達名單 (加入 < 5000 元安全過濾)
+# 取得真實最新行情並計算【短空勝率綜合評分】
 @st.cache_data(ttl=600)
 def load_radar_market_data():
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     
     track_targets = [
-        {"代號": "3037", "名稱": "欣興", "券資比": 34.8, "主力分點": [("元大-土城永寧", 0.172), ("摩根大通", 0.081)]},
+        {"代號": "2492", "名稱": "華新科", "券資比": 16.5, "主力分點": [("凱基-台北", 0.173), ("美商美林", 0.089)]},
         {"代號": "4551", "名稱": "智伸科", "券資比": 5.2, "主力分點": [("美商美林", 0.123), ("元大-總公司", 0.066)]},
+        {"代號": "2368", "名稱": "金像電", "券資比": 14.2, "主力分點": [("凱基-台北", 0.138), ("富邦-建國", 0.053)]},
         {"代號": "2383", "名稱": "台光電", "券資比": 8.1, "主力分點": [("富邦-建國", 0.090), ("統一-敦南", 0.067)]},
         {"代號": "2059", "名稱": "川湖", "券資比": 9.4, "主力分點": [("元大-總公司", 0.121), ("凱基-台北", 0.075)]},
-        {"代號": "2368", "名稱": "金像電", "券資比": 14.2, "主力分點": [("凱基-台北", 0.138), ("富邦-建國", 0.053)]},
         {"代號": "3443", "名稱": "創意", "券資比": 21.5, "主力分點": [("元大-土城永寧", 0.119), ("美商美林", 0.079)]},
-        {"代號": "2492", "名稱": "華新科", "券資比": 16.5, "主力分點": [("凱基-台北", 0.173), ("美商美林", 0.089)]},
+        {"代號": "3037", "名稱": "欣興", "券資比": 34.8, "主力分點": [("元大-土城永寧", 0.172), ("摩根大通", 0.081)]},
     ]
     
     enhanced_list = []
@@ -345,7 +344,6 @@ def load_radar_market_data():
             low_p = round(close_price * 0.98, 2)
             vol_lots = 15000
 
-        # 【關鍵過濾】：股價 5000 元以上（或異常報價）直接剔除
         if close_price >= 5000.0:
             continue
 
@@ -389,6 +387,24 @@ def load_radar_market_data():
         risk_level = "⚠️ 嚴禁摸頂 (極高軋空)" if short_ratio >= 30 else ("🟡 觀察開盤 (中度風險)" if short_ratio >= 15 else "🟢 適合短空 (低軋空風險)")
         action_guide = "主力可能連續鎖漲停，切勿放空！" if short_ratio >= 30 else "隔日沖出貨機率極高，順勢切入。"
         
+        # 【短空勝率綜合演算法】：
+        # 1. 主力鎖碼佔比 (權重 40%): 佔比每 1% 得 2 分 (最高 50 分)
+        score_ratio = min(total_ratio * 2.0, 50.0)
+        
+        # 2. 倒貨獲利意願 (權重 30%): 主力報酬率每 1% 得 15 分 (最高 30 分)
+        score_profit = min(max(total_p_rate, 0) * 15.0, 30.0)
+        
+        # 3. 軋空風控懲罰 (權重 30%): 券資比越低越安全 (券資比 > 30% 扣重分)
+        if short_ratio >= 30:
+            score_risk = -35.0  # 高軋空風險強制大幅扣分
+        elif short_ratio >= 15:
+            score_risk = 10.0
+        else:
+            score_risk = 20.0   # 低券資比最適合短空
+            
+        total_win_rate_score = int(round(score_ratio + score_profit + score_risk))
+        total_win_rate_score = max(min(total_win_rate_score, 99), 10)  # 限制在 10 ~ 99 分
+        
         enhanced_list.append({
             "股票代號": code,
             "股票名稱": name,
@@ -414,18 +430,21 @@ def load_radar_market_data():
             "主力加權成本": avg_cost,
             "主力合計獲利(萬)": total_profit_wan,
             "主力合計報酬率(%)": total_p_rate,
+            "短空勝率分": total_win_rate_score,
             "各分點詳細清單": detailed_brokers,
             "軋空風險評級": risk_level,
             "實戰指引": action_guide
         })
         
+    # 【核心排序】：依據「短空勝率分」由高到低（降序）嚴格排序！
+    enhanced_list = sorted(enhanced_list, key=lambda x: x["短空勝率分"], reverse=True)
     return pd.DataFrame(enhanced_list), today_str
 
 # 執行全市場掃描
-with st.spinner("正在連線證券即時引擎抓取真實 K 線與分點籌碼..."):
+with st.spinner("正在連線證券即時引擎依【短空勝率】動態排序..."):
     df_raw, update_date = load_radar_market_data()
 
-# 健全過濾 (強制過濾現價 < 5000)
+# 健全過濾
 def check_broker_overlap(broker_str, selected_list):
     if not selected_list:
         return True
@@ -444,6 +463,9 @@ if kd_filter and "K(9)" in df_raw.columns:
 df_filtered = df_raw[mask].copy()
 df_display = df_filtered if not df_filtered.empty else df_raw[df_raw["現價"] < 5000.0].copy()
 
+# 確保展示資料亦維持勝率由高到低
+df_display = df_display.sort_values(by="短空勝率分", ascending=False).reset_index(drop=True)
+
 # 頂部 4 大統計指標
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("📅 最新更新日期", update_date)
@@ -453,10 +475,10 @@ c4.metric("⚡ 高檔過熱股 (K>80)", f"{len(df_raw[pd.to_numeric(df_raw['K(9)
 
 st.markdown("---")
 
-# 主表格 (全螢幕展開)
-st.subheader("📊 盤後全市場隔日沖 × 主力成本 × 軋空風控決策表")
+# 主表格 (全螢幕展開，勝率分放首要欄位)
+st.subheader("📊 盤後全市場隔日沖 × 主力成本 × 短空勝率決策表 (勝率降序排列)")
 preferred_cols = [
-    "股票代號", "股票名稱", "現價", "主力加權成本", "最高壓力(AH)", "近高壓力(NH)",
+    "短空勝率分", "股票代號", "股票名稱", "現價", "主力加權成本", "最高壓力(AH)", "近高壓力(NH)",
     "券資比(%)", "軋空風險評級", "主力合計買超", "主力合計佔比(%)", "隔日沖分點清單", "實戰指引"
 ]
 actual_cols = [col for col in preferred_cols if col in df_display.columns]
@@ -465,19 +487,20 @@ st.dataframe(df_display[actual_cols], use_container_width=True)
 st.markdown("---")
 
 # 操盤工作台 (左側極速清單 1.1 × 右側專業寬幅圖表 3.9)
-st.subheader("🖥️ 操盤工作台 (全寬大視窗)")
+st.subheader("🖥️ 操盤工作台 (勝率最高依序置頂)")
 
-left_side, right_side = st.columns([1.1, 3.9], gap="medium")
+left_side, right_side = st.columns([1.15, 3.85], gap="medium")
 
-# 【左欄：支援滑鼠點選與鍵盤 ↑ / ↓ 快速瀏覽清單】
+# 【左欄：支援滑鼠點選與鍵盤 ↑ / ↓ 快速瀏覽清單 (已按勝率精準排序)】
 with left_side:
-    st.markdown("### 📋 自選短空清單")
-    st.caption("💡 點選清單後可用鍵盤 **↑ / ↓ 鍵** 快速切換")
+    st.markdown("### 📋 自選短空清單 (勝率排序)")
+    st.caption("💡 依勝率由高至低排列，可用鍵盤 **↑ / ↓ 鍵** 切換")
     
     stock_list_options = []
-    for _, r in df_display.iterrows():
+    for rank, (_, r) in enumerate(df_display.iterrows(), 1):
         c_sym = "+" if float(r.get('漲跌', 0)) > 0 else ""
-        opt_str = f"{r['股票代號']} {r['股票名稱']}  ({r['現價']} | {c_sym}{r.get('漲跌幅(%)', 0)}%)"
+        badge = "👑" if rank == 1 else ("⭐" if rank <= 3 else "🎯")
+        opt_str = f"{badge} [{r['短空勝率分']}分] {r['股票代號']} {r['股票名稱']} ({r['現價']}|{c_sym}{r.get('漲跌幅(%)', 0)}%)"
         stock_list_options.append(opt_str)
 
     if "selected_stock_code" not in st.session_state or str(st.session_state["selected_stock_code"]) not in [str(x) for x in df_display["股票代號"].values]:
@@ -486,7 +509,7 @@ with left_side:
     current_code = str(st.session_state["selected_stock_code"])
     current_idx = 0
     for i, opt in enumerate(stock_list_options):
-        if opt.startswith(current_code):
+        if f" {current_code} " in opt:
             current_idx = i
             break
 
@@ -498,16 +521,18 @@ with left_side:
         key="stock_radio_selector"
     )
     
-    target_code = selected_option.split(" ")[0]
+    # 解析選中的股票代號
+    target_code = selected_option.split("] ")[1].split(" ")[0]
     st.session_state["selected_stock_code"] = target_code
 
     target_row = df_display[df_display["股票代號"] == target_code].iloc[0]
     
-    # 高對比度深色卡片
+    # 高對比度深色卡片 (加入勝率評分展示)
     summary_card_html = f"""
     <div style="background-color: #1E1E1E; border: 1px solid #333333; border-radius: 8px; padding: 14px 16px; margin-top: 10px; color: #FFFFFF; font-family: monospace;">
-        <div style="font-size: 15px; font-weight: bold; color: #FFFFFF; border-bottom: 1px solid #333333; padding-bottom: 8px; margin-bottom: 10px;">
-            📌 {target_row['股票名稱']} ({target_code}) 快速摘要
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333333; padding-bottom: 8px; margin-bottom: 10px;">
+            <span style="font-size: 15px; font-weight: bold; color: #FFFFFF;">📌 {target_row['股票名稱']} ({target_code})</span>
+            <span style="background-color: #D93025; color: #FFF; font-size: 12px; font-weight: bold; padding: 2px 6px; border-radius: 4px;">勝率 {target_row['短空勝率分']}分</span>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
             <span style="color: #AAAAAA;">現價：</span>
@@ -520,6 +545,10 @@ with left_side:
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
             <span style="color: #AAAAAA;">最高壓力 (AH)：</span>
             <span style="font-weight: bold; color: #FF4444; font-size: 14px;">{target_row['最高壓力(AH)']} 元</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
+            <span style="color: #AAAAAA;">主力合計佔比：</span>
+            <span style="font-weight: bold; color: #00FF66; font-size: 14px;">{target_row['主力合計佔比(%)']}%</span>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
             <span style="color: #AAAAAA;">券資比：</span>
