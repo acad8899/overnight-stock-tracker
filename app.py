@@ -563,11 +563,15 @@ with left_side:
     st.markdown("### 📋 明日短空鎖碼清單")
     st.caption("💡 依勝率由高至低排列，可用鍵盤 **↑ / ↓ 鍵** 切換")
     
+    # 【核心修改】：將清單中括號內的行情文字依漲跌設定為紅/綠色
     stock_list_options = []
     for rank, (_, r) in enumerate(df_display.iterrows(), 1):
         c_sym = "+" if float(r.get('漲跌', 0)) > 0 else ""
         badge = "👑" if rank == 1 else ("⭐" if rank <= 3 else "🎯")
-        opt_str = f"{badge} [{r['短空勝率分']}分] {r['股票代號']} {r['股票名稱']} ({r['現價']}|{c_sym}{r.get('漲跌幅(%)', 0)}%)"
+        chg_val = float(r.get('漲跌', 0))
+        chg_color = "red" if chg_val >= 0 else "green"
+        paren_text = f":{chg_color}[({r['現價']}|{c_sym}{r.get('漲跌幅(%)', 0)}%)]"
+        opt_str = f"{badge} [{r['短空勝率分']}分] {r['股票代號']} {r['股票名稱']} {paren_text}"
         stock_list_options.append(opt_str)
 
     if "selected_stock_code" not in st.session_state or str(st.session_state["selected_stock_code"]) not in [str(x) for x in df_display["股票代號"].values]:
@@ -736,7 +740,6 @@ with right_side:
         cols_order = ["分點名稱", "今日鎖碼庫存(張)", "佔比(%)", "收盤價", "預估成本", "帳面浮盈(萬)", "帳面報酬率(%)", "倒貨意願"]
         actual_cols_order = [c for c in cols_order if c in df_styled.columns]
         
-        # 僅針對「帳面浮盈(萬)」與「帳面報酬率(%)」進行紅綠染色，其餘欄位維持無樣式
         styled_df_view = df_styled[actual_cols_order].style.apply(
             lambda row: [
                 ('color: #FF4444; font-weight: bold;' if df_brokers.loc[row.name, '預估獲利(萬)'] >= 0 else 'color: #00CC66; font-weight: bold;') 
