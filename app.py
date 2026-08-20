@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 18 大知名隔日沖主力分點名冊
+# 30 大知名隔日沖主力分點名冊
 TARGET_BROKERS = [
     # 外資量化隔日沖
     "美商美林", "摩根大通", "新加坡商瑞銀", "台灣摩根士丹利", "美商高盛",
