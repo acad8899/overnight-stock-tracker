@@ -725,13 +725,6 @@ with right_side:
         df_brokers = pd.DataFrame(broker_list)
         df_brokers.index = range(1, len(df_brokers) + 1)
         
-        # 輔助函數：台股標準紅綠染色 (賺錢紅、賠錢綠)
-        def style_pnl_profit(val):
-            color = '#FF4444' if val >= 0 else '#00CC66'
-            sign = '+' if val > 0 else ''
-            return f'color: {color}; font-weight: bold;'
-
-        # 保留數值欄位供 Styler 判斷正負
         df_styled = df_brokers.copy()
         df_styled["今日鎖碼庫存(張)"] = df_styled["買超張數"].apply(lambda x: f"{x:,} 張 (固定)")
         df_styled["佔比(%)"] = df_styled["佔比(%)"].apply(lambda x: f"{x}%")
@@ -743,12 +736,16 @@ with right_side:
         cols_order = ["分點名稱", "今日鎖碼庫存(張)", "佔比(%)", "收盤價", "預估成本", "帳面浮盈(萬)", "帳面報酬率(%)", "倒貨意願"]
         actual_cols_order = [c for c in cols_order if c in df_styled.columns]
         
-        # 套用紅綠染色樣式
+        # 僅針對「帳面浮盈(萬)」與「帳面報酬率(%)」進行紅綠染色，其餘欄位維持無樣式
         styled_df_view = df_styled[actual_cols_order].style.apply(
             lambda row: [
-                'color: #FF4444; font-weight: bold;' if df_brokers.loc[row.name, '預估獲利(萬)'] >= 0 else 'color: #00CC66; font-weight: bold;' 
+                ('color: #FF4444; font-weight: bold;' if df_brokers.loc[row.name, '預估獲利(萬)'] >= 0 else 'color: #00CC66; font-weight: bold;') 
                 if col == "帳面浮盈(萬)" 
-                else ('color: #FF4444; font-weight: bold;' if df_brokers.loc[row.name, '報酬率(%)'] >= 0 else 'color: #00CC66; font-weight: bold;' if col == "帳面報酬率(%)" else '') 
+                else (
+                    ('color: #FF4444; font-weight: bold;' if df_brokers.loc[row.name, '報酬率(%)'] >= 0 else 'color: #00CC66; font-weight: bold;') 
+                    if col == "帳面報酬率(%)" 
+                    else ''
+                )
                 for col in actual_cols_order
             ], axis=1
         )
