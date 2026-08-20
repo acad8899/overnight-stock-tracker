@@ -26,7 +26,7 @@ TARGET_BROKERS = [
 
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
-    st.title("🎯 每日隔日沖主力短空雷達 (流動性風控 × 盤後連動旗艦版)")
+    st.title("🎯 每日隔日沖主力短空雷達 (精簡排版 × 盤後連動旗艦版)")
     st.caption("🔥 嚴格剔除「日均量 < 1,500 張」冷門無量股，杜絕流動性風險與滑價問題。")
 with head_col2:
     st.write("")
@@ -34,7 +34,7 @@ with head_col2:
         st.cache_data.clear()
         st.rerun()
 
-# 頂部橫向折疊式設定面板 (加入最低均量門檻設定)
+# 頂部橫向折疊式設定面板
 with st.expander("⚙️ 點此展開／收合【篩選條件與流動性風控設定】", expanded=False):
     f_col1, f_col2, f_col3, f_col4, f_col5 = st.columns([1.2, 1.2, 1.6, 1, 1])
     with f_col1:
@@ -280,7 +280,7 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
     fig.update_yaxes(gridcolor="#222222", showgrid=True, side="right")
     return fig
 
-# 盤後資料引擎 (含日均量計算)
+# 盤後資料引擎
 @st.cache_data(ttl=600)
 def load_radar_market_data():
     today_str = datetime.date.today().strftime("%Y-%m-%d")
@@ -393,20 +393,26 @@ def load_radar_market_data():
             unloading_status = "🔴 主力正在出貨 (短空黃金期)"
             status_color = "#FF4444"
 
+        # 【精簡版警報】：縮減字數以釋放表格寬度
         if short_ratio >= 30 or close_price >= limit_up * 0.985:
-            alert_signal = "🛑【軋空停損警戒】帶量衝高逼近漲停，切勿放空/嚴格停損"
+            short_alert_tag = "🛑 軋空停損"
+            full_alert_desc = "🛑【軋空停損警戒】帶量衝高逼近漲停，切勿放空/嚴格停損"
             alert_color = "#FF2222"
         elif close_price <= avg_cost * 1.005 or unloading_pct >= 85:
-            alert_signal = "🎯【獲利收割信號】跌破主力成本/出貨完畢，建議分批獲利回補"
+            short_alert_tag = "🎯 獲利收割"
+            full_alert_desc = "🎯【獲利收割信號】跌破主力成本/出貨完畢，建議分批獲利回補"
             alert_color = "#00E5FF"
         elif close_price < avg_cost and close_price < high_p * 0.985:
-            alert_signal = "🚨【破位出貨加碼】跌破 VWAP/均價線，主力爆量倒貨成型"
+            short_alert_tag = "🚨 破位出貨"
+            full_alert_desc = "🚨【破位出貨加碼】跌破 VWAP/均價線，主力爆量倒貨成型"
             alert_color = "#FF4444"
         elif high_p >= nh_res * 0.995 and close_price < high_p:
-            alert_signal = "⚡【摸頂試空信號】衝高逼近核心壓力(NH)受阻滯漲，勝率極佳"
+            short_alert_tag = "⚡ 摸頂試空"
+            full_alert_desc = "⚡【摸頂試空信號】衝高逼近核心壓力(NH)受阻滯漲，勝率極佳"
             alert_color = "#FF9900"
         else:
-            alert_signal = "👀【盤中常規監控】等待早盤衝高或破線訊號"
+            short_alert_tag = "👀 常規監控"
+            full_alert_desc = "👀【盤中常規監控】等待早盤衝高或破線訊號"
             alert_color = "#888888"
 
         score_ratio = min(total_ratio * 2.0, 50.0)
@@ -457,7 +463,8 @@ def load_radar_market_data():
             "已倒貨張數(估)": estimated_unloaded_shares,
             "出貨狀態標籤": unloading_status,
             "狀態顏色": status_color,
-            "盤中即時警報": alert_signal,
+            "即時信號": short_alert_tag,
+            "盤中即時警報完整": full_alert_desc,
             "警報顏色": alert_color
         })
         
@@ -471,7 +478,6 @@ def check_broker_overlap(broker_str, selected_list):
         return True
     return any(b in broker_str for b in selected_list)
 
-# 【核心更新】：加入「5日均量 >= min_vol_threshold (預設1500張)」過濾條件
 mask = (df_raw["主力合計佔比(%)"] >= min_ratio) & \
        (df_raw["5日均量(張)"] >= min_vol_threshold) & \
        (df_raw["現價"] < 5000.0) & \
@@ -495,10 +501,12 @@ c4.metric("💧 流動性達標股 (均量≥1500張)", f"{len(df_raw[df_raw['5�
 
 st.markdown("---")
 
+# 【欄位寬度與順序最佳化】：隔日沖分點與佔比前移，警告精簡為標籤
 st.subheader("📊 盤後全市場隔日沖 × 主力成本 × 鎖碼決策表 (勝率降序排列)")
 preferred_cols = [
-    "短空勝率分", "股票代號", "股票名稱", "現價", "5日均量(張)", "主力加權成本", "近高壓力(NH)", "最高壓力(AH)",
-    "出貨進度(%)", "盤中即時警報", "券資比(%)", "軋空風險評級", "主力合計買超", "主力合計佔比(%)", "隔日沖分點清單"
+    "短空勝率分", "股票代號", "股票名稱", "現價", "即時信號", "出貨進度(%)", 
+    "隔日沖分點清單", "主力合計佔比(%)", "主力合計買超", "主力加權成本", 
+    "近高壓力(NH)", "最高壓力(AH)", "券資比(%)", "5日均量(張)"
 ]
 actual_cols = [col for col in preferred_cols if col in df_display.columns]
 st.dataframe(df_display[actual_cols], use_container_width=True)
@@ -593,9 +601,10 @@ with right_side:
     broker_list = target_row.get("各分點詳細清單", [])
     unloading_val = target_row.get("出貨進度(%)", 0)
 
+    # 頂部即時警報橫條（維持完整中文解說）
     alert_banner_html = f"""
     <div style="background-color: #1A1A1A; border-left: 6px solid {target_row['警報顏色']}; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-        <span style="color: #FFFFFF; font-size: 14px; font-weight: bold;">{target_row['盤中即時警報']}</span>
+        <span style="color: #FFFFFF; font-size: 14px; font-weight: bold;">{target_row['盤中即時警報完整']}</span>
         <span style="color: {target_row['狀態顏色']}; font-size: 12px; font-weight: bold; border: 1px solid {target_row['狀態顏色']}; padding: 2px 8px; border-radius: 12px;">{target_row['出貨狀態標籤']}</span>
     </div>
     """
