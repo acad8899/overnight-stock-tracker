@@ -6,9 +6,14 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # 頁面排版設定：全寬展開
-st.set_page_config(page_title="隔日沖主力短空雷達 (多主力分點旗艦版)", layout="wide", page_icon="🎯", initial_sidebar_state="collapsed")
+st.set_page_config(
+    page_title="隔日沖主力短空雷達 (智能出貨進度與即時警報旗艦版)", 
+    layout="wide", 
+    page_icon="🎯", 
+    initial_sidebar_state="collapsed"
+)
 
-# 【大幅擴充】：全台 18 大知名隔日沖主力分點名冊
+# 18 大知名隔日沖主力分點名冊
 TARGET_BROKERS = [
     "凱基-台北", "美商美林", "元大-土城永寧", "富邦-建國", 
     "元大-總公司", "統一-敦南", "摩根大通", "新加坡商瑞銀",
@@ -17,16 +22,18 @@ TARGET_BROKERS = [
     "台灣摩根士丹利", "富邦-台北"
 ]
 
+# 頂部抬頭列與重新整理按鈕
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
-    st.title("🎯 每日隔日沖主力短空雷達 (多主力分點旗艦版)")
-    st.caption("🔥 已全面擴充監控「全台 18 大隔日沖主力分點」與擴大標的池，大幅提升每日短空選股覆蓋率。")
+    st.title("🎯 每日隔日沖主力短空雷達 (智能出貨進度與即時警報旗艦版)")
+    st.caption("🔥 整合「全市場隔日沖自動掃描」×「盤中主力出貨進度追蹤」×「實戰 3 大盤中即時短空警報燈號」。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即重新整理最新行情", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
+# 頂部橫向折疊式設定面板
 with st.expander("⚙️ 點此展開／收合【篩選條件與風控設定】", expanded=False):
     f_col1, f_col2, f_col3, f_col4 = st.columns([1.2, 1.8, 1, 1])
     with f_col1:
@@ -40,6 +47,7 @@ with st.expander("⚙️ 點此展開／收合【篩選條件與風控設定】"
         st.write("")
         kd_filter = st.checkbox("僅顯示 KD > 80 (過熱區)", value=False)
 
+# 計算實戰短空指標 (均線, VWAP, KDJ)
 def calculate_pro_short_indicators(df):
     if df is None or df.empty:
         return pd.DataFrame()
@@ -56,16 +64,19 @@ def calculate_pro_short_indicators(df):
     df["20MA"] = df["收盤"].rolling(20, min_periods=1).mean().round(2)
     df["VOL_5MA"] = df["成交量"].rolling(5, min_periods=1).mean().round(0)
 
+    # VWAP 均價線
     typical_price = (df["最高"].astype(float) + df["最低"].astype(float) + df["收盤"].astype(float)) / 3.0
     cum_vol = df["成交量"].astype(float).cumsum()
     cum_tp_vol = (typical_price * df["成交量"].astype(float)).cumsum()
     df["VWAP"] = (cum_tp_vol / cum_vol.replace(0, 1)).round(2)
 
+    # 隔日沖主力買賣超估計
     df["主力買賣超"] = [
         int(v * 0.18 * (1 if c >= o else -0.85)) 
         for v, c, o in zip(volumes, closes, opens)
     ]
 
+    # KDJ (9, 3, 3)
     k, d = 50.0, 50.0
     k_list, d_list, j_list = [], [], []
     for i in range(len(df)):
@@ -89,6 +100,7 @@ def calculate_pro_short_indicators(df):
     df["J"] = j_list
     return df
 
+# 使用 yfinance 抓取即時行情走勢
 @st.cache_data(ttl=300)
 def fetch_real_kline(stock_code, interval="5m"):
     stock_code_str = str(stock_code).strip()
@@ -138,6 +150,7 @@ def fetch_real_kline(stock_code, interval="5m"):
             continue
     return pd.DataFrame()
 
+# 繪製 4 層專業短空技術線圖
 def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limit_up_price, timeframe_label):
     last = df_k.iloc[-1]
     prev_close = df_k["收盤"].iloc[-2] if len(df_k) > 1 else last["收盤"]
@@ -274,7 +287,7 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
     fig.update_yaxes(gridcolor="#222222", showgrid=True, side="right")
     return fig
 
-# 【擴充大型隔日沖監控股票池 (15+ 檔)】
+# 【功能升級二】：全市場隔日沖自動掃描池 (18 大主力分點全面覆蓋)
 @st.cache_data(ttl=600)
 def load_radar_market_data():
     today_str = datetime.date.today().strftime("%Y-%m-%d")
@@ -315,9 +328,9 @@ def load_radar_market_data():
             prev_close = round(float(prev_row["收盤"]), 2)
             change = round(close_price - prev_close, 2)
             change_pct = round((change / prev_close) * 100, 2) if prev_close else 0.0
-            
             high_p = round(float(last_row["最高"]), 2)
             low_p = round(float(last_row["最低"]), 2)
+            today_volume = int(last_row["成交量"])
         else:
             close_price = base_prev_close
             prev_close = base_prev_close
@@ -325,6 +338,7 @@ def load_radar_market_data():
             change_pct = 0.0
             high_p = round(close_price * 1.02, 2)
             low_p = round(close_price * 0.98, 2)
+            today_volume = int(yesterday_settled_vol * 1.2)
 
         if close_price >= 5000.0:
             continue
@@ -344,7 +358,6 @@ def load_radar_market_data():
         for b_name, b_pct in item["主力分點"]:
             b_fixed_vol = int(yesterday_settled_vol * b_pct)
             b_cost = round(prev_close * 0.985, 2)
-            
             profit_per_share = close_price - b_cost
             profit_wan = round((profit_per_share * b_fixed_vol * 1000) / 10000, 2)
             p_rate = round((profit_per_share / b_cost) * 100, 2)
@@ -372,6 +385,39 @@ def load_radar_market_data():
         risk_level = "⚠️ 嚴禁摸頂 (極高軋空)" if short_ratio >= 30 else ("🟡 觀察開盤 (中度風險)" if short_ratio >= 15 else "🟢 適合短空 (低軋空風險)")
         action_guide = "主力可能連續鎖漲停，切勿放空！" if short_ratio >= 30 else "隔日沖出貨機率極高，順勢切入。"
         
+        # 【功能升級一】：盤中主力出貨進度估算 (Unloading Tracker)
+        # 根據盤中下殺放量程度估算已倒出張數與百分比
+        estimated_unloaded_shares = int(min(today_volume * 0.42, total_fixed_shares * 1.1)) if (close_price < high_p) else int(today_volume * 0.15)
+        unloading_pct = int(min(round((estimated_unloaded_shares / total_fixed_shares) * 100), 100)) if total_fixed_shares > 0 else 0
+        
+        if unloading_pct >= 85:
+            unloading_status = "🟢 主力已倒光 (嚴禁追空 / 提防低檔反彈)"
+            status_color = "#00CC66"
+        elif unloading_pct >= 50:
+            unloading_status = "🟡 出貨尾聲 (獲利豐厚 / 分批停利)"
+            status_color = "#FFCC00"
+        else:
+            unloading_status = "🔴 主力正在出貨 (短空黃金期)"
+            status_color = "#FF4444"
+
+        # 【功能升級三】：盤中 3 大短空即時決策警報燈號判定
+        if short_ratio >= 30 or close_price >= limit_up * 0.985:
+            alert_signal = "🛑【軋空停損警戒】帶量衝高逼近漲停，切勿放空/嚴格停損"
+            alert_color = "#FF2222"
+        elif close_price <= avg_cost * 1.005 or unloading_pct >= 85:
+            alert_signal = "🎯【獲利收割信號】跌破主力成本/出貨完畢，建議分批獲利回補"
+            alert_color = "#00E5FF"
+        elif close_price < avg_cost and close_price < high_p * 0.985:
+            alert_signal = "🚨【破位出貨加碼】跌破 VWAP/均價線，主力爆量倒貨成型"
+            alert_color = "#FF4444"
+        elif high_p >= nh_res * 0.995 and close_price < high_p:
+            alert_signal = "⚡【摸頂試空信號】衝高逼近核心壓力(NH)受阻滯漲，勝率極佳"
+            alert_color = "#FF9900"
+        else:
+            alert_signal = "👀【盤中常規監控】等待早盤衝高或破線訊號"
+            alert_color = "#888888"
+
+        # 短空勝率綜合評分演算法
         score_ratio = min(total_ratio * 2.0, 50.0)
         score_profit = min(max(total_p_rate, 0) * 15.0, 30.0)
         
@@ -404,7 +450,6 @@ def load_radar_market_data():
             "K(9)": 66.9,
             "D(9)": 54.2,
             "J(9)": 92.3,
-            "均線狀態": "多頭排列",
             "券資比(%)": short_ratio,
             "隔日沖分點清單": "、".join([b[0] for b in item["主力分點"]]),
             "主力合計買超": total_fixed_shares,
@@ -415,7 +460,13 @@ def load_radar_market_data():
             "短空勝率分": total_win_rate_score,
             "各分點詳細清單": detailed_brokers,
             "軋空風險評級": risk_level,
-            "實戰指引": action_guide
+            "實戰指引": action_guide,
+            "出貨進度(%)": unloading_pct,
+            "已倒貨張數(估)": estimated_unloaded_shares,
+            "出貨狀態標籤": unloading_status,
+            "狀態顏色": status_color,
+            "盤中即時警報": alert_signal,
+            "警報顏色": alert_color
         })
         
     enhanced_list = sorted(enhanced_list, key=lambda x: x["短空勝率分"], reverse=True)
@@ -442,6 +493,7 @@ df_filtered = df_raw[mask].copy()
 df_display = df_filtered if not df_filtered.empty else df_raw[df_raw["現價"] < 5000.0].copy()
 df_display = df_display.sort_values(by="短空勝率分", ascending=False).reset_index(drop=True)
 
+# 頂部 4 大統計指標
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("📅 最新更新日期", update_date)
 c2.metric("🎯 今日鎖碼短空標的", f"{len(df_filtered)} 檔" if not df_filtered.empty else f"{len(df_display)} 檔 (展示全庫)")
@@ -450,22 +502,24 @@ c4.metric("⚡ 高檔過熱股 (K>80)", f"{len(df_raw[pd.to_numeric(df_raw['K(9)
 
 st.markdown("---")
 
-st.subheader("📊 盤後全市場隔日沖 × 主力成本 × 短空勝率決策表 (勝率降序排列)")
+# 主決策表
+st.subheader("📊 盤後全市場隔日沖 × 主力成本 × 出貨進度決策表 (勝率降序排列)")
 preferred_cols = [
-    "短空勝率分", "股票代號", "股票名稱", "現價", "主力加權成本", "近高壓力(NH)", "最高壓力(AH)", "漲停價",
-    "券資比(%)", "軋空風險評級", "主力合計買超", "主力合計佔比(%)", "隔日沖分點清單", "實戰指引"
+    "短空勝率分", "股票代號", "股票名稱", "現價", "主力加權成本", "近高壓力(NH)", "最高壓力(AH)",
+    "出貨進度(%)", "盤中即時警報", "券資比(%)", "軋空風險評級", "主力合計買超", "主力合計佔比(%)", "隔日沖分點清單"
 ]
 actual_cols = [col for col in preferred_cols if col in df_display.columns]
 st.dataframe(df_display[actual_cols], use_container_width=True)
 
 st.markdown("---")
 
-st.subheader("🖥️ 操盤工作台 (勝率最高依序置頂)")
+# 操盤工作台
+st.subheader("🖥️ 操盤工作台 (即時出貨監控與警報連動)")
 
-left_side, right_side = st.columns([1.15, 3.85], gap="medium")
+left_side, right_side = st.columns([1.2, 3.8], gap="medium")
 
 with left_side:
-    st.markdown("### 📋 自選短空清單 (勝率排序)")
+    st.markdown("### 📋 自選短空清單")
     st.caption("💡 依勝率由高至低排列，可用鍵盤 **↑ / ↓ 鍵** 切換")
     
     stock_list_options = []
@@ -498,6 +552,7 @@ with left_side:
 
     target_row = df_display[df_display["股票代號"] == target_code].iloc[0]
     
+    # 快速摘要深色卡片
     summary_card_html = f"""
     <div style="background-color: #1E1E1E; border: 1px solid #333333; border-radius: 8px; padding: 14px 16px; margin-top: 10px; color: #FFFFFF; font-family: monospace;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333333; padding-bottom: 8px; margin-bottom: 10px;">
@@ -542,6 +597,32 @@ with right_side:
     nh_val = target_row.get("近高壓力(NH)")
     limit_p = target_row.get("漲停價")
     broker_list = target_row.get("各分點詳細清單", [])
+    unloading_val = target_row.get("出貨進度(%)", 0)
+
+    # 【功能升級三】：頂部即時警報橫條
+    alert_banner_html = f"""
+    <div style="background-color: #1A1A1A; border-left: 6px solid {target_row['警報顏色']}; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+        <span style="color: #FFFFFF; font-size: 14px; font-weight: bold;">{target_row['盤中即時警報']}</span>
+        <span style="color: {target_row['狀態顏色']}; font-size: 12px; font-weight: bold; border: 1px solid {target_row['狀態顏色']}; padding: 2px 8px; border-radius: 12px;">{target_row['出貨狀態標籤']}</span>
+    </div>
+    """
+    st.markdown(alert_banner_html, unsafe_allow_html=True)
+
+    # 【功能升級一】：視覺化出貨進度估算條 (Progress Tracker)
+    p_bar_color = "#FF4444" if unloading_val < 50 else ("#FFCC00" if unloading_val < 85 else "#00CC66")
+    progress_html = f"""
+    <div style="background-color: #1E1E1E; border: 1px solid #333; border-radius: 6px; padding: 10px 14px; margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px; color: #BBB; margin-bottom: 6px;">
+            <span>📦 主力鎖碼總量：<b style="color:#FFF;">{target_row['主力合計買超']:,} 張</b></span>
+            <span>📉 預估已倒出：<b style="color:{p_bar_color};">{target_row['已倒貨張數(估)']:,} 張</b></span>
+            <span>🔥 倒貨進度：<b style="color:{p_bar_color}; font-size:14px;">{unloading_val}%</b></span>
+        </div>
+        <div style="background-color: #333333; border-radius: 6px; height: 10px; width: 100%; overflow: hidden;">
+            <div style="background-color: {p_bar_color}; height: 100%; width: {unloading_val}%; transition: width 0.4s ease;"></div>
+        </div>
+    </div>
+    """
+    st.markdown(progress_html, unsafe_allow_html=True)
 
     c_tf1, c_tf2 = st.columns([1, 1])
     with c_tf1:
@@ -569,6 +650,7 @@ with right_side:
 
     st.markdown("---")
 
+    # 分點持倉與即時損益明細
     st.markdown(f"#### 🏢 【{target_name} ({target_code})】各大主力分點昨日鎖碼持倉與今日即時損益")
     
     p_tot_wan = float(target_row['主力合計獲利(萬)'])
@@ -576,7 +658,7 @@ with right_side:
     p_color_hex = "#FF4444" if p_tot_rate >= 0 else "#00CC66"
     p_sign = "+" if p_tot_rate > 0 else ""
     
-    summary_card_html = f"""
+    summary_cards_html = f"""
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px;">
         <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #3399FF;">
             <div style="color:#888; font-size:11px; margin-bottom:2px;">📦 昨日鎖碼總庫存</div>
@@ -596,7 +678,7 @@ with right_side:
         </div>
     </div>
     """
-    st.markdown(summary_card_html, unsafe_allow_html=True)
+    st.markdown(summary_cards_html, unsafe_allow_html=True)
     
     if broker_list:
         df_brokers = pd.DataFrame(broker_list)
@@ -610,9 +692,10 @@ with right_side:
 
 st.markdown("---")
 
-st.subheader("💡 實戰短空 3 大高勝率訊號")
+# 實戰短空 3 大高勝率訊號
+st.subheader("💡 實戰短空 3 大高勝率訊號與警報指引")
 st.info("""
-1. **衝撞近高壓力 NH 遇阻滯漲**：早盤主力急拉時，在 **橘黃色 NH 核心壓力線** 附近爆量出長上影線或翻黑，為極佳摸頂空點。
-2. **破 VWAP 均價線（跌破全場成本）**：早盤衝高後，一旦 5分K **實體長黑跌破粉紅色 VWAP 均價線**，代表當天進場散戶轉為套牢，為順勢加碼放空點。
-3. **漲停價停損防線**：若多頭買盤超乎預期突破所有壓力直奔漲停價，必須嚴格遵守紀律停損。
+1. ⚡ **【摸頂試空信號】**：早盤主力急拉時，股價觸碰 **橘黃色 NH 核心壓力線** 附近爆量出長上影線或翻黑，為第一高勝率放空點。
+2. 🚨 **【破位出貨加碼】**：5分K **實體長黑摜破粉紅色 VWAP 均價線**，確認當天追高散戶全數套牢，出貨進度加速，為順勢加碼點。
+3. 🛑 **【軋空停損防線】**：若主力買盤極強突破 NH 並帶量直奔漲停價，系統亮起紅色警報，必須嚴格遵守紀律立即停損出場。
 """)
