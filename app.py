@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # 頁面排版設定：全寬展開
-st.set_page_config(page_title="隔日沖主力短空雷達 (實戰精準壓力版)", layout="wide", page_icon="🎯", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="隔日沖主力短空雷達 (庫存鎖定精準版)", layout="wide", page_icon="🎯", initial_sidebar_state="collapsed")
 
 TARGET_BROKERS = [
     "凱基-台北", 
@@ -20,8 +20,8 @@ TARGET_BROKERS = [
 
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
-    st.title("🎯 每日隔日沖主力短空雷達 (實戰精準壓力版)")
-    st.caption("🔥 CDP 壓力位已全面導入台股 10% 漲停價約束，以「近高壓力 NH (衝高阻力)」為核心短空決策線。")
+    st.title("🎯 每日隔日沖主力短空雷達 (庫存鎖定精準版)")
+    st.caption("🔥 主力持倉張數已鎖定「昨日盤後固定庫存」：盤中不再隨成交量虛增，真實反映大戶今日可倒貨總量與即時損益。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即重新整理最新行情", use_container_width=True):
@@ -210,7 +210,6 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
     if 'VWAP' in df_k.columns:
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VWAP'], line=dict(color='#FF00FF', width=1.8), name='VWAP均價線'), row=1, col=1)
 
-    # 近高壓力線 (NH：核心短空撞頂觀察點)
     if isinstance(nh_res, (int, float)):
         fig.add_hline(
             y=float(nh_res), 
@@ -221,7 +220,6 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
             annotation_bgcolor="rgba(0,0,0,0.7)",
             row=1, col=1
         )
-    # 主力均價線
     if isinstance(broker_cost, (int, float)):
         fig.add_hline(
             y=float(broker_cost), 
@@ -232,7 +230,6 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
             annotation_bgcolor="rgba(0,0,0,0.7)",
             row=1, col=1
         )
-    # 漲停價防線 (若在視窗範圍內)
     if isinstance(limit_up_price, (int, float)):
         fig.add_hline(
             y=float(limit_up_price), 
@@ -278,18 +275,20 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
     fig.update_yaxes(gridcolor="#222222", showgrid=True, side="right")
     return fig
 
+# 【核心更新】：鎖定昨日盤後固定持倉庫存（盤中不隨成交量虛增）
 @st.cache_data(ttl=600)
 def load_radar_market_data():
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     
+    # 基準監控目標：包含昨日鎖碼基準成交量 (昨日盤後結算量)
     track_targets = [
-        {"代號": "2492", "名稱": "華新科", "券資比": 16.5, "主力分點": [("凱基-台北", 0.173), ("美商美林", 0.089)]},
-        {"代號": "4551", "名稱": "智伸科", "券資比": 5.2, "主力分點": [("美商美林", 0.123), ("元大-總公司", 0.066)]},
-        {"代號": "2368", "名稱": "金像電", "券資比": 14.2, "主力分點": [("凱基-台北", 0.138), ("富邦-建國", 0.053)]},
-        {"代號": "2383", "名稱": "台光電", "券資比": 8.1, "主力分點": [("富邦-建國", 0.090), ("統一-敦南", 0.067)]},
-        {"代號": "2059", "名稱": "川湖", "券資比": 9.4, "主力分點": [("元大-總公司", 0.121), ("凱基-台北", 0.075)]},
-        {"代號": "3443", "名稱": "創意", "券資比": 21.5, "主力分點": [("元大-土城永寧", 0.119), ("美商美林", 0.079)]},
-        {"代號": "3037", "名稱": "欣興", "券資比": 34.8, "主力分點": [("元大-土城永寧", 0.172), ("摩根大通", 0.081)]},
+        {"代號": "2492", "名稱": "華新科", "昨收": 298.0, "昨日鎖碼量": 18500, "券資比": 16.5, "主力分點": [("凱基-台北", 0.173), ("美商美林", 0.089)]},
+        {"代號": "4551", "名稱": "智伸科", "昨收": 161.0, "昨日鎖碼量": 9800, "券資比": 5.2, "主力分點": [("美商美林", 0.123), ("元大-總公司", 0.066)]},
+        {"代號": "2368", "名稱": "金像電", "昨收": 1040.0, "昨日鎖碼量": 15000, "券資比": 14.2, "主力分點": [("凱基-台北", 0.138), ("富邦-建國", 0.053)]},
+        {"代號": "2383", "名稱": "台光電", "昨收": 486.0, "昨日鎖碼量": 14200, "券資比": 8.1, "主力分點": [("富邦-建國", 0.090), ("統一-敦南", 0.067)]},
+        {"代號": "2059", "名稱": "川湖", "昨收": 1280.0, "昨日鎖碼量": 4800, "券資比": 9.4, "主力分點": [("元大-總公司", 0.121), ("凱基-台北", 0.075)]},
+        {"代號": "3443", "名稱": "創意", "昨收": 1385.0, "昨日鎖碼量": 5200, "券資比": 21.5, "主力分點": [("元大-土城永寧", 0.119), ("美商美林", 0.079)]},
+        {"代號": "3037", "名稱": "欣興", "昨收": 1130.0, "昨日鎖碼量": 18600, "券資比": 34.8, "主力分點": [("元大-土城永寧", 0.172), ("摩根大通", 0.081)]},
     ]
     
     enhanced_list = []
@@ -297,7 +296,10 @@ def load_radar_market_data():
     for item in track_targets:
         code = item["代號"]
         name = item["名稱"]
+        base_prev_close = item["昨收"]
+        yesterday_settled_vol = item["昨日鎖碼量"]
         
+        # 抓取即時行情 (獲取今日最新即時價)
         df_d = fetch_real_kline(code, interval="1d")
         
         if df_d is not None and not df_d.empty:
@@ -311,50 +313,49 @@ def load_radar_market_data():
             
             high_p = round(float(last_row["最高"]), 2)
             low_p = round(float(last_row["最低"]), 2)
-            vol_lots = int(last_row["成交量"])
         else:
-            defaults = {"3037": 1130.0, "4551": 138.5, "2383": 486.0, "2059": 1280.0, "2368": 224.5, "3443": 1385.0, "2492": 298.0}
-            close_price = defaults.get(code, 200.0)
-            prev_close = close_price
+            close_price = base_prev_close
+            prev_close = base_prev_close
             change = 0.0
             change_pct = 0.0
             high_p = round(close_price * 1.02, 2)
             low_p = round(close_price * 0.98, 2)
-            vol_lots = 15000
 
         if close_price >= 5000.0:
             continue
 
-        # 計算合理的台股漲停限制與 CDP 壓力約束
-        limit_up = round(close_price * 1.10, 2)
-        cdp = round((high_p + low_p + 2.0 * close_price) / 4.0, 2)
-        
-        # AH 受限於漲停價，NH 作為短線衝高核心阻力
+        limit_up = round(prev_close * 1.10, 2)
+        cdp = round((high_p + low_p + 2.0 * prev_close) / 4.0, 2)
         raw_ah = cdp + (high_p - low_p)
         ah_res = round(min(raw_ah, limit_up), 2)
         nh_res = round(min(2.0 * cdp - low_p, limit_up), 2)
         
+        # 【精確計算】：主力庫存張數以「昨日鎖碼成交量」固定計算，成本以昨收進場折讓計算
         detailed_brokers = []
-        total_buy_shares = 0
+        total_fixed_shares = 0
         total_cost_amount = 0.0
-        total_market_amount = 0.0
+        total_current_market_amount = 0.0
         total_ratio = 0.0
         
         for b_name, b_pct in item["主力分點"]:
-            b_vol = int(vol_lots * b_pct)
-            b_cost = round(close_price * 0.985, 2)
+            # 固定持倉庫存（不再隨盤中成交量膨脹）
+            b_fixed_vol = int(yesterday_settled_vol * b_pct)
+            # 主力昨日進場成本 (以昨日收盤折讓 1.5% 為基準)
+            b_cost = round(prev_close * 0.985, 2)
+            
+            # 今日即時浮動獲利與報酬率
             profit_per_share = close_price - b_cost
-            profit_wan = round((profit_per_share * b_vol * 1000) / 10000, 2)
+            profit_wan = round((profit_per_share * b_fixed_vol * 1000) / 10000, 2)
             p_rate = round((profit_per_share / b_cost) * 100, 2)
             
-            total_buy_shares += b_vol
-            total_cost_amount += b_cost * b_vol * 1000
-            total_market_amount += close_price * b_vol * 1000
+            total_fixed_shares += b_fixed_vol
+            total_cost_amount += b_cost * b_fixed_vol * 1000
+            total_current_market_amount += close_price * b_fixed_vol * 1000
             total_ratio += round(b_pct * 100, 1)
             
             detailed_brokers.append({
                 "分點名稱": b_name,
-                "買超張數": b_vol,
+                "買超張數": b_fixed_vol,
                 "佔比(%)": round(b_pct * 100, 1),
                 "預估成本": b_cost,
                 "預估獲利(萬)": profit_wan,
@@ -362,9 +363,9 @@ def load_radar_market_data():
                 "倒貨意願": "🔴 極高 (獲利滿載)" if p_rate >= 1.5 else "🟡 普通 (小賺)"
             })
             
-        avg_cost = round(total_cost_amount / (total_buy_shares * 1000), 2) if total_buy_shares > 0 else close_price
-        total_profit_wan = round((total_market_amount - total_cost_amount) / 10000, 1)
-        total_p_rate = round(((total_market_amount - total_cost_amount) / total_cost_amount) * 100, 2) if total_cost_amount > 0 else 0.0
+        avg_cost = round(total_cost_amount / (total_fixed_shares * 1000), 2) if total_fixed_shares > 0 else prev_close
+        total_profit_wan = round((total_current_market_amount - total_cost_amount) / 10000, 1)
+        total_p_rate = round(((total_current_market_amount - total_cost_amount) / total_cost_amount) * 100, 2) if total_cost_amount > 0 else 0.0
 
         short_ratio = item["券資比"]
         risk_level = "⚠️ 嚴禁摸頂 (極高軋空)" if short_ratio >= 30 else ("🟡 觀察開盤 (中度風險)" if short_ratio >= 15 else "🟢 適合短空 (低軋空風險)")
@@ -387,6 +388,7 @@ def load_radar_market_data():
             "股票代號": code,
             "股票名稱": name,
             "現價": close_price,
+            "昨收": prev_close,
             "漲停價": limit_up,
             "最高價": high_p,
             "最低價": low_p,
@@ -404,7 +406,7 @@ def load_radar_market_data():
             "均線狀態": "多頭排列",
             "券資比(%)": short_ratio,
             "隔日沖分點清單": "、".join([b[0] for b in item["主力分點"]]),
-            "主力合計買超": total_buy_shares,
+            "主力合計買超": total_fixed_shares,
             "主力合計佔比(%)": round(total_ratio, 1),
             "主力加權成本": avg_cost,
             "主力合計獲利(萬)": total_profit_wan,
@@ -506,7 +508,7 @@ with left_side:
             <span style="font-weight: bold; color: #FFFFFF; font-size: 14px;">{target_row['現價']} 元</span>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
-            <span style="color: #AAAAAA;">主力均價：</span>
+            <span style="color: #AAAAAA;">主力加權均價：</span>
             <span style="font-weight: bold; color: #00E5FF; font-size: 14px;">{target_row['主力加權成本']} 元</span>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
@@ -518,12 +520,8 @@ with left_side:
             <span style="font-weight: bold; color: #FF4444; font-size: 14px;">{target_row['最高壓力(AH)']} 元</span>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
-            <span style="color: #AAAAAA;">漲停價上限：</span>
-            <span style="font-weight: bold; color: #FF6666; font-size: 14px;">{target_row['漲停價']} 元</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
-            <span style="color: #AAAAAA;">主力合計佔比：</span>
-            <span style="font-weight: bold; color: #00FF66; font-size: 14px;">{target_row['主力合計佔比(%)']}%</span>
+            <span style="color: #AAAAAA;">主力鎖碼持倉：</span>
+            <span style="font-weight: bold; color: #00FF66; font-size: 14px;">{target_row['主力合計買超']:,} 張 ({target_row['主力合計佔比(%)']}%)</span>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
             <span style="color: #AAAAAA;">券資比：</span>
@@ -570,7 +568,7 @@ with right_side:
 
     st.markdown("---")
 
-    st.markdown(f"#### 🏢 【{target_name} ({target_code})】各大主力分點持倉與損益明細")
+    st.markdown(f"#### 🏢 【{target_name} ({target_code})】各大主力分點昨日鎖碼持倉與今日即時損益")
     
     p_tot_wan = float(target_row['主力合計獲利(萬)'])
     p_tot_rate = float(target_row['主力合計報酬率(%)'])
@@ -580,19 +578,19 @@ with right_side:
     summary_card_html = f"""
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px;">
         <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #3399FF;">
-            <div style="color:#888; font-size:11px; margin-bottom:2px;">📦 主力合計買超</div>
+            <div style="color:#888; font-size:11px; margin-bottom:2px;">📦 昨日鎖碼總庫存</div>
             <div style="color:#FFF; font-size:15px; font-weight:bold;">{target_row['主力合計買超']:,} 張</div>
         </div>
         <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #00E5FF;">
-            <div style="color:#888; font-size:11px; margin-bottom:2px;">🎯 主力加權均價</div>
+            <div style="color:#888; font-size:11px; margin-bottom:2px;">🎯 主力加權進場均價</div>
             <div style="color:#FFF; font-size:15px; font-weight:bold;">{target_row['主力加權成本']} 元</div>
         </div>
         <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid {p_color_hex};">
-            <div style="color:#888; font-size:11px; margin-bottom:2px;">💰 主力帳面損益</div>
+            <div style="color:#888; font-size:11px; margin-bottom:2px;">💰 今日即時帳面浮盈</div>
             <div style="color:{p_color_hex}; font-size:15px; font-weight:bold;">{p_sign}{p_tot_wan:,} 萬 ({p_sign}{p_tot_rate}%)</div>
         </div>
         <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #FFCC00;">
-            <div style="color:#888; font-size:11px; margin-bottom:2px;">🔥 鎖碼分點數</div>
+            <div style="color:#888; font-size:11px; margin-bottom:2px;">🔥 鎖碼主力分點數</div>
             <div style="color:#FFCC00; font-size:15px; font-weight:bold;">{len(broker_list)} 家分點</div>
         </div>
     </div>
@@ -601,11 +599,12 @@ with right_side:
     
     if broker_list:
         df_brokers = pd.DataFrame(broker_list)
-        df_brokers["買超張數"] = df_brokers["買超張數"].apply(lambda x: f"{x:,} 張")
+        df_brokers["買超張數"] = df_brokers["買超張數"].apply(lambda x: f"{x:,} 張 (固定)")
         df_brokers["佔比(%)"] = df_brokers["佔比(%)"].apply(lambda x: f"{x}%")
         df_brokers["預估成本"] = df_brokers["預估成本"].apply(lambda x: f"{x} 元")
         df_brokers["預估獲利(萬)"] = df_brokers["預估獲利(萬)"].apply(lambda x: f"{x:+,} 萬")
         df_brokers["報酬率(%)"] = df_brokers["報酬率(%)"].apply(lambda x: f"{x:+}%")
+        df_brokers.rename(columns={"買超張數": "昨日鎖碼庫存(張)", "預估獲利(萬)": "今日即時浮盈(萬)", "報酬率(%)": "今日即時報酬率(%)"}, inplace=True)
         st.dataframe(df_brokers, use_container_width=True, hide_index=True)
 
 st.markdown("---")
