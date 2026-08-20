@@ -59,7 +59,7 @@ with head_col2:
         st.cache_data.clear()
         st.rerun()
 
-# 頂部橫向折疊式設定面板 (改用 utf-8-sig 編碼 CSV，Excel 直接開不報錯)
+# 頂部橫向折疊式設定面板
 with st.expander("⚙️ 點此展開／收合【篩選條件、流動性風控與分點特性表匯出】", expanded=False):
     f_col1, f_col2, f_col3, f_col4, f_col5 = st.columns([1.2, 1.2, 1.6, 1, 1])
     with f_col1:
@@ -80,7 +80,6 @@ with st.expander("⚙️ 點此展開／收合【篩選條件、流動性風控�
         BROKER_DATA_CATALOG, 
         columns=["編號", "派系分類", "主力分點名稱", "鎖碼標的偏好", "典型操盤手法", "次日早盤出貨慣性", "短空狙擊策略與注意事項"]
     )
-    # 使用 utf-8-sig，Excel 點開即用且不需任何外掛套件
     csv_data = df_catalog.to_csv(index=False).encode('utf-8-sig')
     
     st.download_button(
@@ -406,6 +405,7 @@ def load_radar_market_data():
                 "分點名稱": b_name,
                 "買超張數": b_fixed_vol,
                 "佔比(%)": round(b_pct * 100, 1),
+                "收盤價": close_price,
                 "預估成本": b_cost,
                 "預估獲利(萬)": profit_wan,
                 "報酬率(%)": p_rate,
@@ -724,11 +724,15 @@ with right_side:
         df_brokers.index = range(1, len(df_brokers) + 1)
         df_brokers["買超張數"] = df_brokers["買超張數"].apply(lambda x: f"{x:,} 張 (固定)")
         df_brokers["佔比(%)"] = df_brokers["佔比(%)"].apply(lambda x: f"{x}%")
+        df_brokers["收盤價"] = df_brokers["收盤價"].apply(lambda x: f"{x} 元")
         df_brokers["預估成本"] = df_brokers["預估成本"].apply(lambda x: f"{x} 元")
         df_brokers["預估獲利(萬)"] = df_brokers["預估獲利(萬)"].apply(lambda x: f"{x:+,} 萬")
         df_brokers["報酬率(%)"] = df_brokers["報酬率(%)"].apply(lambda x: f"{x:+}%")
         df_brokers.rename(columns={"買超張數": "今日鎖碼庫存(張)", "預估獲利(萬)": "帳面浮盈(萬)", "報酬率(%)": "帳面報酬率(%)"}, inplace=True)
-        st.dataframe(df_brokers, use_container_width=True)
+        # 依序排列欄位，將收盤價置於佔比與預估成本之間
+        cols_order = ["分點名稱", "今日鎖碼庫存(張)", "佔比(%)", "收盤價", "預估成本", "帳面浮盈(萬)", "帳面報酬率(%)", "倒貨意願"]
+        actual_cols_order = [c for c in cols_order if c in df_brokers.columns]
+        st.dataframe(df_brokers[actual_cols_order], use_container_width=True)
 
 st.markdown("---")
 
