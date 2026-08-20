@@ -7,13 +7,13 @@ from plotly.subplots import make_subplots
 
 # 頁面排版設定：全寬展開
 st.set_page_config(
-    page_title="隔日沖主力短空雷達 (智能出貨進度與即時警報旗艦版)", 
+    page_title="隔日沖主力短空雷達 (30大主力分點 × 10%黃金門檻版)", 
     layout="wide", 
     page_icon="🎯", 
     initial_sidebar_state="collapsed"
 )
 
-# 30 大知名隔日沖主力分點名冊
+# 【全台 30 大隔日沖主力完全名冊】
 TARGET_BROKERS = [
     # 外資量化隔日沖
     "美商美林", "摩根大通", "新加坡商瑞銀", "台灣摩根士丹利", "美商高盛",
@@ -32,19 +32,19 @@ TARGET_BROKERS = [
 # 頂部抬頭列與重新整理按鈕
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
-    st.title("🎯 每日隔日沖主力短空雷達 (智能出貨進度與即時警報旗艦版)")
-    st.caption("🔥 整合「全市場隔日沖自動掃描」×「盤中主力出貨進度追蹤」×「實戰 3 大盤中即時短空警報燈號」。")
+    st.title("🎯 每日隔日沖主力短空雷達 (30大主力分點 × 10%黃金門檻版)")
+    st.caption("🔥 預設主力佔比門檻為 10%（兼具籌碼集中度與過濾雜訊），監控全台 30 大隔日沖主力席位。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即重新整理最新行情", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
-# 頂部橫向折疊式設定面板
+# 頂部橫向折疊式設定面板 (預設值改為 10)
 with st.expander("⚙️ 點此展開／收合【篩選條件與風控設定】", expanded=False):
     f_col1, f_col2, f_col3, f_col4 = st.columns([1.2, 1.8, 1, 1])
     with f_col1:
-        min_ratio = st.slider("主力合計佔比 (%) 門檻：", min_value=1, max_value=30, value=5, step=1)
+        min_ratio = st.slider("主力合計佔比 (%) 門檻：", min_value=1, max_value=30, value=10, step=1)
     with f_col2:
         selected_brokers = st.multiselect("監控主力分點：", options=TARGET_BROKERS, default=TARGET_BROKERS)
     with f_col3:
@@ -107,7 +107,7 @@ def calculate_pro_short_indicators(df):
     df["J"] = j_list
     return df
 
-# 使用 yfinance 抓取即時行情走勢
+# 抓取即時行情走勢
 @st.cache_data(ttl=300)
 def fetch_real_kline(stock_code, interval="5m"):
     stock_code_str = str(stock_code).strip()
@@ -294,7 +294,7 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
     fig.update_yaxes(gridcolor="#222222", showgrid=True, side="right")
     return fig
 
-# 【功能升級二】：全市場隔日沖自動掃描池 (18 大主力分點全面覆蓋)
+# 全市場隔日沖自動掃描池
 @st.cache_data(ttl=600)
 def load_radar_market_data():
     today_str = datetime.date.today().strftime("%Y-%m-%d")
@@ -310,7 +310,7 @@ def load_radar_market_data():
         {"代號": "3231", "名稱": "緯創", "昨收": 115.0, "昨日鎖碼量": 42000, "券資比": 6.8, "主力分點": [("凱基-台北", 0.145), ("新加坡商瑞銀", 0.072)]},
         {"代號": "2376", "名稱": "技嘉", "昨收": 272.0, "昨日鎖碼量": 16800, "券資比": 11.3, "主力分點": [("美商美林", 0.112), ("元大-土城永寧", 0.068)]},
         {"代號": "3661", "名稱": "世芯-KY", "昨收": 2850.0, "昨日鎖碼量": 3200, "券資比": 18.2, "主力分點": [("台灣摩根士丹利", 0.132), ("統一-南京", 0.065)]},
-        {"代號": "6274", "名稱": "台燿", "昨收": 168.5, "昨日鎖碼量": 11200, "券資比": 7.9, "主力分點": [("群益金鼎-大安", 0.128), ("國票-安和", 0.074)]},
+        {"代號": "6274", "名稱": "台燿", "昨收": 168.5, "昨日鎖碼量": 11200, "券資比": 7.9, "主力分點": [("群益金鼎-大安", 0.128), ("國票-敦北法人", 0.074)]},
         {"代號": "3017", "名稱": "奇鋐", "昨收": 610.0, "昨日鎖碼量": 8900, "券資比": 13.5, "主力分點": [("凱基-松山", 0.105), ("富邦-建國", 0.062)]},
         {"代號": "8210", "名稱": "勤誠", "昨收": 268.0, "昨日鎖碼量": 6400, "券資比": 9.1, "主力分點": [("國泰-敦南", 0.115), ("凱基-市府", 0.058)]},
         {"代號": "1519", "名稱": "華城", "昨收": 640.0, "昨日鎖碼量": 9500, "券資比": 22.4, "主力分點": [("元大-大同", 0.135), ("康和-永和", 0.069)]},
@@ -392,8 +392,7 @@ def load_radar_market_data():
         risk_level = "⚠️ 嚴禁摸頂 (極高軋空)" if short_ratio >= 30 else ("🟡 觀察開盤 (中度風險)" if short_ratio >= 15 else "🟢 適合短空 (低軋空風險)")
         action_guide = "主力可能連續鎖漲停，切勿放空！" if short_ratio >= 30 else "隔日沖出貨機率極高，順勢切入。"
         
-        # 【功能升級一】：盤中主力出貨進度估算 (Unloading Tracker)
-        # 根據盤中下殺放量程度估算已倒出張數與百分比
+        # 盤中主力出貨進度估算
         estimated_unloaded_shares = int(min(today_volume * 0.42, total_fixed_shares * 1.1)) if (close_price < high_p) else int(today_volume * 0.15)
         unloading_pct = int(min(round((estimated_unloaded_shares / total_fixed_shares) * 100), 100)) if total_fixed_shares > 0 else 0
         
@@ -407,7 +406,7 @@ def load_radar_market_data():
             unloading_status = "🔴 主力正在出貨 (短空黃金期)"
             status_color = "#FF4444"
 
-        # 【功能升級三】：盤中 3 大短空即時決策警報燈號判定
+        # 盤中 3 大短空即時決策警報燈號
         if short_ratio >= 30 or close_price >= limit_up * 0.985:
             alert_signal = "🛑【軋空停損警戒】帶量衝高逼近漲停，切勿放空/嚴格停損"
             alert_color = "#FF2222"
@@ -424,7 +423,7 @@ def load_radar_market_data():
             alert_signal = "👀【盤中常規監控】等待早盤衝高或破線訊號"
             alert_color = "#888888"
 
-        # 短空勝率綜合評分演算法
+        # 短空勝率評分演算法
         score_ratio = min(total_ratio * 2.0, 50.0)
         score_profit = min(max(total_p_rate, 0) * 15.0, 30.0)
         
@@ -606,7 +605,7 @@ with right_side:
     broker_list = target_row.get("各分點詳細清單", [])
     unloading_val = target_row.get("出貨進度(%)", 0)
 
-    # 【功能升級三】：頂部即時警報橫條
+    # 頂部即時警報橫條
     alert_banner_html = f"""
     <div style="background-color: #1A1A1A; border-left: 6px solid {target_row['警報顏色']}; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
         <span style="color: #FFFFFF; font-size: 14px; font-weight: bold;">{target_row['盤中即時警報']}</span>
@@ -615,7 +614,7 @@ with right_side:
     """
     st.markdown(alert_banner_html, unsafe_allow_html=True)
 
-    # 【功能升級一】：視覺化出貨進度估算條 (Progress Tracker)
+    # 視覺化出貨進度估算條
     p_bar_color = "#FF4444" if unloading_val < 50 else ("#FFCC00" if unloading_val < 85 else "#00CC66")
     progress_html = f"""
     <div style="background-color: #1E1E1E; border: 1px solid #333; border-radius: 6px; padding: 10px 14px; margin-bottom: 12px;">
