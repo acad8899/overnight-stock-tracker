@@ -27,7 +27,7 @@ TARGET_BROKERS = [
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
     st.title("🎯 每日隔日沖主力短空雷達 (精簡排版 × 盤後連動旗艦版)")
-    st.caption("🔥 嚴格剔除「日均量 < 1,500 張」冷門無量股，杜絕流動性風險與滑價問題。")
+    st.caption("🔥 嚴格剔除「日均量 < 1,500 張」冷門無量股，索引編號由 1 依序排列。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即同步最新盤後分點與行情", use_container_width=True):
@@ -393,7 +393,6 @@ def load_radar_market_data():
             unloading_status = "🔴 主力正在出貨 (短空黃金期)"
             status_color = "#FF4444"
 
-        # 【精簡版警報】：縮減字數以釋放表格寬度
         if short_ratio >= 30 or close_price >= limit_up * 0.985:
             short_alert_tag = "🛑 軋空停損"
             full_alert_desc = "🛑【軋空停損警戒】帶量衝高逼近漲停，切勿放空/嚴格停損"
@@ -493,6 +492,9 @@ df_filtered = df_raw[mask].copy()
 df_display = df_filtered if not df_filtered.empty else df_raw[df_raw["現價"] < 5000.0].copy()
 df_display = df_display.sort_values(by="短空勝率分", ascending=False).reset_index(drop=True)
 
+# 【核心修改】：將 Index 調整為從 1 開始 (1, 2, 3...)
+df_display.index = range(1, len(df_display) + 1)
+
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("📅 最新結算日期", update_date)
 c2.metric("🎯 明日短空鎖碼標的", f"{len(df_filtered)} 檔" if not df_filtered.empty else f"{len(df_display)} 檔 (展示全庫)")
@@ -501,7 +503,6 @@ c4.metric("💧 流動性達標股 (均量≥1500張)", f"{len(df_raw[df_raw['5�
 
 st.markdown("---")
 
-# 【欄位寬度與順序最佳化】：隔日沖分點與佔比前移，警告精簡為標籤
 st.subheader("📊 盤後全市場隔日沖 × 主力成本 × 鎖碼決策表 (勝率降序排列)")
 preferred_cols = [
     "短空勝率分", "股票代號", "股票名稱", "現價", "即時信號", "出貨進度(%)", 
@@ -601,7 +602,6 @@ with right_side:
     broker_list = target_row.get("各分點詳細清單", [])
     unloading_val = target_row.get("出貨進度(%)", 0)
 
-    # 頂部即時警報橫條（維持完整中文解說）
     alert_banner_html = f"""
     <div style="background-color: #1A1A1A; border-left: 6px solid {target_row['警報顏色']}; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
         <span style="color: #FFFFFF; font-size: 14px; font-weight: bold;">{target_row['盤中即時警報完整']}</span>
@@ -682,13 +682,14 @@ with right_side:
     
     if broker_list:
         df_brokers = pd.DataFrame(broker_list)
+        df_brokers.index = range(1, len(df_brokers) + 1)
         df_brokers["買超張數"] = df_brokers["買超張數"].apply(lambda x: f"{x:,} 張 (固定)")
         df_brokers["佔比(%)"] = df_brokers["佔比(%)"].apply(lambda x: f"{x}%")
         df_brokers["預估成本"] = df_brokers["預估成本"].apply(lambda x: f"{x} 元")
         df_brokers["預估獲利(萬)"] = df_brokers["預估獲利(萬)"].apply(lambda x: f"{x:+,} 萬")
         df_brokers["報酬率(%)"] = df_brokers["報酬率(%)"].apply(lambda x: f"{x:+}%")
         df_brokers.rename(columns={"買超張數": "今日鎖碼庫存(張)", "預估獲利(萬)": "帳面浮盈(萬)", "報酬率(%)": "帳面報酬率(%)"}, inplace=True)
-        st.dataframe(df_brokers, use_container_width=True, hide_index=True)
+        st.dataframe(df_brokers, use_container_width=True)
 
 st.markdown("---")
 
