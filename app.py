@@ -319,7 +319,7 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
     fig.update_yaxes(gridcolor="#222222", showgrid=True, side="right")
     return fig
 
-# 盤後資料引擎 (正式納入南亞科、華通)
+# 盤後資料引擎
 @st.cache_data(ttl=600)
 def load_radar_market_data():
     today_str = datetime.date.today().strftime("%Y-%m-%d")
@@ -395,7 +395,7 @@ def load_radar_market_data():
             b_fixed_vol = int(yesterday_settled_vol * b_pct)
             b_cost = round(prev_close * 0.985, 2)
             profit_per_share = close_price - b_cost
-            profit_wan = round((profit_per_share * b_fixed_vol * 1000) / 10000, 2)
+            profit_wan_int = int(round((profit_per_share * b_fixed_vol * 1000) / 10000))
             p_rate = round((profit_per_share / b_cost) * 100, 2)
             
             total_fixed_shares += b_fixed_vol
@@ -409,13 +409,13 @@ def load_radar_market_data():
                 "佔比(%)": round(b_pct * 100, 1),
                 "收盤價": close_price,
                 "預估成本": b_cost,
-                "預估獲利(萬)": profit_wan,
+                "預估獲利(萬)": profit_wan_int,
                 "報酬率(%)": p_rate,
                 "倒貨意願": "🔴 極高 (獲利滿載)" if p_rate >= 1.5 else "🟡 普通 (小賺)"
             })
             
         avg_cost = round(total_cost_amount / (total_fixed_shares * 1000), 2) if total_fixed_shares > 0 else prev_close
-        total_profit_wan = round((total_current_market_amount - total_cost_amount) / 10000, 1)
+        total_profit_wan_int = int(round((total_current_market_amount - total_cost_amount) / 10000))
         total_p_rate = round(((total_current_market_amount - total_cost_amount) / total_cost_amount) * 100, 2) if total_cost_amount > 0 else 0.0
 
         short_ratio = item["券資比"]
@@ -494,7 +494,7 @@ def load_radar_market_data():
             "主力合計買超": total_fixed_shares,
             "主力合計佔比(%)": round(total_ratio, 1),
             "主力加權成本": avg_cost,
-            "主力合計獲利(萬)": total_profit_wan,
+            "主力合計獲利(萬)": total_profit_wan_int,
             "主力合計報酬率(%)": total_p_rate,
             "短空勝率分": total_win_rate_score,
             "各分點詳細清單": detailed_brokers,
@@ -694,7 +694,7 @@ with right_side:
 
     st.markdown(f"#### 🏢 【{target_name} ({target_code})】各大主力分點今日盤後鎖碼持倉與明日倒貨評估")
     
-    p_tot_wan = float(target_row['主力合計獲利(萬)'])
+    p_tot_wan_int = int(target_row['主力合計獲利(萬)'])
     p_tot_rate = float(target_row['主力合計報酬率(%)'])
     p_color_hex = "#FF4444" if p_tot_rate >= 0 else "#00CC66"
     p_sign = "+" if p_tot_rate > 0 else ""
@@ -711,7 +711,7 @@ with right_side:
         </div>
         <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid {p_color_hex};">
             <div style="color:#888; font-size:11px; margin-bottom:2px;">💰 主力帳面利潤</div>
-            <div style="color:{p_color_hex}; font-size:15px; font-weight:bold;">{p_sign}{p_tot_wan:,} 萬 ({p_sign}{p_tot_rate}%)</div>
+            <div style="color:{p_color_hex}; font-size:15px; font-weight:bold;">{p_sign}{p_tot_wan_int:,} 萬 ({p_sign}{p_tot_rate}%)</div>
         </div>
         <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #FFCC00;">
             <div style="color:#888; font-size:11px; margin-bottom:2px;">🔥 鎖碼主力分點數</div>
@@ -724,16 +724,35 @@ with right_side:
     if broker_list:
         df_brokers = pd.DataFrame(broker_list)
         df_brokers.index = range(1, len(df_brokers) + 1)
-        df_brokers["買超張數"] = df_brokers["買超張數"].apply(lambda x: f"{x:,} 張 (固定)")
-        df_brokers["佔比(%)"] = df_brokers["佔比(%)"].apply(lambda x: f"{x}%")
-        df_brokers["收盤價"] = df_brokers["收盤價"].apply(lambda x: f"{x} 元")
-        df_brokers["預估成本"] = df_brokers["預估成本"].apply(lambda x: f"{x} 元")
-        df_brokers["預估獲利(萬)"] = df_brokers["預估獲利(萬)"].apply(lambda x: f"{x:+,} 萬")
-        df_brokers["報酬率(%)"] = df_brokers["報酬率(%)"].apply(lambda x: f"{x:+}%")
-        df_brokers.rename(columns={"買超張數": "今日鎖碼庫存(張)", "預估獲利(萬)": "帳面浮盈(萬)", "報酬率(%)": "帳面報酬率(%)"}, inplace=True)
+        
+        # 輔助函數：台股標準紅綠染色 (賺錢紅、賠錢綠)
+        def style_pnl_profit(val):
+            color = '#FF4444' if val >= 0 else '#00CC66'
+            sign = '+' if val > 0 else ''
+            return f'color: {color}; font-weight: bold;'
+
+        # 保留數值欄位供 Styler 判斷正負
+        df_styled = df_brokers.copy()
+        df_styled["今日鎖碼庫存(張)"] = df_styled["買超張數"].apply(lambda x: f"{x:,} 張 (固定)")
+        df_styled["佔比(%)"] = df_styled["佔比(%)"].apply(lambda x: f"{x}%")
+        df_styled["收盤價"] = df_styled["收盤價"].apply(lambda x: f"{x} 元")
+        df_styled["預估成本"] = df_styled["預估成本"].apply(lambda x: f"{x} 元")
+        df_styled["帳面浮盈(萬)"] = df_styled["預估獲利(萬)"].apply(lambda x: f"{x:+,} 萬")
+        df_styled["帳面報酬率(%)"] = df_styled["報酬率(%)"].apply(lambda x: f"{x:+}%")
+        
         cols_order = ["分點名稱", "今日鎖碼庫存(張)", "佔比(%)", "收盤價", "預估成本", "帳面浮盈(萬)", "帳面報酬率(%)", "倒貨意願"]
-        actual_cols_order = [c for c in cols_order if c in df_brokers.columns]
-        st.dataframe(df_brokers[actual_cols_order], use_container_width=True)
+        actual_cols_order = [c for c in cols_order if c in df_styled.columns]
+        
+        # 套用紅綠染色樣式
+        styled_df_view = df_styled[actual_cols_order].style.apply(
+            lambda row: [
+                'color: #FF4444; font-weight: bold;' if df_brokers.loc[row.name, '預估獲利(萬)'] >= 0 else 'color: #00CC66; font-weight: bold;' 
+                if col == "帳面浮盈(萬)" 
+                else ('color: #FF4444; font-weight: bold;' if df_brokers.loc[row.name, '報酬率(%)'] >= 0 else 'color: #00CC66; font-weight: bold;' if col == "帳面報酬率(%)" else '') 
+                for col in actual_cols_order
+            ], axis=1
+        )
+        st.dataframe(styled_df_view, use_container_width=True)
 
 st.markdown("---")
 
