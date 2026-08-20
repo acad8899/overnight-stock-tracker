@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import io
 import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -60,7 +59,7 @@ with head_col2:
         st.cache_data.clear()
         st.rerun()
 
-# 頂部橫向折疊式設定面板 (加入 Excel 下載按鈕)
+# 頂部橫向折疊式設定面板 (改用 utf-8-sig 編碼 CSV，Excel 直接開不報錯)
 with st.expander("⚙️ 點此展開／收合【篩選條件、流動性風控與分點特性表匯出】", expanded=False):
     f_col1, f_col2, f_col3, f_col4, f_col5 = st.columns([1.2, 1.2, 1.6, 1, 1])
     with f_col1:
@@ -77,21 +76,18 @@ with st.expander("⚙️ 點此展開／收合【篩選條件、流動性風控�
         kd_filter = st.checkbox("僅顯示 KD > 80 (過熱區)", value=False)
     
     st.markdown("---")
-    # 生成 Excel 二進位資料流供下載
     df_catalog = pd.DataFrame(
         BROKER_DATA_CATALOG, 
         columns=["編號", "派系分類", "主力分點名稱", "鎖碼標的偏好", "典型操盤手法", "次日早盤出貨慣性", "短空狙擊策略與注意事項"]
     )
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-        df_catalog.to_excel(writer, index=False, sheet_name='30大隔日沖主力特性')
-    excel_bytes = buffer.getvalue()
+    # 使用 utf-8-sig，Excel 點開即用且不需任何外掛套件
+    csv_data = df_catalog.to_csv(index=False).encode('utf-8-sig')
     
     st.download_button(
-        label="📥 點此下載【台股 30 大隔日沖主力操盤特性手冊】(Excel / .xlsx 格式)",
-        data=excel_bytes,
-        file_name="Taiwan_Top30_DayTrade_Brokers.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        label="📥 點此下載【台股 30 大隔日沖主力操盤特性表】(Excel 支援格式 / .csv)",
+        data=csv_data,
+        file_name="Taiwan_Top30_DayTrade_Brokers.csv",
+        mime="text/csv"
     )
 
 def calculate_pro_short_indicators(df):
