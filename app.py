@@ -7,7 +7,7 @@ from plotly.subplots import make_subplots
 
 # 頁面排版設定：全寬展開
 st.set_page_config(
-    page_title="隔日沖主力短空雷達 (證交所盤後即時連動旗艦版)", 
+    page_title="隔日沖主力短空雷達 (流動性風控 × 盤後連動旗艦版)", 
     layout="wide", 
     page_icon="🎯", 
     initial_sidebar_state="collapsed"
@@ -26,24 +26,27 @@ TARGET_BROKERS = [
 
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
-    st.title("🎯 每日隔日沖主力短空雷達 (證交所盤後即時連動旗艦版)")
-    st.caption("🔥 每日 18:00 自動結算最新隔日沖分點名冊、鎖碼張數與主力成本，杜絕歷史數據失真。")
+    st.title("🎯 每日隔日沖主力短空雷達 (流動性風控 × 盤後連動旗艦版)")
+    st.caption("🔥 嚴格剔除「日均量 < 1,500 張」冷門無量股，杜絕流動性風險與滑價問題。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即同步最新盤後分點與行情", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
-with st.expander("⚙️ 點此展開／收合【篩選條件與風控設定】", expanded=False):
-    f_col1, f_col2, f_col3, f_col4 = st.columns([1.2, 1.8, 1, 1])
+# 頂部橫向折疊式設定面板 (加入最低均量門檻設定)
+with st.expander("⚙️ 點此展開／收合【篩選條件與流動性風控設定】", expanded=False):
+    f_col1, f_col2, f_col3, f_col4, f_col5 = st.columns([1.2, 1.2, 1.6, 1, 1])
     with f_col1:
         min_ratio = st.slider("主力合計佔比 (%) 門檻：", min_value=1, max_value=30, value=10, step=1)
     with f_col2:
-        selected_brokers = st.multiselect("監控主力分點：", options=TARGET_BROKERS, default=TARGET_BROKERS)
+        min_vol_threshold = st.number_input("最低日均量門檻 (張)：", min_value=500, max_value=10000, value=1500, step=500)
     with f_col3:
+        selected_brokers = st.multiselect("監控主力分點：", options=TARGET_BROKERS, default=TARGET_BROKERS)
+    with f_col4:
         st.write("")
         exclude_high_risk = st.checkbox("自動過濾「高軋空風險」", value=False)
-    with f_col4:
+    with f_col5:
         st.write("")
         kd_filter = st.checkbox("僅顯示 KD > 80 (過熱區)", value=False)
 
@@ -277,12 +280,11 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
     fig.update_yaxes(gridcolor="#222222", showgrid=True, side="right")
     return fig
 
-# 【盤後最新結算引擎】：連線最新盤後真實資料
+# 盤後資料引擎 (含日均量計算)
 @st.cache_data(ttl=600)
 def load_radar_market_data():
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     
-    # 盤後即時結算名冊（每日 18:00 官方結算後同步更新）
     track_targets = [
         {"代號": "2609", "名稱": "陽明", "昨收": 68.5, "昨日鎖碼量": 38500, "券資比": 5.4, "主力分點": [("美商美林", 0.165), ("凱基-台北", 0.092)]},
         {"代號": "6274", "名稱": "台燿", "昨收": 168.5, "昨日鎖碼量": 12800, "券資比": 7.9, "主力分點": [("群益金鼎-大安", 0.138), ("國票-敦北法人", 0.082)]},
@@ -322,6 +324,7 @@ def load_radar_market_data():
             high_p = round(float(last_row["最高"]), 2)
             low_p = round(float(last_row["最低"]), 2)
             today_volume = int(last_row["成交量"])
+            avg_5d_volume = int(df_d["成交量"].tail(5).mean()) if len(df_d) >= 1 else today_volume
         else:
             close_price = base_prev_close
             prev_close = base_prev_close
@@ -330,6 +333,7 @@ def load_radar_market_data():
             high_p = round(close_price * 1.02, 2)
             low_p = round(close_price * 0.98, 2)
             today_volume = int(yesterday_settled_vol * 1.2)
+            avg_5d_volume = today_volume
 
         if close_price >= 5000.0:
             continue
@@ -437,6 +441,7 @@ def load_radar_market_data():
             "K(9)": 66.9,
             "D(9)": 54.2,
             "J(9)": 92.3,
+            "5日均量(張)": avg_5d_volume,
             "券資比(%)": short_ratio,
             "隔日沖分點清單": "、".join([b[0] for b in item["主力分點"]]),
             "主力合計買超": total_fixed_shares,
@@ -466,7 +471,9 @@ def check_broker_overlap(broker_str, selected_list):
         return True
     return any(b in broker_str for b in selected_list)
 
+# 【核心更新】：加入「5日均量 >= min_vol_threshold (預設1500張)」過濾條件
 mask = (df_raw["主力合計佔比(%)"] >= min_ratio) & \
+       (df_raw["5日均量(張)"] >= min_vol_threshold) & \
        (df_raw["現價"] < 5000.0) & \
        df_raw["隔日沖分點清單"].apply(lambda s: check_broker_overlap(s, selected_brokers))
 
@@ -482,15 +489,15 @@ df_display = df_display.sort_values(by="短空勝率分", ascending=False).reset
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("📅 最新結算日期", update_date)
-c2.metric("🎯 明日鎖碼短空標的", f"{len(df_filtered)} 檔" if not df_filtered.empty else f"{len(df_display)} 檔 (展示全庫)")
+c2.metric("🎯 明日短空鎖碼標的", f"{len(df_filtered)} 檔" if not df_filtered.empty else f"{len(df_display)} 檔 (展示全庫)")
 c3.metric("📊 追蹤主力分點", f"{len(selected_brokers)} 家 (全台30大)")
-c4.metric("⚡ 高檔過熱股 (K>80)", f"{len(df_raw[pd.to_numeric(df_raw['K(9)'], errors='coerce') >= 80])} 檔")
+c4.metric("💧 流動性達標股 (均量≥1500張)", f"{len(df_raw[df_raw['5日均量(張)'] >= min_vol_threshold])} 檔")
 
 st.markdown("---")
 
 st.subheader("📊 盤後全市場隔日沖 × 主力成本 × 鎖碼決策表 (勝率降序排列)")
 preferred_cols = [
-    "短空勝率分", "股票代號", "股票名稱", "現價", "主力加權成本", "近高壓力(NH)", "最高壓力(AH)",
+    "短空勝率分", "股票代號", "股票名稱", "現價", "5日均量(張)", "主力加權成本", "近高壓力(NH)", "最高壓力(AH)",
     "出貨進度(%)", "盤中即時警報", "券資比(%)", "軋空風險評級", "主力合計買超", "主力合計佔比(%)", "隔日沖分點清單"
 ]
 actual_cols = [col for col in preferred_cols if col in df_display.columns]
@@ -545,6 +552,10 @@ with left_side:
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
             <span style="color: #AAAAAA;">收盤結算價：</span>
             <span style="font-weight: bold; color: #FFFFFF; font-size: 14px;">{target_row['現價']} 元</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
+            <span style="color: #AAAAAA;">5日均量：</span>
+            <span style="font-weight: bold; color: #00FFCC; font-size: 14px;">{target_row['5日均量(張)']:,} 張</span>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
             <span style="color: #AAAAAA;">主力加權均價：</span>
