@@ -397,6 +397,14 @@ def load_radar_market_data():
             total_current_market_amount += close_price * b_fixed_vol * 1000
             total_ratio += round(b_pct * 100, 1)
             
+            # 【修復重點】：精確區分 獲利滿載、小賺保本、套牢小賠
+            if p_rate >= 1.5:
+                broker_intent = "🔴 極高 (獲利滿載)"
+            elif p_rate >= 0:
+                broker_intent = "🟡 普通 (小賺保本)"
+            else:
+                broker_intent = "🟢 套牢 (小賠/停損出貨)"
+
             detailed_brokers.append({
                 "分點名稱": b_name,
                 "買超張數": b_fixed_vol,
@@ -405,7 +413,7 @@ def load_radar_market_data():
                 "預估成本": b_cost,
                 "預估獲利(萬)": profit_wan_int,
                 "報酬率(%)": p_rate,
-                "倒貨意願": "🔴 極高 (獲利滿載)" if p_rate >= 1.5 else "🟡 普通 (小賺)"
+                "倒貨意願": broker_intent
             })
             
         avg_cost = round(total_cost_amount / (total_fixed_shares * 1000), 2) if total_fixed_shares > 0 else prev_close
