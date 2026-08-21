@@ -52,16 +52,16 @@ TARGET_BROKERS = [row[2] for row in BROKER_DATA_CATALOG]
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
     st.title("🎯 每日隔日沖主力短空雷達 (精簡排版 × 盤後連動旗艦版)")
-    st.caption("🔥 嚴格剔除「日均量 < 1,500 張」冷門無量股，索引編號由 1 依序排列。")
+    st.caption("🔥 嚴格剔除「日均量 < 1,500 張」冷門無量股，支援千元高價股智能過濾。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即同步最新盤後分點與行情", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
-# 頂部橫向折疊式設定面板
-with st.expander("⚙️ 點此展開／收合【篩選條件、流動性風控與分點特性表匯出】", expanded=False):
-    f_col1, f_col2, f_col3, f_col4, f_col5 = st.columns([1.2, 1.2, 1.6, 1, 1])
+# 頂部橫向折疊式設定面板 (加入 1000 元以上高價股過濾開關)
+with st.expander("⚙️ 點此展開／收合【篩選條件、股價風控與分點特性表匯出】", expanded=False):
+    f_col1, f_col2, f_col3, f_col4, f_col5 = st.columns([1.2, 1.2, 1.6, 1.1, 1.1])
     with f_col1:
         min_ratio = st.slider("主力合計佔比 (%) 門檻：", min_value=1, max_value=30, value=10, step=1)
     with f_col2:
@@ -70,6 +70,7 @@ with st.expander("⚙️ 點此展開／收合【篩選條件、流動性風控�
         selected_brokers = st.multiselect("監控主力分點：", options=TARGET_BROKERS, default=TARGET_BROKERS)
     with f_col4:
         st.write("")
+        include_high_priced = st.checkbox("納入 1,000 元以上高價股", value=False)
         exclude_high_risk = st.checkbox("自動過濾「高軋空風險」", value=False)
     with f_col5:
         st.write("")
@@ -376,9 +377,6 @@ def load_radar_market_data():
             today_volume = int(yesterday_settled_vol * 1.2)
             avg_5d_volume = today_volume
 
-        if close_price >= 5000.0:
-            continue
-
         limit_up = round(prev_close * 1.10, 2)
         cdp = round((high_p + low_p + 2.0 * prev_close) / 4.0, 2)
         raw_ah = cdp + (high_p - low_p)
@@ -519,10 +517,13 @@ def check_broker_overlap(broker_str, selected_list):
         return True
     return any(b in broker_str for b in selected_list)
 
+# 【核心更新】：高價股過濾（若未勾選 include_high_priced，則過濾現價 >= 1000 元之標的）
 mask = (df_raw["主力合計佔比(%)"] >= min_ratio) & \
        (df_raw["5日均量(張)"] >= min_vol_threshold) & \
-       (df_raw["現價"] < 5000.0) & \
        df_raw["隔日沖分點清單"].apply(lambda s: check_broker_overlap(s, selected_brokers))
+
+if not include_high_priced:
+    mask = mask & (df_raw["現價"] < 1000.0)
 
 if exclude_high_risk:
     mask = mask & (~df_raw["軋空風險評級"].str.contains("極高軋空"))
@@ -531,7 +532,7 @@ if kd_filter and "K(9)" in df_raw.columns:
     mask = mask & (pd.to_numeric(df_raw["K(9)"], errors='coerce') >= 80)
 
 df_filtered = df_raw[mask].copy()
-df_display = df_filtered if not df_filtered.empty else df_raw[df_raw["現價"] < 5000.0].copy()
+df_display = df_filtered if not df_filtered.empty else (df_raw[df_raw["現價"] < 1000.0].copy() if not include_high_priced else df_raw.copy())
 df_display = df_display.sort_values(by="短空勝率分", ascending=False).reset_index(drop=True)
 
 df_display.index = range(1, len(df_display) + 1)
@@ -563,7 +564,6 @@ with left_side:
     st.markdown("### 📋 明日短空鎖碼清單")
     st.caption("💡 依勝率由高至低排列，可用鍵盤 **↑ / ↓ 鍵** 切換")
     
-    # 【核心修改】：將清單中括號內的行情文字依漲跌設定為紅/綠色
     stock_list_options = []
     for rank, (_, r) in enumerate(df_display.iterrows(), 1):
         c_sym = "+" if float(r.get('漲跌', 0)) > 0 else ""
