@@ -30,7 +30,7 @@ BROKER_DATA_CATALOG = [
     [13, "雙北核心", "國票-敦北法人", "機構大戶、高價主流股", "大部位集中進出，拉抬時常伴隨極大成交額", "早盤出貨節奏較慢，分批大單掛賣壓制盤面", "觀察 VWAP 均價線下方的大單壓盤，偏空操作"],
     [14, "雙北核心", "統一-敦南", "散熱、網通、AI供應鏈", "鎖碼意圖明確，喜好搭乘市場熱門主流題材", "09:10 左右為出貨高峰，常打至平盤以下", "實體黑K破 VWAP 即加碼，跌幅擴大時分批回補"],
     [15, "雙北核心", "統一-士林", "中型轉強股、櫃買熱門股", "快速掃單封板，擅長打散戶防守心理線", "開盤衝高無力後快速滑落，走勢乾脆俐落", "5分K 出現長黑吞噬時進場，獲利率通常極佳"],
-    [16, "雙北核心", "群益金鼎-大安", "PCB、載板、被動元件", "主力部位大，進出果斷，拉抬具有族群帶動力", "09:00～09:20 集中倒出，盤中多呈現無量緩跌", "早盤摸頂短空首選，跌破當日開盤價即確立出貨"],
+    [16, "雙北核心", "群益金鼎-大安", "PCB、載板、被动元件", "主力部位大，進出果斷，拉抬具有族群帶動力", "09:00～09:20 集中倒出，盤中多呈現無量緩跌", "早盤摸頂短空首選，跌破當日開盤價即確立出貨"],
     [17, "雙北核心", "國泰-敦南", "車用電子、重電題材股", "擅長波段與隔日沖混搭，量大時多為隔日沖", "開高後連續出脫，若遇大盤偏弱則加速倒貨", "配合大盤偏弱盤勢時放空，勝率大幅提升"],
     [18, "雙北核心", "國泰-敦北", "傳產龍頭、中大型電子", "盤中定點大單掃盤，拉升角度極為陡峭", "09:00～09:15 現貨全數出清，不留戀持倉", "開盤見大量長上影線直接切入短空"],
     [19, "雙北核心", "康和-永和", "投機飆股、低價轉強股", "小型股主力集散地，盤中點火兇悍但續航力短", "09:00 開盤即開出巨大賣單，容易開高走低暴跌", "波動極大，空單進場需快進快出，切忌戀戰"],
@@ -228,11 +228,12 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
     """
     st.markdown(header_html, unsafe_allow_html=True)
     
+    # 4 層結構：K線主圖(48%)、成交量(16%)、主力買賣超(16%)、KD/J指標(20%)
     fig = make_subplots(
         rows=4, cols=1, 
         shared_xaxes=True, 
-        vertical_spacing=0.02, 
-        row_heights=[0.50, 0.16, 0.16, 0.18],
+        vertical_spacing=0.03, 
+        row_heights=[0.48, 0.16, 0.16, 0.20],
         subplot_titles=(
             "",
             f"<span style='color:#FF3333; font-size:11px;'>成交量: {val_vol} 張</span> <span style='color:#FFFF00; font-size:11px;'>5日均量: {val_vol5ma}</span>",
@@ -241,6 +242,7 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
         )
     )
     
+    # 第 1 層：K線主圖
     fig.add_trace(go.Candlestick(
         x=df_k['日期'], open=df_k['開盤'], high=df_k['最高'], low=df_k['最低'], close=df_k['收盤'],
         name='K線',
@@ -257,7 +259,12 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
     if 'VWAP' in df_k.columns:
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VWAP'], line=dict(color='#FF00FF', width=1.8), name='VWAP均價線'), row=1, col=1)
 
-    if isinstance(nh_res, (int, float)):
+    # 參考線（限制在合理的局部範圍內，避免把K棒壓扁）
+    k_min = float(df_k['最低'].min())
+    k_max = float(df_k['最高'].max())
+    y_buffer = (k_max - k_min) * 0.45
+
+    if isinstance(nh_res, (int, float)) and (k_min - y_buffer <= float(nh_res) <= k_max + y_buffer):
         fig.add_hline(
             y=float(nh_res), 
             line=dict(color="#FF8800", width=1.4, dash="dot"), 
@@ -267,7 +274,7 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
             annotation_bgcolor="rgba(0,0,0,0.7)",
             row=1, col=1
         )
-    if isinstance(broker_cost, (int, float)):
+    if isinstance(broker_cost, (int, float)) and (k_min - y_buffer <= float(broker_cost) <= k_max + y_buffer):
         fig.add_hline(
             y=float(broker_cost), 
             line=dict(color="#00E5FF", width=1.2, dash="dash"), 
@@ -277,26 +284,19 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
             annotation_bgcolor="rgba(0,0,0,0.7)",
             row=1, col=1
         )
-    if isinstance(limit_up_price, (int, float)):
-        fig.add_hline(
-            y=float(limit_up_price), 
-            line=dict(color="#FF3333", width=1.0, dash="dashdot"), 
-            annotation_text=f" 漲停價: {limit_up_price} ", 
-            annotation_position="bottom left",
-            annotation_font=dict(color="#FF3333", size=9),
-            annotation_bgcolor="rgba(0,0,0,0.7)",
-            row=1, col=1
-        )
 
+    # 第 2 層：成交量
     vol_colors = ['#FF3333' if float(c) >= float(o) else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
     fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['成交量'], marker_color=vol_colors, name='成交量'), row=2, col=1)
     if 'VOL_5MA' in df_k.columns:
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), name='5MA均量'), row=2, col=1)
 
+    # 第 3 層：主力買賣超
     if '主力買賣超' in df_k.columns:
         broker_colors = ['#FF3333' if int(v) >= 0 else '#00CC00' for v in df_k['主力買賣超']]
         fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['主力買賣超'], marker_color=broker_colors, name='主力買賣超'), row=3, col=1)
 
+    # 第 4 層：KD / J 指標
     if 'K' in df_k.columns and 'D' in df_k.columns and 'J' in df_k.columns:
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['K'], line=dict(color='#FFFF00', width=1.2), name='K值'), row=4, col=1)
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['D'], line=dict(color='#33CCFF', width=1.2), name='D值'), row=4, col=1)
@@ -311,15 +311,17 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
         paper_bgcolor="#000000",
         xaxis_rangeslider_visible=False,
         showlegend=False,
-        height=780,
+        height=820,
         margin=dict(l=35, r=35, t=10, b=15)
     )
     
     fig.update_xaxes(type='category', gridcolor="#222222", showgrid=True, tickangle=0)
     fig.update_yaxes(gridcolor="#222222", showgrid=True, side="right")
+    # 主圖 Y 軸自動聚焦在 K 棒本身高低點區間
+    fig.update_yaxes(range=[k_min - (k_max - k_min) * 0.15, k_max + (k_max - k_min) * 0.15], row=1, col=1)
     return fig
 
-# 【10 大精準鎖定作戰標的資料庫】：威剛(3260)正式替換陽明
+# 【10 大精準鎖定作戰標的資料庫】：威剛(3260)替換陽明
 @st.cache_data(ttl=600)
 def load_radar_market_data():
     today_str = datetime.date.today().strftime("%Y-%m-%d")
@@ -397,7 +399,6 @@ def load_radar_market_data():
             total_current_market_amount += close_price * b_fixed_vol * 1000
             total_ratio += round(b_pct * 100, 1)
             
-            # 【修復重點】：精確區分 獲利滿載、小賺保本、套牢小賠
             if p_rate >= 1.5:
                 broker_intent = "🔴 極高 (獲利滿載)"
             elif p_rate >= 0:
