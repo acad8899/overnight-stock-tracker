@@ -88,7 +88,7 @@ if "custom_watchlist" not in st.session_state:
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
     st.title("🎯 每日隔日沖主力短空雷達 (專業十字查價連動旗艦版)")
-    st.caption("🔥 頂部單行即時連動、灰色虛線十字查價游標、單一輸入框自動偵測與融資大戶力道。")
+    st.caption("🔥 頂部單行固定狀態列、灰色虛線十字查價游標、單一輸入框自動偵測與融資大戶力道。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即同步最新盤後分點與行情", use_container_width=True):
@@ -289,13 +289,37 @@ def fetch_real_kline(stock_code, interval="5m"):
 
 def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limit_up_price, timeframe_label, interval="5m"):
     last = df_k.iloc[-1]
+    prev_close = df_k["收盤"].iloc[-2] if len(df_k) > 1 else last["收盤"]
+    change = round(float(last["收盤"]) - float(prev_close), 2)
+    change_pct = round((change / float(prev_close)) * 100, 2) if float(prev_close) else 0.0
+    
+    chg_color = "#FF3333" if change >= 0 else "#00CC00"
+    chg_symbol = "↑" if change >= 0 else "↓"
+    chg_text = f"+{change}" if change > 0 else f"{change}"
+    
+    val_5ma = last.get("5MA", "-")
+    val_12ma = last.get("12MA", "-")
+    val_20ma = last.get("20MA", "-")
+    val_vwap = last.get("VWAP", "-")
+
     fut_badge_html = "<span style='background-color:#1E88E5; color:#FFFFFF; padding:1px 5px; border-radius:4px; font-weight:bold; font-size:12px; margin-left:6px;'>期</span>" if stock_code in STOCK_FUTURES_SET else ""
     
-    # 頂部標題列
+    # 頂部固定狀態列（完全固定置頂，不隨游標亂跳）
     header_html = f"""
     <div style="background-color: #000000; padding: 6px 10px; font-family: monospace; border: 1px solid #333; font-size: 13px; margin-bottom: 2px;">
-        <div style="text-align: center; color: #FFFFFF; font-size: 15px; font-weight: bold;">
+        <div style="text-align: center; color: #FFFFFF; font-size: 15px; font-weight: bold; margin-bottom: 3px;">
             {stock_code} {stock_name} {fut_badge_html} 短空決策線圖 [{timeframe_label}]
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; font-size: 12px;">
+            <span style="color: #FFFF00;">{timeframe_label} {last['日期']}</span>
+            <span style="color: #00CC00;">開 <span style="color:#FFF;">{last['開盤']}</span></span>
+            <span style="color: #FF3333;">高 <span style="color:#FFF;">{last['最高']}</span></span>
+            <span style="color: #00CC00;">低 <span style="color:#FFF;">{last['最低']}</span></span>
+            <span style="color: {chg_color}; font-weight:bold;">收 {last['收盤']} {chg_symbol}{chg_text} ({change_pct}%)</span>
+            <span style="color: #FFCC00;">均價5: {val_5ma}</span>
+            <span style="color: #00FF00;">均價12: {val_12ma}</span>
+            <span style="color: #33CCFF;">均價20: {val_20ma}</span>
+            <span style="color: #FF00FF; font-weight:bold;">VWAP: {val_vwap}</span>
         </div>
     </div>
     """
@@ -320,45 +344,23 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
         )
     )
     
-    # 動態單行狀態列文字 (包含開高低收、漲跌、均線與 VWAP)
-    top_bar_hover_texts = []
-    for d, o, h, l, c, pct, m5, m12, m20, vw in zip(
-        df_k['日期'], df_k['開盤'], df_k['最高'], df_k['最低'], df_k['收盤'], df_k['漲跌幅'],
-        df_k.get('5MA', [0]*len(df_k)), df_k.get('12MA', [0]*len(df_k)), df_k.get('20MA', [0]*len(df_k)), df_k.get('VWAP', [0]*len(df_k))
-    ):
-        chg_arrow = "↑" if pct >= 0 else "↓"
-        chg_color = "#FF3333" if pct >= 0 else "#00CC00"
-        txt = (
-            f"<span style='color:#FFFF00;'>{d}</span> "
-            f"<span style='color:#00CC00;'>開</span>:{o} "
-            f"<span style='color:#FF3333;'>高</span>:{h} "
-            f"<span style='color:#00CC00;'>低</span>:{l} "
-            f"<span style='color:{chg_color}; font-weight:bold;'>收:{c} {chg_arrow}{pct:+0.2f}%</span> "
-            f"<span style='color:#FFCC00;'>5MA</span>:{m5} "
-            f"<span style='color:#00FF00;'>12MA</span>:{m12} "
-            f"<span style='color:#33CCFF;'>20MA</span>:{m20} "
-            f"<span style='color:#FF00FF;'>VWAP</span>:{vw}"
-        )
-        top_bar_hover_texts.append(txt)
-
-    # 第 1 層：K線主圖
+    # 第 1 層：K線主圖（完全關閉浮動文字框，乾淨走勢）
     fig.add_trace(go.Candlestick(
         x=df_k['日期'], open=df_k['開盤'], high=df_k['最高'], low=df_k['最低'], close=df_k['收盤'],
         name='K線',
-        hovertext=top_bar_hover_texts,
-        hoverinfo="text",
+        hoverinfo='none',
         increasing_line_color='#FF3333', increasing_fillcolor='#FF3333',
         decreasing_line_color='#00CC00', decreasing_fillcolor='#00CC00'
     ), row=1, col=1)
     
     if '5MA' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFCC00', width=1.2), name='5MA', hoverinfo='skip'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFCC00', width=1.2), name='5MA', hoverinfo='none'), row=1, col=1)
     if '12MA' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['12MA'], line=dict(color='#00FF00', width=1.0), name='12MA', hoverinfo='skip'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['12MA'], line=dict(color='#00FF00', width=1.0), name='12MA', hoverinfo='none'), row=1, col=1)
     if '20MA' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['20MA'], line=dict(color='#33CCFF', width=1.5), name='20MA', hoverinfo='skip'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['20MA'], line=dict(color='#33CCFF', width=1.5), name='20MA', hoverinfo='none'), row=1, col=1)
     if 'VWAP' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VWAP'], line=dict(color='#FF00FF', width=1.8), name='VWAP均價線', hoverinfo='skip'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VWAP'], line=dict(color='#FF00FF', width=1.8), name='VWAP均價線', hoverinfo='none'), row=1, col=1)
 
     k_min = float(df_k['最低'].min())
     k_max = float(df_k['最高'].max())
@@ -387,24 +389,24 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
 
     # 第 2 層：成交量
     vol_colors = ['#FF3333' if float(c) >= float(o) else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
-    fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['成交量'], marker_color=vol_colors, name='成交量', hoverinfo='skip'), row=2, col=1)
+    fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['成交量'], marker_color=vol_colors, name='成交量', hoverinfo='none'), row=2, col=1)
     if 'VOL_5MA' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), name='5MA均量', hoverinfo='skip'), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), name='5MA均量', hoverinfo='none'), row=2, col=1)
 
     # 第 3 層：主力買賣超
     if '主力買賣超' in df_k.columns:
         broker_colors = ['#FF3333' if int(v) >= 0 else '#00CC00' for v in df_k['主力買賣超']]
-        fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['主力買賣超'], marker_color=broker_colors, name='主力買賣超', hoverinfo='skip'), row=3, col=1)
+        fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['主力買賣超'], marker_color=broker_colors, name='主力買賣超', hoverinfo='none'), row=3, col=1)
 
     # 第 4 層：大戶多空淨力道
     if '大戶淨力道' in df_k.columns:
         force_colors = ['#FF3333' if int(v) >= 0 else '#00CC00' for v in df_k['大戶淨力道']]
-        fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['大戶淨力道'], marker_color=force_colors, name='大戶多空淨力道', hoverinfo='skip'), row=4, col=1)
+        fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['大戶淨力道'], marker_color=force_colors, name='大戶多空淨力道', hoverinfo='none'), row=4, col=1)
     if '累積大戶淨差' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['累積大戶淨差'], line=dict(color='#FFFF00', width=1.5), name='累積大戶淨差', hoverinfo='skip'), row=4, col=1)
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['累積大戶淨差'], line=dict(color='#FFFF00', width=1.5), name='累積大戶淨差', hoverinfo='none'), row=4, col=1)
     fig.add_hline(y=0, line=dict(color="#666666", width=0.8, dash="dash"), row=4, col=1)
 
-    # 專業頂部單行懸浮資訊條與灰色十字游標
+    # 專業灰色虛線十字查價游標（無任何浮動文字框遮擋）
     fig.update_layout(
         template="plotly_dark",
         plot_bgcolor="#000000",
@@ -413,15 +415,7 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
         showlegend=False,
         height=820,
         margin=dict(l=35, r=35, t=10, b=15),
-        hovermode="x",
-        hoverlabel=dict(
-            bgcolor="rgba(0, 0, 0, 0.95)",
-            font_size=12,
-            font_family="monospace",
-            font_color="#FFFFFF",
-            bordercolor="#222222",
-            align="left"
-        )
+        hovermode=False
     )
     
     # 啟用 X 軸與 Y 軸的灰色虛線十字查價線
