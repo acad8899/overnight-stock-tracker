@@ -7,11 +7,36 @@ from plotly.subplots import make_subplots
 
 # 頁面排版設定：全寬展開
 st.set_page_config(
-    page_title="隔日沖主力短空雷達 (大戶多空淨力道 × 融資籌碼旗艦版)", 
+    page_title="隔日沖主力短空雷達 (個期支援 × 清單自訂管理旗艦版)", 
     layout="wide", 
     page_icon="🎯", 
     initial_sidebar_state="collapsed"
 )
+
+# 台灣期交所 (TAIFEX) 熱門個股期貨代號對照表
+STOCK_FUTURES_MAP = {
+    "2408": "DF",   # 南亞科期貨
+    "3260": "IR",   # 威剛期貨
+    "3406": "GL",   # 玉晶光期貨
+    "2449": "GY",   # 京元電期貨
+    "3231": "IJ",   # 緯創期貨
+    "2327": "DN",   # 國巨期貨
+    "2376": "GI",   # 技嘉期貨
+    "6488": "OY",   # 環球晶期貨
+    "2313": "DX",   # 華通期貨
+    "2492": "FA",   # 華新科期貨
+    "2330": "CD",   # 台積電期貨
+    "2317": "DH",   # 鴻海期貨
+    "2454": "DL",   # 聯發科期貨
+    "2382": "EQ",   # 廣達期貨
+    "2603": "CZ",   # 長榮期貨
+    "2609": "DK",   # 陽明期貨
+    "2344": "CA",   # 華邦電期貨
+    "3037": "DQ",   # 欣興期貨
+    "2368": "IL",   # 金像電期貨
+    "3017": "NP",   # 奇鋐期貨
+    "2383": "FM"    # 台光電期貨
+}
 
 # 30 大隔日沖主力名冊與特性資料庫
 BROKER_DATA_CATALOG = [
@@ -49,18 +74,82 @@ BROKER_DATA_CATALOG = [
 
 TARGET_BROKERS = [row[2] for row in BROKER_DATA_CATALOG]
 
+# 預設 10 檔精準核心標的庫
+DEFAULT_WATCHLIST = [
+    {"代號": "2408", "名稱": "南亞科", "昨收": 62.8, "昨日鎖碼量": 26800, "券資比": 6.2, "融資增減(張)": 1420, "主力分點": [("美商美林", 0.145), ("凱基-台北", 0.083)]},
+    {"代號": "3260", "名稱": "威剛", "昨收": 422.0, "昨日鎖碼量": 20600, "券資比": 8.9, "融資增減(張)": 2150, "主力分點": [("美商美林", 0.138), ("凱基-台北", 0.085)]},
+    {"代號": "3406", "名稱": "玉晶光", "昨收": 465.0, "昨日鎖碼量": 9800, "券資比": 13.2, "融資增減(張)": 950, "主力分點": [("富邦-建國", 0.135), ("元大-土城永寧", 0.081)]},
+    {"代號": "2449", "名稱": "京元電子", "昨收": 125.0, "昨日鎖碼量": 28500, "券資比": 7.1, "融資增減(張)": 1820, "主力分點": [("美商美林", 0.158), ("凱基-台北", 0.091)]},
+    {"代號": "3231", "名稱": "緯創", "昨收": 115.0, "昨日鎖碼量": 45000, "券資比": 6.8, "融資增減(張)": 3480, "主力分點": [("凱基-台北", 0.152), ("新加坡商瑞銀", 0.078)]},
+    {"代號": "2327", "名稱": "國巨", "昨收": 580.0, "昨日鎖碼量": 14200, "券資比": 8.4, "融資增減(張)": 680, "主力分點": [("凱基-台北", 0.128), ("台灣摩根士丹利", 0.075)]},
+    {"代號": "2376", "名稱": "技嘉", "昨收": 272.0, "昨日鎖碼量": 18200, "券資比": 11.3, "融資增減(張)": 1240, "主力分點": [("美商美林", 0.118), ("元大-土城永寧", 0.072)]},
+    {"代號": "6488", "名稱": "環球晶", "昨收": 485.0, "昨日鎖碼量": 8200, "券資比": 9.5, "融資增減(張)": -310, "主力分點": [("新加坡商瑞銀", 0.122), ("凱基-松山", 0.068)]},
+    {"代號": "2313", "名稱": "華通", "昨收": 78.6, "昨日鎖碼量": 15600, "券資比": 11.5, "融資增減(張)": -860, "主力分點": [("元大-土城永寧", 0.112), ("富邦-建國", 0.071)]},
+    {"代號": "2492", "名稱": "華新科", "昨收": 272.5, "昨日鎖碼量": 12000, "券資比": 16.5, "融資增減(張)": -520, "主力分點": [("凱基-台北", 0.082), ("美商美林", 0.045)]}
+]
+
+if "custom_watchlist" not in st.session_state:
+    st.session_state["custom_watchlist"] = DEFAULT_WATCHLIST
+
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
-    st.title("🎯 每日隔日沖主力短空雷達 (大戶多空淨力道 × 融資籌碼旗艦版)")
-    st.caption("🔥 全面替換 KDJ，採用「主力大戶多空淨力道」與「融資浮額動態」，專注高勝率狙擊。")
+    st.title("🎯 每日隔日沖主力短空雷達 (個期支援 × 清單自訂管理旗艦版)")
+    st.caption("🔥 支援個股期貨即時標示、等寬對齊排版、自訂新增/刪除標的與融資大戶力道。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即同步最新盤後分點與行情", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
-# 頂部橫向折疊式設定面板
-with st.expander("⚙️ 點此展開／收合【篩選條件、風控門檻與分點特性表匯出】", expanded=False):
+# 標的名單管理面板 (新增與刪除)
+with st.expander("🛠️ 點此展開／收合【標的名單管理（新增自選、刪除標的）與風控設定】", expanded=False):
+    m_col1, m_col2 = st.columns([1.5, 1.5])
+    with m_col1:
+        st.markdown("##### ➕ 新增自選股票至清單")
+        add_c1, add_c2, add_c3 = st.columns([1, 1.2, 0.8])
+        with add_c1:
+            new_code = st.text_input("股票代號：", placeholder="例如: 2330").strip()
+        with add_c2:
+            new_name = st.text_input("股票名稱：", placeholder="例如: 台積電").strip()
+        with add_c3:
+            st.write("")
+            if st.button("確認新增", use_container_width=True):
+                if new_code and new_name:
+                    existing_codes = [x["代號"] for x in st.session_state["custom_watchlist"]]
+                    if new_code not in existing_codes:
+                        st.session_state["custom_watchlist"].append({
+                            "代號": new_code,
+                            "名稱": new_name,
+                            "昨收": 100.0,
+                            "昨日鎖碼量": 15000,
+                            "券資比": 8.0,
+                            "融資增減(張)": 500,
+                            "主力分點": [("美商美林", 0.12), ("凱基-台北", 0.08)]
+                        })
+                        st.success(f"已成功加入 {new_name} ({new_code})！")
+                        st.rerun()
+                    else:
+                        st.warning("該股票已在清單中！")
+                else:
+                    st.error("請完整輸入代號與名稱！")
+
+    with m_col2:
+        st.markdown("##### ➖ 從清單移除標的")
+        del_c1, del_c2 = st.columns([2, 1])
+        with del_c1:
+            current_pool_options = [f"{item['代號']} {item['名稱']}" for item in st.session_state["custom_watchlist"]]
+            target_to_del = st.selectbox("選擇欲刪除之股票：", options=current_pool_options, label_visibility="collapsed")
+        with del_c2:
+            if st.button("確認刪除", use_container_width=True):
+                if target_to_del:
+                    del_code = target_to_del.split(" ")[0]
+                    st.session_state["custom_watchlist"] = [
+                        x for x in st.session_state["custom_watchlist"] if x["代號"] != del_code
+                    ]
+                    st.success(f"已成功移除 {target_to_del}！")
+                    st.rerun()
+
+    st.markdown("---")
     f_col1, f_col2, f_col3, f_col4 = st.columns([1.2, 1.2, 1.6, 1.2])
     with f_col1:
         min_ratio = st.slider("主力合計佔比 (%) 門檻：", min_value=1, max_value=30, value=10, step=1)
@@ -107,17 +196,14 @@ def calculate_pro_short_indicators(df, interval="5m"):
     cum_tp_vol = (typical_price * df["成交量"].astype(float)).cumsum()
     df["VWAP"] = (cum_tp_vol / cum_vol.replace(0, 1)).round(2)
 
-    # 主力分點買賣超 (大單模擬估算)
     df["主力買賣超"] = [
         int(v * 0.18 * (1 if c >= o else -0.85)) 
         for v, c, o in zip(volumes, closes, opens)
     ]
 
-    # 【全新籌碼核心】：大戶多空淨力道 (Net Force) 與 累積淨差
     net_force_list = []
     for h, l, c, o, v in zip(highs, lows, closes, opens, volumes):
         rng = max(h - l, 0.01)
-        # 多空力量因子：收盤在K棒上半部為買方優勢，下半部為賣方優勢
         bull_bear_factor = ((c - l) - (h - c)) / rng
         force = int(round(v * bull_bear_factor * 0.35))
         net_force_list.append(force)
@@ -125,7 +211,6 @@ def calculate_pro_short_indicators(df, interval="5m"):
     df["大戶淨力道"] = net_force_list
     df["累積大戶淨差"] = df["大戶淨力道"].cumsum()
 
-    # 日線層級：融資增減估算
     if interval == "1d":
         df["融資增減"] = [int(v * 0.04 * (1 if c >= o else -0.7)) for v, c, o in zip(volumes, closes, opens)]
 
@@ -199,11 +284,13 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
     val_broker_net = int(last.get("主力買賣超", 0))
     val_net_force = int(last.get("大戶淨力道", 0))
     val_cum_force = int(last.get("累積大戶淨差", 0))
+
+    fut_tag = f"<span style='background:#FF9900; color:#000; padding:1px 6px; border-radius:3px; font-weight:bold; font-size:12px; margin-left:6px;'>個期: {STOCK_FUTURES_MAP[stock_code]}</span>" if stock_code in STOCK_FUTURES_MAP else ""
     
     header_html = f"""
     <div style="background-color: #000000; padding: 6px 10px; font-family: monospace; border: 1px solid #333; font-size: 13px; margin-bottom: 2px;">
         <div style="text-align: center; color: #FFFFFF; font-size: 15px; font-weight: bold; margin-bottom: 3px;">
-            {stock_code} {stock_name} 短空決策線圖 [{timeframe_label}]
+            {stock_code} {stock_name} {fut_tag} 短空決策線圖 [{timeframe_label}]
         </div>
         <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; font-size: 12px;">
             <span style="color: #FFFF00;">{timeframe_label} {last['日期']}</span>
@@ -220,7 +307,6 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
     """
     st.markdown(header_html, unsafe_allow_html=True)
     
-    # 4 層結構：K線主圖(48%)、成交量(16%)、主力買賣超(16%)、大戶多空淨力道(20%)
     fig = make_subplots(
         rows=4, cols=1, 
         shared_xaxes=True, 
@@ -234,7 +320,6 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
         )
     )
     
-    # 第 1 層：K線主圖
     fig.add_trace(go.Candlestick(
         x=df_k['日期'], open=df_k['開盤'], high=df_k['最高'], low=df_k['最低'], close=df_k['收盤'],
         name='K線',
@@ -276,18 +361,15 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
             row=1, col=1
         )
 
-    # 第 2 層：成交量
     vol_colors = ['#FF3333' if float(c) >= float(o) else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
     fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['成交量'], marker_color=vol_colors, name='成交量'), row=2, col=1)
     if 'VOL_5MA' in df_k.columns:
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), name='5MA均量'), row=2, col=1)
 
-    # 第 3 層：主力買賣超
     if '主力買賣超' in df_k.columns:
         broker_colors = ['#FF3333' if int(v) >= 0 else '#00CC00' for v in df_k['主力買賣超']]
         fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['主力買賣超'], marker_color=broker_colors, name='主力買賣超'), row=3, col=1)
 
-    # 第 4 層：【主力大戶多空淨力道 ＋ 累積趨勢線】（取代 KDJ）
     if '大戶淨力道' in df_k.columns:
         force_colors = ['#FF3333' if int(v) >= 0 else '#00CC00' for v in df_k['大戶淨力道']]
         fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['大戶淨力道'], marker_color=force_colors, name='大戶多空淨力道'), row=4, col=1)
@@ -310,27 +392,12 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
     fig.update_yaxes(range=[k_min - (k_max - k_min) * 0.15, k_max + (k_max - k_min) * 0.15], row=1, col=1)
     return fig
 
-# 【10 大精準鎖定作戰標的資料庫】：含融資增減評估
-@st.cache_data(ttl=600)
-def load_radar_market_data():
+# 動態資料庫加載引擎
+def load_radar_market_data(pool_list):
     today_str = datetime.date.today().strftime("%Y-%m-%d")
-    
-    selected_pool = [
-        {"代號": "2408", "名稱": "南亞科", "昨收": 62.8, "昨日鎖碼量": 26800, "券資比": 6.2, "融資增減(張)": 1420, "主力分點": [("美商美林", 0.145), ("凱基-台北", 0.083)]},
-        {"代號": "2313", "名稱": "華通", "昨收": 78.6, "昨日鎖碼量": 15600, "券資比": 11.5, "融資增減(張)": -860, "主力分點": [("元大-土城永寧", 0.112), ("富邦-建國", 0.071)]},
-        {"代號": "2492", "名稱": "華新科", "昨收": 272.5, "昨日鎖碼量": 12000, "券資比": 16.5, "融資增減(張)": -520, "主力分點": [("凱基-台北", 0.082), ("美商美林", 0.045)]},
-        {"代號": "3260", "名稱": "威剛", "昨收": 422.0, "昨日鎖碼量": 20600, "券資比": 8.9, "融資增減(張)": 2150, "主力分點": [("美商美林", 0.138), ("凱基-台北", 0.085)]},
-        {"代號": "2327", "名稱": "國巨", "昨收": 580.0, "昨日鎖碼量": 14200, "券資比": 8.4, "融資增減(張)": 680, "主力分點": [("凱基-台北", 0.128), ("台灣摩根士丹利", 0.075)]},
-        {"代號": "3406", "名稱": "玉晶光", "昨收": 465.0, "昨日鎖碼量": 9800, "券資比": 13.2, "融資增減(張)": 950, "主力分點": [("富邦-建國", 0.135), ("元大-土城永寧", 0.081)]},
-        {"代號": "2449", "名稱": "京元電子", "昨收": 125.0, "昨日鎖碼量": 28500, "券資比": 7.1, "融資增減(張)": 1820, "主力分點": [("美商美林", 0.158), ("凱基-台北", 0.091)]},
-        {"代號": "6488", "名稱": "環球晶", "昨收": 485.0, "昨日鎖碼量": 8200, "券資比": 9.5, "融資增減(張)": -310, "主力分點": [("新加坡商瑞銀", 0.122), ("凱基-松山", 0.068)]},
-        {"代號": "2376", "名稱": "技嘉", "昨收": 272.0, "昨日鎖碼量": 18200, "券資比": 11.3, "融資增減(張)": 1240, "主力分點": [("美商美林", 0.118), ("元大-土城永寧", 0.072)]},
-        {"代號": "3231", "名稱": "緯創", "昨收": 115.0, "昨日鎖碼量": 45000, "券資比": 6.8, "融資增減(張)": 3480, "主力分點": [("凱基-台北", 0.152), ("新加坡商瑞銀", 0.078)]}
-    ]
-
     enhanced_list = []
     
-    for item in selected_pool:
+    for item in pool_list:
         code = item["代號"]
         name = item["名稱"]
         base_prev_close = item["昨收"]
@@ -427,7 +494,6 @@ def load_radar_market_data():
             unloading_status = "🔴 主力正在出貨 (短空黃金期)"
             status_color = "#FF4444"
 
-        # 融資狀態評估
         margin_status = "🔥 融資大增 (浮額沉重/易多殺多)" if margin_change >= 1000 else ("💧 融資退潮 (散戶離場)" if margin_change <= -500 else "⚪ 融資平穩")
 
         if short_ratio >= 30 or close_price >= limit_up * 0.985:
@@ -467,6 +533,7 @@ def load_radar_market_data():
         enhanced_list.append({
             "股票代號": code,
             "股票名稱": name,
+            "個股期貨": STOCK_FUTURES_MAP.get(code, "—"),
             "現價": close_price,
             "昨收": prev_close,
             "漲停價": limit_up,
@@ -505,7 +572,7 @@ def load_radar_market_data():
     enhanced_list = sorted(enhanced_list, key=lambda x: x["短空勝率分"], reverse=True)
     return pd.DataFrame(enhanced_list), today_str
 
-df_raw, update_date = load_radar_market_data()
+df_raw, update_date = load_radar_market_data(st.session_state["custom_watchlist"])
 
 def check_broker_overlap(broker_str, selected_list):
     if not selected_list:
@@ -536,7 +603,7 @@ st.markdown("---")
 
 st.subheader("📊 盤後全市場隔日沖 × 主力成本 × 鎖碼決策表 (勝率降序排列)")
 preferred_cols = [
-    "短空勝率分", "股票代號", "股票名稱", "現價", "即時信號", "出貨進度(%)", 
+    "短空勝率分", "股票代號", "股票名稱", "個股期貨", "現價", "即時信號", "出貨進度(%)", 
     "隔日沖分點清單", "融資增減(張)", "融資力道評估", "主力合計佔比(%)", "主力合計買超", "主力加權成本", 
     "近高壓力(NH)", "最高壓力(AH)", "券資比(%)", "5日均量(張)"
 ]
@@ -547,11 +614,11 @@ st.markdown("---")
 
 st.subheader("🖥️ 操盤工作台 (次日短空戰略視窗)")
 
-left_side, right_side = st.columns([1.2, 3.8], gap="medium")
+left_side, right_side = st.columns([1.35, 3.65], gap="medium")
 
 with left_side:
     st.markdown("### 📋 明日短空鎖碼清單")
-    st.caption("💡 依勝率由高至低排列，可用鍵盤 **↑ / ↓ 鍵** 切換")
+    st.caption("💡 等寬對齊排列，可用鍵盤 **↑ / ↓ 鍵** 快速切換")
     
     stock_list_options = []
     for rank, (_, r) in enumerate(df_display.iterrows(), 1):
@@ -559,8 +626,20 @@ with left_side:
         badge = "👑" if rank == 1 else ("⭐" if rank <= 3 else "🎯")
         chg_val = float(r.get('漲跌', 0))
         chg_color = "red" if chg_val >= 0 else "green"
-        paren_text = f":{chg_color}[({r['現價']}|{c_sym}{r.get('漲跌幅(%)', 0)}%)]"
-        opt_str = f"{badge} [{r['短空勝率分']}分] {r['股票代號']} {r['股票名稱']} {paren_text}"
+        
+        # 期貨標籤：有期貨才顯示
+        fut_code = STOCK_FUTURES_MAP.get(str(r['股票代號']), "")
+        fut_str = f"[{fut_code}]" if fut_code else "    "
+        
+        score_str = f"[{r['短空勝率分']:>2}分]"
+        code_str = f"{r['股票代號']:<4}"
+        name_str = f"{r['股票名稱']:<4}"
+        price_str = f"{r['現價']:>5.1f}"
+        pct_str = f"{c_sym}{r.get('漲跌幅(%)', 0):>5.2f}%"
+        
+        paren_text = f":{chg_color}[({price_str}|{pct_str})]"
+        
+        opt_str = f"{badge} {score_str} {code_str} {name_str} {fut_str} {paren_text}"
         stock_list_options.append(opt_str)
 
     if "selected_stock_code" not in st.session_state or str(st.session_state["selected_stock_code"]) not in [str(x) for x in df_display["股票代號"].values]:
@@ -585,11 +664,13 @@ with left_side:
     st.session_state["selected_stock_code"] = target_code
 
     target_row = df_display[df_display["股票代號"] == target_code].iloc[0]
+    target_fut_code = STOCK_FUTURES_MAP.get(target_code, "")
+    fut_card_badge = f"<span style='background-color: #FF9900; color: #000; font-size: 12px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 6px;'>個期: {target_fut_code}</span>" if target_fut_code else ""
     
     summary_card_html = f"""
     <div style="background-color: #1E1E1E; border: 1px solid #333333; border-radius: 8px; padding: 14px 16px; margin-top: 10px; color: #FFFFFF; font-family: monospace;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333333; padding-bottom: 8px; margin-bottom: 10px;">
-            <span style="font-size: 15px; font-weight: bold; color: #FFFFFF;">📌 {target_row['股票名稱']} ({target_code})</span>
+            <span style="font-size: 15px; font-weight: bold; color: #FFFFFF;">📌 {target_row['股票名稱']} ({target_code}){fut_card_badge}</span>
             <span style="background-color: #D93025; color: #FFF; font-size: 12px; font-weight: bold; padding: 2px 6px; border-radius: 4px;">勝率 {target_row['短空勝率分']}分</span>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
