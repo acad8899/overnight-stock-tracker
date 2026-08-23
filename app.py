@@ -1,14 +1,16 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import datetime
 import unicodedata
+import json
 import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # 頁面排版設定：全寬展開
 st.set_page_config(
-    page_title="隔日沖主力短空雷達 (專業十字查價旗艦版)", 
+    page_title="隔日沖主力短空雷達 (頂部數據60FPS即時連動旗艦版)", 
     layout="wide", 
     page_icon="🎯", 
     initial_sidebar_state="collapsed"
@@ -87,8 +89,8 @@ if "custom_watchlist" not in st.session_state:
 
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
-    st.title("🎯 每日隔日沖主力短空雷達 (專業十字查價旗艦版)")
-    st.caption("🔥 頂部單行固定狀態列、灰色虛線十字查價游標、單一輸入框自動偵測與融資大戶力道。")
+    st.title("🎯 每日隔日沖主力短空雷達 (頂部數據60FPS即時連動旗艦版)")
+    st.caption("🔥 頂部單行狀態列隨游標即時變動、灰色虛線十字查價、單一輸入框自動偵測與融資大戶力道。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即同步最新盤後分點與行情", use_container_width=True):
@@ -287,7 +289,7 @@ def fetch_real_kline(stock_code, interval="5m"):
             continue
     return pd.DataFrame()
 
-def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limit_up_price, timeframe_label, interval="5m"):
+def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limit_up_price, timeframe_label, interval="5m"):
     last = df_k.iloc[-1]
     prev_close = df_k["收盤"].iloc[-2] if len(df_k) > 1 else last["收盤"]
     change = round(float(last["收盤"]) - float(prev_close), 2)
@@ -304,27 +306,18 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
 
     fut_badge_html = "<span style='background-color:#1E88E5; color:#FFFFFF; padding:1px 5px; border-radius:4px; font-weight:bold; font-size:12px; margin-left:6px;'>期</span>" if stock_code in STOCK_FUTURES_SET else ""
     
-    # 頂部固定單行狀態列
-    header_html = f"""
-    <div style="background-color: #000000; padding: 6px 10px; font-family: monospace; border: 1px solid #333; font-size: 13px; margin-bottom: 2px;">
-        <div style="text-align: center; color: #FFFFFF; font-size: 15px; font-weight: bold; margin-bottom: 3px;">
-            {stock_code} {stock_name} {fut_badge_html} 短空決策線圖 [{timeframe_label}]
-        </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; font-size: 12px;">
-            <span style="color: #FFFF00;">{timeframe_label} {last['日期']}</span>
-            <span style="color: #00CC00;">開 <span style="color:#FFF;">{last['開盤']}</span></span>
-            <span style="color: #FF3333;">高 <span style="color:#FFF;">{last['最高']}</span></span>
-            <span style="color: #00CC00;">低 <span style="color:#FFF;">{last['最低']}</span></span>
-            <span style="color: {chg_color}; font-weight:bold;">收 {last['收盤']} {chg_symbol}{chg_text} ({change_pct}%)</span>
-            <span style="color: #FFCC00;">均價5: {val_5ma}</span>
-            <span style="color: #00FF00;">均價12: {val_12ma}</span>
-            <span style="color: #33CCFF;">均價20: {val_20ma}</span>
-            <span style="color: #FF00FF; font-weight:bold;">VWAP: {val_vwap}</span>
-        </div>
-    </div>
-    """
-    st.markdown(header_html, unsafe_allow_html=True)
-    
+    default_info_html = (
+        f"<span style='color: #FFFF00;'>{timeframe_label} {last['日期']}</span> "
+        f"<span style='color: #00CC00;'>開 <span style='color:#FFF;'>{last['開盤']}</span></span> "
+        f"<span style='color: #FF3333;'>高 <span style='color:#FFF;'>{last['最高']}</span></span> "
+        f"<span style='color: #00CC00;'>低 <span style='color:#FFF;'>{last['最低']}</span></span> "
+        f"<span style='color: {chg_color}; font-weight:bold;'>收 {last['收盤']} {chg_symbol}{chg_text} ({change_pct}%)</span> "
+        f"<span style='color: #FFCC00;'>均價5: {val_5ma}</span> "
+        f"<span style='color: #00FF00;'>均價12: {val_12ma}</span> "
+        f"<span style='color: #33CCFF;'>均價20: {val_20ma}</span> "
+        f"<span style='color: #FF00FF; font-weight:bold;'>VWAP: {val_vwap}</span>"
+    )
+
     val_vol = int(last.get("成交量", 0))
     val_vol5ma = int(last.get("VOL_5MA", 0))
     val_broker_net = int(last.get("主力買賣超", 0))
@@ -344,10 +337,34 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
         )
     )
     
-    # 第 1 層：K線主圖（hoverinfo 設為 none 徹底避免渲染灰色浮動框）
+    # 封裝即時連動數據列表 (注入自訂 JS)
+    customdata_matrix = []
+    for i in range(len(df_k)):
+        r = df_k.iloc[i]
+        prev_c = df_k["收盤"].iloc[i-1] if i > 0 else r["收盤"]
+        c_val = float(r["收盤"])
+        p_val = float(prev_c)
+        chg_v = round(c_val - p_val, 2)
+        pct_v = round((chg_v / p_val) * 100, 2) if p_val else 0.0
+        customdata_matrix.append([
+            f"{timeframe_label} {r['日期']}",
+            f"{r['開盤']}",
+            f"{r['最高']}",
+            f"{r['最低']}",
+            f"{r['收盤']}",
+            f"+{chg_v}" if chg_v > 0 else f"{chg_v}",
+            f"{pct_v}",
+            f"{r.get('5MA', '-')}",
+            f"{r.get('12MA', '-')}",
+            f"{r.get('20MA', '-')}",
+            f"{r.get('VWAP', '-')}"
+        ])
+
+    # 第 1 層：K線主圖
     fig.add_trace(go.Candlestick(
         x=df_k['日期'], open=df_k['開盤'], high=df_k['最高'], low=df_k['最低'], close=df_k['收盤'],
         name='K線',
+        customdata=customdata_matrix,
         hoverinfo='none',
         increasing_line_color='#FF3333', increasing_fillcolor='#FF3333',
         decreasing_line_color='#00CC00', decreasing_fillcolor='#00CC00'
@@ -406,19 +423,18 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['累積大戶淨差'], line=dict(color='#FFFF00', width=1.5), name='累積大戶淨差', hoverinfo='none'), row=4, col=1)
     fig.add_hline(y=0, line=dict(color="#666666", width=0.8, dash="dash"), row=4, col=1)
 
-    # 啟用 hovermode='closest' 觸發十字線，同時不產生提示框
+    # 專業灰色虛線十字查價游標（無任何浮動文字框遮擋）
     fig.update_layout(
         template="plotly_dark",
         plot_bgcolor="#000000",
         paper_bgcolor="#000000",
         xaxis_rangeslider_visible=False,
         showlegend=False,
-        height=820,
+        height=750,
         margin=dict(l=35, r=35, t=10, b=15),
         hovermode="closest"
     )
     
-    # 啟用 X 軸與 Y 軸的灰色虛線十字查價線
     fig.update_xaxes(
         type='category', 
         gridcolor="#222222", 
@@ -445,7 +461,64 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
     )
     
     fig.update_yaxes(range=[k_min - (k_max - k_min) * 0.15, k_max + (k_max - k_min) * 0.15], row=1, col=1)
-    return fig
+
+    # 轉為包含 JS 監聽器的獨立 HTML 組件
+    plotly_div_html = fig.to_html(include_plotlyjs='cdn', full_html=False, config={'displayModeBar': False})
+
+    custom_component_html = f"""
+    <div style="background-color:#000000; font-family: monospace; border:1px solid #333; margin-bottom:4px; padding:6px 10px;">
+        <div style="text-align: center; color: #FFFFFF; font-size: 15px; font-weight: bold; margin-bottom: 3px;">
+            {stock_code} {stock_name} {fut_badge_html} 短空決策線圖 [{timeframe_label}]
+        </div>
+        <div id="dynamic-kline-header-bar" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; font-size: 12px;">
+            {default_info_html}
+        </div>
+    </div>
+    <div id="plotly-container">
+        {plotly_div_html}
+    </div>
+    <script>
+    (function() {{
+        var defaultHtml = `{default_info_html}`;
+        function attachHoverSync() {{
+            var plotDiv = document.querySelector('.plotly-graph-div');
+            var headerEl = document.getElementById('dynamic-kline-header-bar');
+            if (!plotDiv || !headerEl) {{
+                setTimeout(attachHoverSync, 100);
+                return;
+            }}
+            plotDiv.on('plotly_hover', function(data) {{
+                if (!data || !data.points || data.points.length === 0) return;
+                var pt = data.points[0];
+                var cd = pt.customdata;
+                if (cd && cd.length >= 11) {{
+                    var d = cd[0], o = cd[1], h = cd[2], l = cd[3], c = cd[4];
+                    var chg = cd[5], pct = cd[6], m5 = cd[7], m12 = cd[8], m20 = cd[9], vw = cd[10];
+                    var isUp = parseFloat(pct) >= 0;
+                    var chgColor = isUp ? '#FF3333' : '#00CC00';
+                    var chgSym = isUp ? '↑' : '↓';
+                    headerEl.innerHTML = `
+                        <span style="color: #FFFF00;">${{d}}</span>
+                        <span style="color: #00CC00;">開 <span style="color:#FFF;">${{o}}</span></span>
+                        <span style="color: #FF3333;">高 <span style="color:#FFF;">${{h}}</span></span>
+                        <span style="color: #00CC00;">低 <span style="color:#FFF;">${{l}}</span></span>
+                        <span style="color: ${{chgColor}}; font-weight:bold;">收 ${{c}} ${{chgSym}}${{chg}} (${{pct}}%)</span>
+                        <span style="color: #FFCC00;">均價5: ${{m5}}</span>
+                        <span style="color: #00FF00;">均價12: ${{m12}}</span>
+                        <span style="color: #33CCFF;">均價20: ${{m20}}</span>
+                        <span style="color: #FF00FF; font-weight:bold;">VWAP: ${{vw}}</span>
+                    `;
+                }}
+            }});
+            plotDiv.on('plotly_unhover', function() {{
+                headerEl.innerHTML = defaultHtml;
+            }});
+        }}
+        attachHoverSync();
+    }})();
+    </script>
+    """
+    return custom_component_html
 
 # 動態資料庫加載引擎
 def load_radar_market_data(pool_list):
@@ -817,8 +890,8 @@ with right_side:
 
     if stock_k_df is not None and not stock_k_df.empty:
         display_k_df = stock_k_df.tail(int(k_count)).reset_index(drop=True)
-        fig = draw_pro_short_chart(display_k_df, target_code, target_name, b_cost, nh_val, limit_p, selected_tf_label, interval=selected_interval)
-        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+        chart_html = render_interactive_kline_chart(display_k_df, target_code, target_name, b_cost, nh_val, limit_p, selected_tf_label, interval=selected_interval)
+        components.html(chart_html, height=830, scrolling=False)
     else:
         st.info("暫無此標的的走勢資料。")
 
