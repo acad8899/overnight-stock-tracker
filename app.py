@@ -7,36 +7,31 @@ from plotly.subplots import make_subplots
 
 # 頁面排版設定：全寬展開
 st.set_page_config(
-    page_title="隔日沖主力短空雷達 (個期支援 × 清單自訂管理旗艦版)", 
+    page_title="隔日沖主力短空雷達 (智慧個期標示 × 自選管理旗艦版)", 
     layout="wide", 
     page_icon="🎯", 
     initial_sidebar_state="collapsed"
 )
 
-# 台灣期交所 (TAIFEX) 熱門個股期貨代號對照表
-STOCK_FUTURES_MAP = {
-    "2408": "DF",   # 南亞科期貨
-    "3260": "IR",   # 威剛期貨
-    "3406": "GL",   # 玉晶光期貨
-    "2449": "GY",   # 京元電期貨
-    "3231": "IJ",   # 緯創期貨
-    "2327": "DN",   # 國巨期貨
-    "2376": "GI",   # 技嘉期貨
-    "6488": "OY",   # 環球晶期貨
-    "2313": "DX",   # 華通期貨
-    "2492": "FA",   # 華新科期貨
-    "2330": "CD",   # 台積電期貨
-    "2317": "DH",   # 鴻海期貨
-    "2454": "DL",   # 聯發科期貨
-    "2382": "EQ",   # 廣達期貨
-    "2603": "CZ",   # 長榮期貨
-    "2609": "DK",   # 陽明期貨
-    "2344": "CA",   # 華邦電期貨
-    "3037": "DQ",   # 欣興期貨
-    "2368": "IL",   # 金像電期貨
-    "3017": "NP",   # 奇鋐期貨
-    "2383": "FM"    # 台光電期貨
+# 期交所個股期貨支援名單清單 (有支援者顯示「期」圖示)
+STOCK_FUTURES_SET = {
+    "2408", "3260", "3406", "2449", "3231", "2327", "2376", "6488", "2313", "2492",
+    "2330", "2317", "2454", "2382", "2603", "2609", "2344", "3037", "2368", "3017",
+    "2383", "1519", "8210", "3661", "2059", "3443", "4551", "5289", "8299", "3008"
 }
+
+# 內建常用台股代號與名稱對照字典 (用於自動偵測與反查)
+STOCK_NAME_DICT = {
+    "2408": "南亞科", "3260": "威剛", "3406": "玉晶光", "2449": "京元電子", "3231": "緯創",
+    "2327": "國巨", "2376": "技嘉", "6488": "環球晶", "2313": "華通", "2492": "華新科",
+    "2330": "台積電", "2317": "鴻海", "2454": "聯發科", "2382": "廣達", "2603": "長榮",
+    "2609": "陽明", "2344": "華邦電", "3037": "欣興", "2368": "金像電", "3017": "奇鋐",
+    "2383": "台光電", "1519": "華城", "8210": "勤誠", "3661": "世芯-KY", "2059": "川湖",
+    "3443": "創意", "4551": "智伸科", "5289": "宜鼎", "8299": "群聯", "3008": "大立光"
+}
+
+# 反向名稱查代號
+NAME_TO_CODE_DICT = {v: k for k, v in STOCK_NAME_DICT.items()}
 
 # 30 大隔日沖主力名冊與特性資料庫
 BROKER_DATA_CATALOG = [
@@ -93,45 +88,57 @@ if "custom_watchlist" not in st.session_state:
 
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
-    st.title("🎯 每日隔日沖主力短空雷達 (個期支援 × 清單自訂管理旗艦版)")
-    st.caption("🔥 支援個股期貨即時標示、等寬對齊排版、自訂新增/刪除標的與融資大戶力道。")
+    st.title("🎯 每日隔日沖主力短空雷達 (智慧個期標示 × 自選管理旗艦版)")
+    st.caption("🔥 支援個期「期」藍標顯示、單一輸入框自動偵測、等寬對齊與融資大戶力道。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即同步最新盤後分點與行情", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
-# 標的名單管理面板 (新增與刪除)
-with st.expander("🛠️ 點此展開／收合【標的名單管理（新增自選、刪除標的）與風控設定】", expanded=False):
-    m_col1, m_col2 = st.columns([1.5, 1.5])
+# 標的名單管理面板 (智慧單一輸入與刪除)
+with st.expander("🛠️ 點此展開／收合【標的名單管理（單一輸入自動偵測、刪除標的）與風控設定】", expanded=False):
+    m_col1, m_col2 = st.columns([1.6, 1.4])
     with m_col1:
-        st.markdown("##### ➕ 新增自選股票至清單")
-        add_c1, add_c2, add_c3 = st.columns([1, 1.2, 0.8])
+        st.markdown("##### ➕ 新增自選股票 (輸入代號或名稱均可自動偵測)")
+        add_c1, add_c2 = st.columns([2.2, 0.8])
         with add_c1:
-            new_code = st.text_input("股票代號：", placeholder="例如: 2330").strip()
+            input_query = st.text_input("輸入股票代號或名稱：", placeholder="例如輸入: 2330 或 台積電").strip()
         with add_c2:
-            new_name = st.text_input("股票名稱：", placeholder="例如: 台積電").strip()
-        with add_c3:
             st.write("")
             if st.button("確認新增", use_container_width=True):
-                if new_code and new_name:
-                    existing_codes = [x["代號"] for x in st.session_state["custom_watchlist"]]
-                    if new_code not in existing_codes:
-                        st.session_state["custom_watchlist"].append({
-                            "代號": new_code,
-                            "名稱": new_name,
-                            "昨收": 100.0,
-                            "昨日鎖碼量": 15000,
-                            "券資比": 8.0,
-                            "融資增減(張)": 500,
-                            "主力分點": [("美商美林", 0.12), ("凱基-台北", 0.08)]
-                        })
-                        st.success(f"已成功加入 {new_name} ({new_code})！")
-                        st.rerun()
+                if input_query:
+                    # 智慧自動解析代號與名稱
+                    resolved_code = None
+                    resolved_name = None
+                    
+                    if input_query.isdigit():
+                        resolved_code = input_query
+                        resolved_name = STOCK_NAME_DICT.get(resolved_code, f"個股_{resolved_code}")
                     else:
-                        st.warning("該股票已在清單中！")
+                        resolved_name = input_query
+                        resolved_code = NAME_TO_CODE_DICT.get(resolved_name, None)
+                    
+                    if resolved_code:
+                        existing_codes = [x["代號"] for x in st.session_state["custom_watchlist"]]
+                        if resolved_code not in existing_codes:
+                            st.session_state["custom_watchlist"].append({
+                                "代號": resolved_code,
+                                "名稱": resolved_name,
+                                "昨收": 100.0,
+                                "昨日鎖碼量": 15000,
+                                "券資比": 8.0,
+                                "融資增減(張)": 500,
+                                "主力分點": [("美商美林", 0.12), ("凱基-台北", 0.08)]
+                            })
+                            st.success(f"已成功加入：{resolved_name} ({resolved_code})！")
+                            st.rerun()
+                        else:
+                            st.warning(f"{resolved_name} ({resolved_code}) 已在清單中！")
+                    else:
+                        st.error("查無此股票代號，請直接輸入 4 位數股票代號！")
                 else:
-                    st.error("請完整輸入代號與名稱！")
+                    st.error("請輸入欲新增的股票代號或名稱！")
 
     with m_col2:
         st.markdown("##### ➖ 從清單移除標的")
@@ -285,12 +292,12 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
     val_net_force = int(last.get("大戶淨力道", 0))
     val_cum_force = int(last.get("累積大戶淨差", 0))
 
-    fut_tag = f"<span style='background:#FF9900; color:#000; padding:1px 6px; border-radius:3px; font-weight:bold; font-size:12px; margin-left:6px;'>個期: {STOCK_FUTURES_MAP[stock_code]}</span>" if stock_code in STOCK_FUTURES_MAP else ""
+    fut_badge_html = "<span style='background-color:#1E88E5; color:#FFFFFF; padding:1px 5px; border-radius:4px; font-weight:bold; font-size:12px; margin-left:6px;'>期</span>" if stock_code in STOCK_FUTURES_SET else ""
     
     header_html = f"""
     <div style="background-color: #000000; padding: 6px 10px; font-family: monospace; border: 1px solid #333; font-size: 13px; margin-bottom: 2px;">
         <div style="text-align: center; color: #FFFFFF; font-size: 15px; font-weight: bold; margin-bottom: 3px;">
-            {stock_code} {stock_name} {fut_tag} 短空決策線圖 [{timeframe_label}]
+            {stock_code} {stock_name} {fut_badge_html} 短空決策線圖 [{timeframe_label}]
         </div>
         <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; font-size: 12px;">
             <span style="color: #FFFF00;">{timeframe_label} {last['日期']}</span>
@@ -530,10 +537,12 @@ def load_radar_market_data(pool_list):
         total_win_rate_score = int(round(score_ratio + score_profit + score_risk))
         total_win_rate_score = max(min(total_win_rate_score, 99), 10)
         
+        has_fut = "期" if code in STOCK_FUTURES_SET else "—"
+        
         enhanced_list.append({
             "股票代號": code,
             "股票名稱": name,
-            "個股期貨": STOCK_FUTURES_MAP.get(code, "—"),
+            "個期": has_fut,
             "現價": close_price,
             "昨收": prev_close,
             "漲停價": limit_up,
@@ -603,7 +612,7 @@ st.markdown("---")
 
 st.subheader("📊 盤後全市場隔日沖 × 主力成本 × 鎖碼決策表 (勝率降序排列)")
 preferred_cols = [
-    "短空勝率分", "股票代號", "股票名稱", "個股期貨", "現價", "即時信號", "出貨進度(%)", 
+    "短空勝率分", "股票代號", "股票名稱", "個期", "現價", "即時信號", "出貨進度(%)", 
     "隔日沖分點清單", "融資增減(張)", "融資力道評估", "主力合計佔比(%)", "主力合計買超", "主力加權成本", 
     "近高壓力(NH)", "最高壓力(AH)", "券資比(%)", "5日均量(張)"
 ]
@@ -618,7 +627,7 @@ left_side, right_side = st.columns([1.35, 3.65], gap="medium")
 
 with left_side:
     st.markdown("### 📋 明日短空鎖碼清單")
-    st.caption("💡 等寬對齊排列，可用鍵盤 **↑ / ↓ 鍵** 快速切換")
+    st.caption("💡 等寬排版，可用鍵盤 **↑ / ↓ 鍵** 快速切換")
     
     stock_list_options = []
     for rank, (_, r) in enumerate(df_display.iterrows(), 1):
@@ -627,9 +636,8 @@ with left_side:
         chg_val = float(r.get('漲跌', 0))
         chg_color = "red" if chg_val >= 0 else "green"
         
-        # 期貨標籤：有期貨才顯示
-        fut_code = STOCK_FUTURES_MAP.get(str(r['股票代號']), "")
-        fut_str = f"[{fut_code}]" if fut_code else "    "
+        # 期貨標記：有期貨顯示 [期]，無期貨留白對齊
+        fut_symbol = "[期]" if str(r['股票代號']) in STOCK_FUTURES_SET else "   "
         
         score_str = f"[{r['短空勝率分']:>2}分]"
         code_str = f"{r['股票代號']:<4}"
@@ -639,7 +647,7 @@ with left_side:
         
         paren_text = f":{chg_color}[({price_str}|{pct_str})]"
         
-        opt_str = f"{badge} {score_str} {code_str} {name_str} {fut_str} {paren_text}"
+        opt_str = f"{badge} {score_str} {code_str} {name_str} {fut_symbol} {paren_text}"
         stock_list_options.append(opt_str)
 
     if "selected_stock_code" not in st.session_state or str(st.session_state["selected_stock_code"]) not in [str(x) for x in df_display["股票代號"].values]:
@@ -664,8 +672,8 @@ with left_side:
     st.session_state["selected_stock_code"] = target_code
 
     target_row = df_display[df_display["股票代號"] == target_code].iloc[0]
-    target_fut_code = STOCK_FUTURES_MAP.get(target_code, "")
-    fut_card_badge = f"<span style='background-color: #FF9900; color: #000; font-size: 12px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 6px;'>個期: {target_fut_code}</span>" if target_fut_code else ""
+    has_target_fut = target_code in STOCK_FUTURES_SET
+    fut_card_badge = "<span style='background-color: #1E88E5; color: #FFF; font-size: 12px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 6px;'>期</span>" if has_target_fut else ""
     
     summary_card_html = f"""
     <div style="background-color: #1E1E1E; border: 1px solid #333333; border-radius: 8px; padding: 14px 16px; margin-top: 10px; color: #FFFFFF; font-family: monospace;">
