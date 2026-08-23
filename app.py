@@ -1,26 +1,27 @@
 import streamlit as st
 import pandas as pd
 import datetime
+import unicodedata
 import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # 頁面排版設定：全寬展開
 st.set_page_config(
-    page_title="隔日沖主力短空雷達 (智慧個期標示 × 自選管理旗艦版)", 
+    page_title="隔日沖主力短空雷達 (極致對齊 × 智慧個期版)", 
     layout="wide", 
     page_icon="🎯", 
     initial_sidebar_state="collapsed"
 )
 
-# 期交所個股期貨支援名單清單 (有支援者顯示「期」圖示)
+# 期交所個股期貨支援名單清單
 STOCK_FUTURES_SET = {
     "2408", "3260", "3406", "2449", "3231", "2327", "2376", "6488", "2313", "2492",
     "2330", "2317", "2454", "2382", "2603", "2609", "2344", "3037", "2368", "3017",
     "2383", "1519", "8210", "3661", "2059", "3443", "4551", "5289", "8299", "3008"
 }
 
-# 內建常用台股代號與名稱對照字典 (用於自動偵測與反查)
+# 內建常用台股代號與名稱對照字典
 STOCK_NAME_DICT = {
     "2408": "南亞科", "3260": "威剛", "3406": "玉晶光", "2449": "京元電子", "3231": "緯創",
     "2327": "國巨", "2376": "技嘉", "6488": "環球晶", "2313": "華通", "2492": "華新科",
@@ -30,7 +31,6 @@ STOCK_NAME_DICT = {
     "3443": "創意", "4551": "智伸科", "5289": "宜鼎", "8299": "群聯", "3008": "大立光"
 }
 
-# 反向名稱查代號
 NAME_TO_CODE_DICT = {v: k for k, v in STOCK_NAME_DICT.items()}
 
 # 30 大隔日沖主力名冊與特性資料庫
@@ -88,15 +88,15 @@ if "custom_watchlist" not in st.session_state:
 
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
-    st.title("🎯 每日隔日沖主力短空雷達 (智慧個期標示 × 自選管理旗艦版)")
-    st.caption("🔥 支援個期「期」藍標顯示、單一輸入框自動偵測、等寬對齊與融資大戶力道。")
+    st.title("🎯 每日隔日沖主力短空雷達 (極致對齊 × 智慧個期版)")
+    st.caption("🔥 全欄位精確對齊排版、智慧單一輸入自動解析、支援個期藍標與大戶籌碼力道。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即同步最新盤後分點與行情", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
-# 標的名單管理面板 (智慧單一輸入與刪除)
+# 標的名單管理面板
 with st.expander("🛠️ 點此展開／收合【標的名單管理（單一輸入自動偵測、刪除標的）與風控設定】", expanded=False):
     m_col1, m_col2 = st.columns([1.6, 1.4])
     with m_col1:
@@ -108,7 +108,6 @@ with st.expander("🛠️ 點此展開／收合【標的名單管理（單一輸
             st.write("")
             if st.button("確認新增", use_container_width=True):
                 if input_query:
-                    # 智慧自動解析代號與名稱
                     resolved_code = None
                     resolved_name = None
                     
@@ -181,6 +180,17 @@ with st.expander("🛠️ 點此展開／收合【標的名單管理（單一輸
         file_name="Taiwan_Top30_DayTrade_Brokers.csv",
         mime="text/csv"
     )
+
+# 中英文字串顯示長度精確對齊計算器
+def pad_display_text(text, target_display_width):
+    current_width = 0
+    for ch in str(text):
+        if unicodedata.east_asian_width(ch) in ('F', 'W', 'A'):
+            current_width += 2
+        else:
+            current_width += 1
+    pad_len = max(target_display_width - current_width, 0)
+    return str(text) + (" " * pad_len)
 
 def calculate_pro_short_indicators(df, interval="5m"):
     if df is None or df.empty:
@@ -627,7 +637,7 @@ left_side, right_side = st.columns([1.35, 3.65], gap="medium")
 
 with left_side:
     st.markdown("### 📋 明日短空鎖碼清單")
-    st.caption("💡 等寬排版，可用鍵盤 **↑ / ↓ 鍵** 快速切換")
+    st.caption("💡 嚴格等寬對齊，可用鍵盤 **↑ / ↓ 鍵** 快速切換")
     
     stock_list_options = []
     for rank, (_, r) in enumerate(df_display.iterrows(), 1):
@@ -636,18 +646,24 @@ with left_side:
         chg_val = float(r.get('漲跌', 0))
         chg_color = "red" if chg_val >= 0 else "green"
         
-        # 期貨標記：有期貨顯示 [期]，無期貨留白對齊
-        fut_symbol = "[期]" if str(r['股票代號']) in STOCK_FUTURES_SET else "   "
+        # 1. 分數欄 (等寬 6 字元)
+        score_padded = f"[{r['短空勝率分']:>2}分]"
         
-        score_str = f"[{r['短空勝率分']:>2}分]"
-        code_str = f"{r['股票代號']:<4}"
-        name_str = f"{r['股票名稱']:<4}"
-        price_str = f"{r['現價']:>5.1f}"
-        pct_str = f"{c_sym}{r.get('漲跌幅(%)', 0):>5.2f}%"
+        # 2. 代號欄 (等寬 5 字元)
+        code_padded = f"{r['股票代號']:<4} "
         
-        paren_text = f":{chg_color}[({price_str}|{pct_str})]"
+        # 3. 股票名稱欄 (中文字元寬度補齊，固定寬度 8 字元)
+        name_padded = pad_display_text(r['股票名稱'], 8)
         
-        opt_str = f"{badge} {score_str} {code_str} {name_str} {fut_symbol} {paren_text}"
+        # 4. [期] 欄位 (固定寬度 4 字元對齊)
+        fut_symbol = "[期]" if str(r['股票代號']) in STOCK_FUTURES_SET else "    "
+        
+        # 5. 價格與漲跌幅欄位 (右靠對齊)
+        price_padded = f"{float(r['現價']):>6.1f}"
+        pct_padded = f"{c_sym}{float(r.get('漲跌幅(%)', 0)):>5.2f}%"
+        paren_text = f":{chg_color}[({price_padded}|{pct_padded})]"
+        
+        opt_str = f"{badge} {score_padded} {code_padded} {name_padded} {fut_symbol} {paren_text}"
         stock_list_options.append(opt_str)
 
     if "selected_stock_code" not in st.session_state or str(st.session_state["selected_stock_code"]) not in [str(x) for x in df_display["股票代號"].values]:
