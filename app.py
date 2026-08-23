@@ -69,7 +69,6 @@ BROKER_DATA_CATALOG = [
 
 TARGET_BROKERS = [row[2] for row in BROKER_DATA_CATALOG]
 
-# 預設 10 檔精準核心標的庫
 DEFAULT_WATCHLIST = [
     {"代號": "2408", "名稱": "南亞科", "昨收": 62.8, "昨日鎖碼量": 26800, "券資比": 6.2, "融資增減(張)": 1420, "主力分點": [("美商美林", 0.145), ("凱基-台北", 0.083)]},
     {"代號": "3260", "名稱": "威剛", "昨收": 422.0, "昨日鎖碼量": 20600, "券資比": 8.9, "融資增減(張)": 2150, "主力分點": [("美商美林", 0.138), ("凱基-台北", 0.085)]},
@@ -89,7 +88,7 @@ if "custom_watchlist" not in st.session_state:
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
     st.title("🎯 每日隔日沖主力短空雷達 (專業十字查價連動旗艦版)")
-    st.caption("🔥 支援灰色虛線十字查價游標、即時數值連動懸浮視窗、等寬對齊與融資大戶力道。")
+    st.caption("🔥 乾淨走勢無浮窗遮擋、灰色虛線十字查價游標、單一輸入框自動偵測與融資大戶力道。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即同步最新盤後分點與行情", use_container_width=True):
@@ -227,7 +226,6 @@ def calculate_pro_short_indicators(df, interval="5m"):
     df["大戶淨力道"] = net_force_list
     df["累積大戶淨差"] = df["大戶淨力道"].cumsum()
 
-    # 計算每根 K 棒的漲跌幅
     pct_changes = [0.0]
     for i in range(1, len(closes)):
         prev_c = closes[i-1]
@@ -344,46 +342,23 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
         )
     )
     
-    # 專業自訂懸浮 Hover 資訊文本 (鼠標移動即時連動)
-    custom_hover_texts = []
-    for d, o, h, l, c, pct, v, v5, m5, m12, m20, vw, force, cum_f in zip(
-        df_k['日期'], df_k['開盤'], df_k['最高'], df_k['最低'], df_k['收盤'], df_k['漲跌幅'],
-        df_k['成交量'], df_k.get('VOL_5MA', [0]*len(df_k)),
-        df_k.get('5MA', [0]*len(df_k)), df_k.get('12MA', [0]*len(df_k)), df_k.get('20MA', [0]*len(df_k)), df_k.get('VWAP', [0]*len(df_k)),
-        df_k.get('大戶淨力道', [0]*len(df_k)), df_k.get('累積大戶淨差', [0]*len(df_k))
-    ):
-        txt = (
-            f"<b>時間：{d}</b><br>"
-            f"━━━━━━━━━━━━━━━━━━<br>"
-            f"開盤：<b>{o}</b> 最高：<b>{h}</b><br>"
-            f"最低：<b>{l}</b> 收盤：<b>{c}</b> ({pct:+0.2f}%)<br>"
-            f"5MA：<b>{m5}</b> 12MA：<b>{m12}</b> 20MA：<b>{m20}</b><br>"
-            f"VWAP均價：<b>{vw}</b><br>"
-            f"━━━━━━━━━━━━━━━━━━<br>"
-            f"成交量：<b>{v:,} 張</b> (均量: {int(v5):,})<br>"
-            f"大戶淨力道：<b>{int(force):+,} 張</b><br>"
-            f"累積淨差：<b>{int(cum_f):+,} 張</b>"
-        )
-        custom_hover_texts.append(txt)
-
-    # 第 1 層：K線主圖 (含專業灰色十字追蹤點)
+    # 第 1 層：K線主圖（移除遮擋大黑框，保留極簡乾淨畫面）
     fig.add_trace(go.Candlestick(
         x=df_k['日期'], open=df_k['開盤'], high=df_k['最高'], low=df_k['最低'], close=df_k['收盤'],
         name='K線',
-        hovertext=custom_hover_texts,
-        hoverinfo="text",
+        hoverinfo='none',
         increasing_line_color='#FF3333', increasing_fillcolor='#FF3333',
         decreasing_line_color='#00CC00', decreasing_fillcolor='#00CC00'
     ), row=1, col=1)
     
     if '5MA' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFCC00', width=1.2), name='5MA', hoverinfo='skip'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFCC00', width=1.2), name='5MA', hoverinfo='none'), row=1, col=1)
     if '12MA' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['12MA'], line=dict(color='#00FF00', width=1.0), name='12MA', hoverinfo='skip'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['12MA'], line=dict(color='#00FF00', width=1.0), name='12MA', hoverinfo='none'), row=1, col=1)
     if '20MA' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['20MA'], line=dict(color='#33CCFF', width=1.5), name='20MA', hoverinfo='skip'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['20MA'], line=dict(color='#33CCFF', width=1.5), name='20MA', hoverinfo='none'), row=1, col=1)
     if 'VWAP' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VWAP'], line=dict(color='#FF00FF', width=1.8), name='VWAP均價線', hoverinfo='skip'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VWAP'], line=dict(color='#FF00FF', width=1.8), name='VWAP均價線', hoverinfo='none'), row=1, col=1)
 
     k_min = float(df_k['最低'].min())
     k_max = float(df_k['最高'].max())
@@ -412,24 +387,24 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
 
     # 第 2 層：成交量
     vol_colors = ['#FF3333' if float(c) >= float(o) else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
-    fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['成交量'], marker_color=vol_colors, name='成交量', hoverinfo='skip'), row=2, col=1)
+    fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['成交量'], marker_color=vol_colors, name='成交量', hoverinfo='none'), row=2, col=1)
     if 'VOL_5MA' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), name='5MA均量', hoverinfo='skip'), row=2, col=1)
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), name='5MA均量', hoverinfo='none'), row=2, col=1)
 
     # 第 3 層：主力買賣超
     if '主力買賣超' in df_k.columns:
         broker_colors = ['#FF3333' if int(v) >= 0 else '#00CC00' for v in df_k['主力買賣超']]
-        fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['主力買賣超'], marker_color=broker_colors, name='主力買賣超', hoverinfo='skip'), row=3, col=1)
+        fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['主力買賣超'], marker_color=broker_colors, name='主力買賣超', hoverinfo='none'), row=3, col=1)
 
     # 第 4 層：大戶多空淨力道
     if '大戶淨力道' in df_k.columns:
         force_colors = ['#FF3333' if int(v) >= 0 else '#00CC00' for v in df_k['大戶淨力道']]
-        fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['大戶淨力道'], marker_color=force_colors, name='大戶多空淨力道', hoverinfo='skip'), row=4, col=1)
+        fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['大戶淨力道'], marker_color=force_colors, name='大戶多空淨力道', hoverinfo='none'), row=4, col=1)
     if '累積大戶淨差' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['累積大戶淨差'], line=dict(color='#FFFF00', width=1.5), name='累積大戶淨差', hoverinfo='skip'), row=4, col=1)
+        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['累積大戶淨差'], line=dict(color='#FFFF00', width=1.5), name='累積大戶淨差', hoverinfo='none'), row=4, col=1)
     fig.add_hline(y=0, line=dict(color="#666666", width=0.8, dash="dash"), row=4, col=1)
 
-    # 專業灰色虛線十字查價游標 (Crosshair Spikes) 設定
+    # 專業灰色虛線十字查價游標（無懸浮大黑框遮擋）
     fig.update_layout(
         template="plotly_dark",
         plot_bgcolor="#000000",
@@ -438,17 +413,10 @@ def draw_pro_short_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limi
         showlegend=False,
         height=820,
         margin=dict(l=35, r=35, t=10, b=15),
-        hovermode="x unified",
-        hoverlabel=dict(
-            bgcolor="rgba(10, 10, 10, 0.92)",
-            font_size=12,
-            font_family="monospace",
-            font_color="#FFFFFF",
-            bordercolor="#444444"
-        )
+        hovermode="x"
     )
     
-    # 啟用 X 軸與 Y 軸的灰色虛線十字線 (Gray Spikes)
+    # 啟用 X 軸與 Y 軸的灰色虛線十字查價線
     fig.update_xaxes(
         type='category', 
         gridcolor="#222222", 
@@ -714,19 +682,11 @@ with left_side:
         chg_val = float(r.get('漲跌', 0))
         chg_color = "red" if chg_val >= 0 else "green"
         
-        # 1. 分數欄 (等寬 6 字元)
         score_padded = f"[{r['短空勝率分']:>2}分]"
-        
-        # 2. 代號欄 (等寬 5 字元)
         code_padded = f"{r['股票代號']:<4} "
-        
-        # 3. 股票名稱欄 (中文字元寬度補齊，固定寬度 8 字元)
         name_padded = pad_display_text(r['股票名稱'], 8)
-        
-        # 4. [期] 欄位 (固定寬度 4 字元對齊)
         fut_symbol = "[期]" if str(r['股票代號']) in STOCK_FUTURES_SET else "    "
         
-        # 5. 價格與漲跌幅欄位 (右靠對齊)
         price_padded = f"{float(r['現價']):>6.1f}"
         pct_padded = f"{c_sym}{float(r.get('漲跌幅(%)', 0)):>5.2f}%"
         paren_text = f":{chg_color}[({price_padded}|{pct_padded})]"
