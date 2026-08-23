@@ -10,7 +10,7 @@ from plotly.subplots import make_subplots
 
 # 頁面排版設定：全寬展開
 st.set_page_config(
-    page_title="隔日沖主力短空雷達 (頂部數據60FPS即時連動旗艦版)", 
+    page_title="隔日沖主力短空雷達 (全圖層精準連動旗艦版)", 
     layout="wide", 
     page_icon="🎯", 
     initial_sidebar_state="collapsed"
@@ -89,8 +89,8 @@ if "custom_watchlist" not in st.session_state:
 
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
-    st.title("🎯 每日隔日沖主力短空雷達 (頂部數據60FPS即時連動旗艦版)")
-    st.caption("🔥 頂部單行狀態列隨游標即時變動、灰色虛線十字查價、單一輸入框自動偵測與融資大戶力道。")
+    st.title("🎯 每日隔日沖主力短空雷達 (全圖層精準連動旗艦版)")
+    st.caption("🔥 頂部單行狀態列隨游標100%全圖層連動、灰色虛線十字查價、無遮擋黑框。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即同步最新盤後分點與行情", use_container_width=True):
@@ -337,34 +337,39 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
         )
     )
     
-    # 封裝即時連動數據列表 (注入自訂 JS)
-    customdata_matrix = []
+    # 建立全域以「日期字串」為 Key 的完整對照字典（確保游標在任何圖層皆能 100% 抓到數據）
+    kline_lookup_dict = {}
     for i in range(len(df_k)):
         r = df_k.iloc[i]
+        d_key = str(r["日期"])
         prev_c = df_k["收盤"].iloc[i-1] if i > 0 else r["收盤"]
         c_val = float(r["收盤"])
         p_val = float(prev_c)
         chg_v = round(c_val - p_val, 2)
         pct_v = round((chg_v / p_val) * 100, 2) if p_val else 0.0
-        customdata_matrix.append([
-            f"{timeframe_label} {r['日期']}",
-            f"{r['開盤']}",
-            f"{r['最高']}",
-            f"{r['最低']}",
-            f"{r['收盤']}",
-            f"+{chg_v}" if chg_v > 0 else f"{chg_v}",
-            f"{pct_v}",
-            f"{r.get('5MA', '-')}",
-            f"{r.get('12MA', '-')}",
-            f"{r.get('20MA', '-')}",
-            f"{r.get('VWAP', '-')}"
-        ])
+        
+        is_up = pct_v >= 0
+        chg_color_str = "#FF3333" if is_up else "#00CC00"
+        chg_sym_str = "↑" if is_up else "↓"
+        chg_sign_str = f"+{chg_v}" if chg_v > 0 else f"{chg_v}"
+        
+        formatted_html = (
+            f"<span style='color: #FFFF00;'>{timeframe_label} {d_key}</span> "
+            f"<span style='color: #00CC00;'>開 <span style='color:#FFF;'>{r['開盤']}</span></span> "
+            f"<span style='color: #FF3333;'>高 <span style='color:#FFF;'>{r['最高']}</span></span> "
+            f"<span style='color: #00CC00;'>低 <span style='color:#FFF;'>{r['最低']}</span></span> "
+            f"<span style='color: {chg_color_str}; font-weight:bold;'>收 {r['收盤']} {chg_sym_str}{chg_sign_str} ({pct_v}%)</span> "
+            f"<span style='color: #FFCC00;'>均價5: {r.get('5MA', '-')}</span> "
+            f"<span style='color: #00FF00;'>均價12: {r.get('12MA', '-')}</span> "
+            f"<span style='color: #33CCFF;'>均價20: {r.get('20MA', '-')}</span> "
+            f"<span style='color: #FF00FF; font-weight:bold;'>VWAP: {r.get('VWAP', '-')}</span>"
+        )
+        kline_lookup_dict[d_key] = formatted_html
 
     # 第 1 層：K線主圖
     fig.add_trace(go.Candlestick(
         x=df_k['日期'], open=df_k['開盤'], high=df_k['最高'], low=df_k['最低'], close=df_k['收盤'],
         name='K線',
-        customdata=customdata_matrix,
         hoverinfo='none',
         increasing_line_color='#FF3333', increasing_fillcolor='#FF3333',
         decreasing_line_color='#00CC00', decreasing_fillcolor='#00CC00'
@@ -423,7 +428,7 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['累積大戶淨差'], line=dict(color='#FFFF00', width=1.5), name='累積大戶淨差', hoverinfo='none'), row=4, col=1)
     fig.add_hline(y=0, line=dict(color="#666666", width=0.8, dash="dash"), row=4, col=1)
 
-    # 專業灰色虛線十字查價游標（無任何浮動文字框遮擋）
+    # 專業灰色虛線十字查價游標
     fig.update_layout(
         template="plotly_dark",
         plot_bgcolor="#000000",
@@ -432,7 +437,7 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
         showlegend=False,
         height=750,
         margin=dict(l=35, r=35, t=10, b=15),
-        hovermode="closest"
+        hovermode="x"
     )
     
     fig.update_xaxes(
@@ -462,8 +467,8 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
     
     fig.update_yaxes(range=[k_min - (k_max - k_min) * 0.15, k_max + (k_max - k_min) * 0.15], row=1, col=1)
 
-    # 轉為包含 JS 監聽器的獨立 HTML 組件
     plotly_div_html = fig.to_html(include_plotlyjs='cdn', full_html=False, config={'displayModeBar': False})
+    lookup_json = json.dumps(kline_lookup_dict)
 
     custom_component_html = f"""
     <div style="background-color:#000000; font-family: monospace; border:1px solid #333; margin-bottom:4px; padding:6px 10px;">
@@ -480,36 +485,29 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
     <script>
     (function() {{
         var defaultHtml = `{default_info_html}`;
+        var lookupData = {lookup_json};
+        
         function attachHoverSync() {{
             var plotDiv = document.querySelector('.plotly-graph-div');
             var headerEl = document.getElementById('dynamic-kline-header-bar');
             if (!plotDiv || !headerEl) {{
-                setTimeout(attachHoverSync, 100);
+                setTimeout(attachHoverSync, 80);
                 return;
             }}
+            
+            // 監聽全圖層 Hover 事件（以 x 值日期為 Key，100% 命中）
             plotDiv.on('plotly_hover', function(data) {{
                 if (!data || !data.points || data.points.length === 0) return;
-                var pt = data.points[0];
-                var cd = pt.customdata;
-                if (cd && cd.length >= 11) {{
-                    var d = cd[0], o = cd[1], h = cd[2], l = cd[3], c = cd[4];
-                    var chg = cd[5], pct = cd[6], m5 = cd[7], m12 = cd[8], m20 = cd[9], vw = cd[10];
-                    var isUp = parseFloat(pct) >= 0;
-                    var chgColor = isUp ? '#FF3333' : '#00CC00';
-                    var chgSym = isUp ? '↑' : '↓';
-                    headerEl.innerHTML = `
-                        <span style="color: #FFFF00;">${{d}}</span>
-                        <span style="color: #00CC00;">開 <span style="color:#FFF;">${{o}}</span></span>
-                        <span style="color: #FF3333;">高 <span style="color:#FFF;">${{h}}</span></span>
-                        <span style="color: #00CC00;">低 <span style="color:#FFF;">${{l}}</span></span>
-                        <span style="color: ${{chgColor}}; font-weight:bold;">收 ${{c}} ${{chgSym}}${{chg}} (${{pct}}%)</span>
-                        <span style="color: #FFCC00;">均價5: ${{m5}}</span>
-                        <span style="color: #00FF00;">均價12: ${{m12}}</span>
-                        <span style="color: #33CCFF;">均價20: ${{m20}}</span>
-                        <span style="color: #FF00FF; font-weight:bold;">VWAP: ${{vw}}</span>
-                    `;
+                for (var i = 0; i < data.points.length; i++) {{
+                    var pt = data.points[i];
+                    var xVal = pt.x;
+                    if (xVal && lookupData[xVal]) {{
+                        headerEl.innerHTML = lookupData[xVal];
+                        break;
+                    }}
                 }}
             }});
+            
             plotDiv.on('plotly_unhover', function() {{
                 headerEl.innerHTML = defaultHtml;
             }});
