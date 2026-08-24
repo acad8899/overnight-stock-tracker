@@ -152,7 +152,8 @@ DEFAULT_WATCHLIST = [
     }
 ]
 
-if "custom_watchlist" not in st.session_state:
+# 自動重置或同步 Session 清單格式
+if "custom_watchlist" not in st.session_state or not isinstance(st.session_state.get("custom_watchlist", [{}])[0].get("主力分點", [None])[0], dict):
     st.session_state["custom_watchlist"] = DEFAULT_WATCHLIST
 
 head_col1, head_col2 = st.columns([4, 1])
@@ -544,7 +545,7 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
     """
     return custom_component_html
 
-# 動態資料庫加載引擎
+# 動態資料庫加載引擎 (支援多重格式安全解析)
 def load_radar_market_data(pool_list):
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     enhanced_list = []
@@ -553,7 +554,7 @@ def load_radar_market_data(pool_list):
         code = item["代號"]
         name = item["名稱"]
         base_prev_close = item["昨收"]
-        yesterday_settled_vol = item["昨日鎖碼量"]
+        yesterday_settled_vol = item.get("昨日鎖碼量", 10000)
         margin_change = item.get("融資增減(張)", item.get("融資增減", 0))
         short_ratio = item.get("券資比", 8.0)
         
@@ -596,11 +597,21 @@ def load_radar_market_data(pool_list):
         total_current_market_amount = 0.0
         total_ratio = 0.0
         
-        for b_dict in item.get("主力分點", []):
-            b_name = b_dict["分點"]
-            b_fixed_vol = int(b_dict["買超"])
-            b_cost = float(b_dict.get("均價", prev_close))
-            b_ratio = float(b_dict.get("佔比", round((b_fixed_vol / max(today_volume, 1)) * 100, 2)))
+        raw_brokers = item.get("主力分點", [])
+        for b_item in raw_brokers:
+            # 穩健兼容 Dict 或 Tuple 結構
+            if isinstance(b_item, dict):
+                b_name = b_item.get("分點", "主力分點")
+                b_fixed_vol = int(b_item.get("買超", 0))
+                b_cost = float(b_item.get("均價", prev_close))
+                b_ratio = float(b_item.get("佔比", round((b_fixed_vol / max(today_volume, 1)) * 100, 2)))
+            elif isinstance(b_item, (tuple, list)):
+                b_name = str(b_item[0])
+                b_ratio = round(float(b_item[1]) * 100, 2) if float(b_item[1]) < 1 else float(b_item[1])
+                b_fixed_vol = int(yesterday_settled_vol * (b_ratio / 100.0))
+                b_cost = round(prev_close * 0.985, 2)
+            else:
+                continue
             
             profit_per_share = close_price - b_cost
             profit_wan_int = int(round((profit_per_share * b_fixed_vol * 1000) / 10000))
@@ -688,6 +699,8 @@ def load_radar_market_data(pool_list):
         
         has_fut = "期" if code in STOCK_FUTURES_SET else "—"
         
+        broker_names_list = [b["分點名稱"] for b in detailed_brokers]
+        
         enhanced_list.append({
             "股票代號": code,
             "股票名稱": name,
@@ -708,7 +721,7 @@ def load_radar_market_data(pool_list):
             "融資力道評估": margin_status,
             "5日均量(張)": avg_5d_volume,
             "券資比(%)": short_ratio,
-            "隔日沖分點清單": "、".join([b["分點"] for b in item.get("主力分點", [])]),
+            "隔日沖分點清單": "、".join(broker_names_list),
             "主力合計買超": total_fixed_shares,
             "主力合計佔比(%)": round(total_ratio, 2),
             "主力加權成本": avg_cost,
