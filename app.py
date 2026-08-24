@@ -92,16 +92,17 @@ DEFAULT_WATCHLIST = [
 if "custom_watchlist" not in st.session_state:
     st.session_state["custom_watchlist"] = DEFAULT_WATCHLIST
 
-# 🚀 官方 TWSE / TPEx 即時信用交易 (融資券) 抓取引擎 (含反爬蟲 Header 與 OpenAPI 支援)
-@st.cache_data(ttl=300)
+# 🚀 官方 TWSE / TPEx 即時信用交易 (融資券) 抓取引擎 (完整修正欄位索引與解析版)
+@st.cache_data(ttl=60)
 def fetch_real_margin_data():
     margin_dict = {}
     today = datetime.date.today()
     
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/javascript, */*; q=0.01",
-        "Referer": "https://www.twse.com.tw/zh/trading/margin/margin-balance.html"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Connection": "keep-alive"
     }
     
     date_candidates = [
@@ -116,15 +117,18 @@ def fetch_real_margin_data():
     for d_str in date_candidates:
         try:
             url = f"https://www.twse.com.tw/rwd/zh/marginTrading/marginBalance?date={d_str}&selectType=ALL&response=json"
-            res = requests.get(url, headers=headers, timeout=5).json()
+            res = requests.get(url, headers=headers, timeout=6).json()
             if res.get("stat") == "OK" and "data" in res:
                 for row in res["data"]:
                     code = str(row[0]).strip()
                     try:
-                        m_chg_str = str(row[6]).replace(",", "").replace("+", "")
-                        m_chg = int(m_chg_str)
-                        m_balance = int(str(row[5]).replace(",", ""))
-                        s_balance = int(str(row[11]).replace(",", ""))
+                        buy_v = int(str(row[2]).replace(",", "").replace("+", "").replace("-", "0") or 0)
+                        sell_v = int(str(row[3]).replace(",", "").replace("+", "").replace("-", "0") or 0)
+                        cash_v = int(str(row[4]).replace(",", "").replace("+", "").replace("-", "0") or 0)
+                        m_chg = buy_v - sell_v - cash_v
+                        
+                        m_balance = int(str(row[6]).replace(",", "") or 1)
+                        s_balance = int(str(row[12]).replace(",", "") or 0) if len(row) > 12 else 0
                         short_ratio = round((s_balance / m_balance * 100), 1) if m_balance > 0 else 0.0
                     except Exception:
                         continue
@@ -133,25 +137,28 @@ def fetch_real_margin_data():
         except Exception:
             continue
 
-    # 2. 抓取上櫃融資券 (TPEx - 威剛、環球晶等)
+    # 2. 抓取上櫃融資券 (TPEx - 威剛 3260, 環球晶 6488 等)
     for d_str in date_candidates:
         try:
             d_obj = datetime.datetime.strptime(d_str, "%Y%m%d")
             roc_date = f"{d_obj.year - 1911}/{d_obj.strftime('%m/%d')}"
             url = f"https://www.tpex.org.tw/web/stock/margin_trading/margin_balance/margin_bal_result.php?l=zh-tw&d={roc_date}&_={int(datetime.datetime.now().timestamp()*1000)}"
-            tpex_headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Referer": "https://www.tpex.org.tw/web/stock/margin_trading/margin_balance/margin_bal.php"
-            }
-            res = requests.get(url, headers=tpex_headers, timeout=5).json()
-            if "aaData" in res and len(res["aaData"]) > 0:
-                for row in res["aaData"]:
+            tpex_headers = headers.copy()
+            tpex_headers["Referer"] = "https://www.tpex.org.tw/web/stock/margin_trading/margin_balance/margin_bal.php"
+            
+            res = requests.get(url, headers=tpex_headers, timeout=6).json()
+            rows_data = res.get("aaData") or res.get("data") or []
+            if len(rows_data) > 0:
+                for row in rows_data:
                     code = str(row[0]).strip()
                     try:
-                        cur_bal = int(str(row[5]).replace(",", ""))
-                        prev_bal = int(str(row[6]).replace(",", ""))
-                        m_chg = cur_bal - prev_bal
-                        s_bal = int(str(row[11]).replace(",", "")) if len(row) > 11 else 0
+                        buy_v = int(str(row[3]).replace(",", "") or 0)
+                        sell_v = int(str(row[4]).replace(",", "") or 0)
+                        cash_v = int(str(row[5]).replace(",", "") or 0)
+                        m_chg = buy_v - sell_v - cash_v
+                        
+                        cur_bal = int(str(row[6]).replace(",", "") or 1)
+                        s_bal = int(str(row[13]).replace(",", "") or 0) if len(row) > 13 else 0
                         short_ratio = round((s_bal / cur_bal * 100), 1) if cur_bal > 0 else 0.0
                     except Exception:
                         continue
