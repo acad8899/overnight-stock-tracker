@@ -75,101 +75,59 @@ BROKER_DATA_CATALOG = [
 
 TARGET_BROKERS = [row[2] for row in BROKER_DATA_CATALOG]
 
-# 🎯 8/24 盤後官方 10 檔完整正確結算庫
+# 預設自選監控清單
 DEFAULT_WATCHLIST = [
-    {"代號": "3406", "名稱": "玉晶光", "昨收": 652.0, "昨日鎖碼量": 9800, "融資增減": -120, "券資比": 13.2, "主力分點": [("富邦-建國", 0.135), ("元大-土城永寧", 0.081)]},
-    {"代號": "2449", "名稱": "京元電子", "昨收": 235.0, "昨日鎖碼量": 28500, "融資增減": -166, "券資比": 7.1, "主力分點": [("美商美林", 0.158), ("凱基-台北", 0.091)]},
-    {"代號": "3231", "名稱": "緯創", "昨收": 172.0, "昨日鎖碼量": 45000, "融資增減": -40, "券資比": 6.8, "主力分點": [("凱基-台北", 0.152), ("新加坡商瑞銀", 0.078)]},
-    {"代號": "2376", "名稱": "技嘉", "昨收": 335.0, "昨日鎖碼量": 18200, "融資增減": -95, "券資比": 11.3, "主力分點": [("美商美林", 0.118), ("元大-土城永寧", 0.072)]},
-    {"代號": "3260", "名稱": "威剛", "昨收": 422.0, "昨日鎖碼量": 20600, "融資增減": -991, "券資比": 5.0, "主力分點": [("美商美林", 0.138), ("凱基-台北", 0.085)]},
-    {"代號": "2327", "名稱": "國巨", "昨收": 580.0, "昨日鎖碼量": 14200, "融資增減": -45, "券資比": 8.4, "主力分點": [("凱基-台北", 0.128), ("台灣摩根士丹利", 0.075)]},
-    {"代號": "2313", "名稱": "華通", "昨收": 210.0, "昨日鎖碼量": 15600, "融資增減": -860, "券資比": 11.5, "主力分點": [("元大-土城永寧", 0.112), ("富邦-建國", 0.071)]},
-    {"代號": "2408", "名稱": "南亞科", "昨收": 528.0, "昨日鎖碼量": 26800, "融資增減": -2325, "券資比": 6.2, "主力分點": [("美商美林", 0.145), ("凱基-台北", 0.083)]},
-    {"代號": "2492", "名稱": "華新科", "昨收": 268.0, "昨日鎖碼量": 12000, "融資增減": -520, "券資比": 16.5, "主力分點": [("凱基-台北", 0.082), ("美商美林", 0.045)]},
-    {"代號": "6488", "名稱": "環球晶", "昨收": 485.0, "昨日鎖碼量": 8200, "融資增減": -310, "券資比": 9.5, "主力分點": [("新加坡商瑞銀", 0.122), ("凱基-松山", 0.068)]}
+    {"代號": "3406", "名稱": "玉晶光", "昨收": 652.0, "昨日鎖碼量": 9800, "主力分點": [("富邦-建國", 0.135), ("元大-土城永寧", 0.081)]},
+    {"代號": "2449", "名稱": "京元電子", "昨收": 235.0, "昨日鎖碼量": 28500, "主力分點": [("美商美林", 0.158), ("凱基-台北", 0.091)]},
+    {"代號": "3231", "名稱": "緯創", "昨收": 172.0, "昨日鎖碼量": 45000, "主力分點": [("凱基-台北", 0.152), ("新加坡商瑞銀", 0.078)]},
+    {"代號": "2376", "名稱": "技嘉", "昨收": 335.0, "昨日鎖碼量": 18200, "主力分點": [("美商美林", 0.118), ("元大-土城永寧", 0.072)]},
+    {"代號": "3260", "名稱": "威剛", "昨收": 422.0, "昨日鎖碼量": 20600, "主力分點": [("美商美林", 0.138), ("凱基-台北", 0.085)]},
+    {"代號": "2327", "名稱": "國巨", "昨收": 580.0, "昨日鎖碼量": 14200, "主力分點": [("凱基-台北", 0.128), ("台灣摩根士丹利", 0.075)]},
+    {"代號": "2313", "名稱": "華通", "昨收": 210.0, "昨日鎖碼量": 15600, "主力分點": [("元大-土城永寧", 0.112), ("富邦-建國", 0.071)]},
+    {"代號": "2408", "名稱": "南亞科", "昨收": 528.0, "昨日鎖碼量": 26800, "主力分點": [("美商美林", 0.145), ("凱基-台北", 0.083)]},
+    {"代號": "2492", "名稱": "華新科", "昨收": 268.0, "昨日鎖碼量": 12000, "主力分點": [("凱基-台北", 0.082), ("美商美林", 0.045)]},
+    {"代號": "6488", "名稱": "環球晶", "昨收": 485.0, "昨日鎖碼量": 8200, "主力分點": [("新加坡商瑞銀", 0.122), ("凱基-松山", 0.068)]}
 ]
 
 if "custom_watchlist" not in st.session_state:
     st.session_state["custom_watchlist"] = DEFAULT_WATCHLIST
 
-# 🚀 官方 TWSE / TPEx OpenAPI 數據抓取引擎
-@st.cache_data(ttl=120)
-def fetch_real_margin_data():
-    margin_dict = {}
-    today = datetime.date.today()
-    
+# 🚀 透過 Yahoo 股市 API 直接抓取單檔股票最新信用交易 (融資券)
+@st.cache_data(ttl=180)
+def fetch_yahoo_margin_data(stock_code):
+    suffix = ".TWO" if str(stock_code) in TPEX_STOCKS else ".TW"
+    symbol = f"{stock_code}{suffix}"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
     }
+    url = f"https://tw.stock.yahoo.com/_td-stock/api/resource/StockServices.marginPurchaseAndShortSale;symbol={symbol}"
     
-    date_candidates = [
-        today.strftime("%Y%m%d"),
-        (today - datetime.timedelta(days=1)).strftime("%Y%m%d"),
-        (today - datetime.timedelta(days=2)).strftime("%Y%m%d"),
-        (today - datetime.timedelta(days=3)).strftime("%Y%m%d")
-    ]
+    try:
+        res = requests.get(url, headers=headers, timeout=4).json()
+        margin_list = res.get("marginPurchaseAndShortSale", [])
+        if margin_list and len(margin_list) > 0:
+            latest = margin_list[0]
+            # 融資增減 = 買進 - 賣出 - 現金償還 (或直接取 netChange)
+            margin_change = int(latest.get("marginPurchaseNetChange", 0))
+            if margin_change == 0 and "marginPurchaseBuy" in latest and "marginPurchaseSell" in latest:
+                b = int(latest.get("marginPurchaseBuy", 0))
+                s = int(latest.get("marginPurchaseSell", 0))
+                c = int(latest.get("marginPurchaseCashRepayment", 0))
+                margin_change = b - s - c
+                
+            m_bal = int(latest.get("marginPurchaseBalance", 1))
+            s_bal = int(latest.get("shortSaleBalance", 0))
+            short_ratio = round((s_bal / m_bal * 100), 1) if m_bal > 0 else 0.0
+            return {"融資增減": margin_change, "券資比": short_ratio}
+    except Exception:
+        pass
     
-    # 1. 抓取上市融資券 (TWSE)
-    for d_str in date_candidates:
-        try:
-            url = f"https://www.twse.com.tw/rwd/zh/marginTrading/marginBalance?date={d_str}&selectType=ALL&response=json"
-            res = requests.get(url, headers=headers, timeout=4).json()
-            if res.get("stat") == "OK" and "data" in res and len(res["data"]) > 0:
-                for row in res["data"]:
-                    code = str(row[0]).strip()
-                    try:
-                        buy_v = int(str(row[2]).replace(",", "").replace("+", "").replace("-", "0") or 0)
-                        sell_v = int(str(row[3]).replace(",", "").replace("+", "").replace("-", "0") or 0)
-                        cash_v = int(str(row[4]).replace(",", "").replace("+", "").replace("-", "0") or 0)
-                        m_chg = buy_v - sell_v - cash_v
-                        
-                        m_balance = int(str(row[6]).replace(",", "") or 1)
-                        s_balance = int(str(row[12]).replace(",", "") or 0) if len(row) > 12 else 0
-                        short_ratio = round((s_balance / m_balance * 100), 1) if m_balance > 0 else 0.0
-                    except Exception:
-                        continue
-                    margin_dict[code] = {"融資增減": m_chg, "券資比": short_ratio}
-                break
-        except Exception:
-            continue
-
-    # 2. 抓取上櫃融資券 (TPEx)
-    for d_str in date_candidates:
-        try:
-            d_obj = datetime.datetime.strptime(d_str, "%Y%m%d")
-            roc_date = f"{d_obj.year - 1911}/{d_obj.strftime('%m/%d')}"
-            url = f"https://www.tpex.org.tw/web/stock/margin_trading/margin_balance/margin_bal_result.php?l=zh-tw&d={roc_date}&_={int(datetime.datetime.now().timestamp()*1000)}"
-            tpex_headers = headers.copy()
-            tpex_headers["Referer"] = "https://www.tpex.org.tw/web/stock/margin_trading/margin_balance/margin_bal.php"
-            
-            res = requests.get(url, headers=tpex_headers, timeout=4).json()
-            rows_data = res.get("aaData") or res.get("data") or []
-            if len(rows_data) > 0:
-                for row in rows_data:
-                    code = str(row[0]).strip()
-                    try:
-                        buy_v = int(str(row[3]).replace(",", "") or 0)
-                        sell_v = int(str(row[4]).replace(",", "") or 0)
-                        cash_v = int(str(row[5]).replace(",", "") or 0)
-                        m_chg = buy_v - sell_v - cash_v
-                        
-                        cur_bal = int(str(row[6]).replace(",", "") or 1)
-                        s_bal = int(str(row[13]).replace(",", "") or 0) if len(row) > 13 else 0
-                        short_ratio = round((s_bal / cur_bal * 100), 1) if cur_bal > 0 else 0.0
-                    except Exception:
-                        continue
-                    margin_dict[code] = {"融資增減": m_chg, "券資比": short_ratio}
-                break
-        except Exception:
-            continue
-
-    return margin_dict
+    return {"融資增減": 0, "券資比": 8.0}
 
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
     st.title("🎯 每日隔日沖主力短空雷達 (全圖層精準連動旗艦版)")
-    st.caption("🔥 頂部單行狀態列隨游標100%全圖層連動、自動串接上市櫃融資券結算數據。")
+    st.caption("🔥 頂部單行狀態列隨游標100%全圖層連動、串接 Yahoo 股市即時融資券結算。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即同步最新盤後分點與行情", use_container_width=True):
@@ -205,8 +163,6 @@ with st.expander("🛠️ 點此展開／收合【標的名單管理與風控設
                                 "名稱": resolved_name,
                                 "昨收": 100.0,
                                 "昨日鎖碼量": 15000,
-                                "融資增減": 0,
-                                "券資比": 8.0,
                                 "主力分點": [("美商美林", 0.12), ("凱基-台北", 0.08)]
                             })
                             st.success(f"已成功加入：{resolved_name} ({resolved_code})！")
@@ -554,12 +510,10 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
     """
     return custom_component_html
 
-# 動態資料庫加載引擎
+# 動態資料庫加載引擎 (直接呼叫 Yahoo 股市 API 獲取信用交易數據)
 def load_radar_market_data(pool_list):
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     enhanced_list = []
-    
-    real_margin_data = fetch_real_margin_data()
     
     for item in pool_list:
         code = item["代號"]
@@ -567,10 +521,10 @@ def load_radar_market_data(pool_list):
         base_prev_close = item["昨收"]
         yesterday_settled_vol = item["昨日鎖碼量"]
         
-        # 優先取用即時爬蟲資料，若無則取用 8/24 官方結算庫數值
-        stock_margin_info = real_margin_data.get(code, {})
-        margin_change = stock_margin_info.get("融資增減", item.get("融資增減", 0))
-        short_ratio = stock_margin_info.get("券資比", item.get("券資比", 8.0))
+        # 直連 Yahoo 股市 API 獲取融資券
+        stock_margin_info = fetch_yahoo_margin_data(code)
+        margin_change = stock_margin_info.get("融資增減", 0)
+        short_ratio = stock_margin_info.get("券資比", 8.0)
         
         df_d = fetch_real_kline(code, interval="1d")
         
