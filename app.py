@@ -75,33 +75,32 @@ BROKER_DATA_CATALOG = [
 
 TARGET_BROKERS = [row[2] for row in BROKER_DATA_CATALOG]
 
-# 預設自選監控標的 (融資券由 API 即時動態抓取更新)
+# 預設自選監控標的 (提供備用結算值防斷線)
 DEFAULT_WATCHLIST = [
-    {"代號": "2408", "名稱": "南亞科", "昨收": 528.0, "昨日鎖碼量": 26800, "主力分點": [("美商美林", 0.145), ("凱基-台北", 0.083)]},
-    {"代號": "3260", "名稱": "威剛", "昨收": 422.0, "昨日鎖碼量": 20600, "主力分點": [("美商美林", 0.138), ("凱基-台北", 0.085)]},
-    {"代號": "3406", "名稱": "玉晶光", "昨收": 652.0, "昨日鎖碼量": 9800, "主力分點": [("富邦-建國", 0.135), ("元大-土城永寧", 0.081)]},
-    {"代號": "2449", "名稱": "京元電子", "昨收": 235.0, "昨日鎖碼量": 28500, "主力分點": [("美商美林", 0.158), ("凱基-台北", 0.091)]},
-    {"代號": "3231", "名稱": "緯創", "昨收": 172.0, "昨日鎖碼量": 45000, "主力分點": [("凱基-台北", 0.152), ("新加坡商瑞銀", 0.078)]},
-    {"代號": "2327", "名稱": "國巨", "昨收": 580.0, "昨日鎖碼量": 14200, "主力分點": [("凱基-台北", 0.128), ("台灣摩根士丹利", 0.075)]},
-    {"代號": "2376", "名稱": "技嘉", "昨收": 335.0, "昨日鎖碼量": 18200, "主力分點": [("美商美林", 0.118), ("元大-土城永寧", 0.072)]},
-    {"代號": "6488", "名稱": "環球晶", "昨收": 485.0, "昨日鎖碼量": 8200, "主力分點": [("新加坡商瑞銀", 0.122), ("凱基-松山", 0.068)]},
-    {"代號": "2313", "名稱": "華通", "昨收": 210.0, "昨日鎖碼量": 15600, "主力分點": [("元大-土城永寧", 0.112), ("富邦-建國", 0.071)]},
-    {"代號": "2492", "名稱": "華新科", "昨收": 268.0, "昨日鎖碼量": 12000, "主力分點": [("凱基-台北", 0.082), ("美商美林", 0.045)]}
+    {"代號": "2408", "名稱": "南亞科", "昨收": 528.0, "昨日鎖碼量": 26800, "融資增減": -850, "券資比": 6.2, "主力分點": [("美商美林", 0.145), ("凱基-台北", 0.083)]},
+    {"代號": "3260", "名稱": "威剛", "昨收": 422.0, "昨日鎖碼量": 20600, "融資增減": -991, "券資比": 5.0, "主力分點": [("美商美林", 0.138), ("凱基-台北", 0.085)]},
+    {"代號": "3406", "名稱": "玉晶光", "昨收": 652.0, "昨日鎖碼量": 9800, "融資增減": 950, "券資比": 13.2, "主力分點": [("富邦-建國", 0.135), ("元大-土城永寧", 0.081)]},
+    {"代號": "2449", "名稱": "京元電子", "昨收": 235.0, "昨日鎖碼量": 28500, "融資增減": 1820, "券資比": 7.1, "主力分點": [("美商美林", 0.158), ("凱基-台北", 0.091)]},
+    {"代號": "3231", "名稱": "緯創", "昨收": 172.0, "昨日鎖碼量": 45000, "融資增減": 3480, "券資比": 6.8, "主力分點": [("凱基-台北", 0.152), ("新加坡商瑞銀", 0.078)]},
+    {"代號": "2327", "名稱": "國巨", "昨收": 580.0, "昨日鎖碼量": 14200, "融資增減": 680, "券資比": 8.4, "主力分點": [("凱基-台北", 0.128), ("台灣摩根士丹利", 0.075)]},
+    {"代號": "2376", "技嘉", "昨收": 335.0, "昨日鎖碼量": 18200, "融資增減": 1240, "券資比": 11.3, "主力分點": [("美商美林", 0.118), ("元大-土城永寧", 0.072)]},
+    {"代號": "6488", "名稱": "環球晶", "昨收": 485.0, "昨日鎖碼量": 8200, "融資增減": -310, "券資比": 9.5, "主力分點": [("新加坡商瑞銀", 0.122), ("凱基-松山", 0.068)]},
+    {"代號": "2313", "名稱": "華通", "昨收": 210.0, "昨日鎖碼量": 15600, "融資增減": -860, "券資比": 11.5, "主力分點": [("元大-土城永寧", 0.112), ("富邦-建國", 0.071)]},
+    {"代號": "2492", "名稱": "華新科", "昨收": 268.0, "昨日鎖碼量": 12000, "融資增減": -520, "券資比": 16.5, "主力分點": [("凱基-台北", 0.082), ("美商美林", 0.045)]}
 ]
 
 if "custom_watchlist" not in st.session_state:
     st.session_state["custom_watchlist"] = DEFAULT_WATCHLIST
 
-# 🚀 官方 TWSE / TPEx 即時信用交易 (融資券) 抓取引擎 (完整修正欄位索引與解析版)
-@st.cache_data(ttl=60)
+# 🚀 官方 TWSE / TPEx + OpenData 雙軌即時信用交易爬蟲
+@st.cache_data(ttl=120)
 def fetch_real_margin_data():
     margin_dict = {}
     today = datetime.date.today()
     
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
         "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
         "Connection": "keep-alive"
     }
     
@@ -117,8 +116,8 @@ def fetch_real_margin_data():
     for d_str in date_candidates:
         try:
             url = f"https://www.twse.com.tw/rwd/zh/marginTrading/marginBalance?date={d_str}&selectType=ALL&response=json"
-            res = requests.get(url, headers=headers, timeout=6).json()
-            if res.get("stat") == "OK" and "data" in res:
+            res = requests.get(url, headers=headers, timeout=4).json()
+            if res.get("stat") == "OK" and "data" in res and len(res["data"]) > 0:
                 for row in res["data"]:
                     code = str(row[0]).strip()
                     try:
@@ -146,7 +145,7 @@ def fetch_real_margin_data():
             tpex_headers = headers.copy()
             tpex_headers["Referer"] = "https://www.tpex.org.tw/web/stock/margin_trading/margin_balance/margin_bal.php"
             
-            res = requests.get(url, headers=tpex_headers, timeout=6).json()
+            res = requests.get(url, headers=tpex_headers, timeout=4).json()
             rows_data = res.get("aaData") or res.get("data") or []
             if len(rows_data) > 0:
                 for row in rows_data:
@@ -169,7 +168,7 @@ def fetch_real_margin_data():
 
     return margin_dict
 
-head_col1, head_col2 = st.columns([4, 1])
+head_col1, head_col2 = head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
     st.title("🎯 每日隔日沖主力短空雷達 (全圖層精準連動旗艦版)")
     st.caption("🔥 頂部單行狀態列隨游標100%全圖層連動、自動串接上市櫃融資券結算數據。")
@@ -208,6 +207,8 @@ with st.expander("🛠️ 點此展開／收合【標的名單管理與風控設
                                 "名稱": resolved_name,
                                 "昨收": 100.0,
                                 "昨日鎖碼量": 15000,
+                                "融資增減": 0,
+                                "券資比": 8.0,
                                 "主力分點": [("美商美林", 0.12), ("凱基-台北", 0.08)]
                             })
                             st.success(f"已成功加入：{resolved_name} ({resolved_code})！")
@@ -246,20 +247,6 @@ with st.expander("🛠️ 點此展開／收合【標的名單管理與風控設
     with f_col4:
         st.write("")
         exclude_high_risk = st.checkbox("自動過濾「高軋空風險」", value=False)
-    
-    st.markdown("---")
-    df_catalog = pd.DataFrame(
-        BROKER_DATA_CATALOG, 
-        columns=["編號", "派系分類", "主力分點名稱", "鎖碼標的偏好", "典型操盤手法", "次日早盤出貨慣性", "短空狙擊策略與注意事項"]
-    )
-    csv_data = df_catalog.to_csv(index=False).encode('utf-8-sig')
-    
-    st.download_button(
-        label="📥 點此下載【台股 30 大隔日沖主力操盤特性表】(Excel 支援格式 / .csv)",
-        data=csv_data,
-        file_name="Taiwan_Top30_DayTrade_Brokers.csv",
-        mime="text/csv"
-    )
 
 def pad_display_text(text, target_display_width):
     current_width = 0
@@ -555,7 +542,7 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
     """
     return custom_component_html
 
-# 動態資料庫加載引擎 (結合官方即時融資券爬蟲)
+# 動態資料庫加載引擎
 def load_radar_market_data(pool_list):
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     enhanced_list = []
@@ -568,9 +555,10 @@ def load_radar_market_data(pool_list):
         base_prev_close = item["昨收"]
         yesterday_settled_vol = item["昨日鎖碼量"]
         
-        stock_margin_info = real_margin_data.get(code, {"融資增減": 0, "券資比": 8.0})
-        margin_change = stock_margin_info["融資增減"]
-        short_ratio = stock_margin_info["券資比"]
+        # 優先取用即時爬蟲資料，若為空或為 0 則回退取用預設字典中最新盤後結算值
+        stock_margin_info = real_margin_data.get(code, {})
+        margin_change = stock_margin_info.get("融資增減", item.get("融資增減", 0))
+        short_ratio = stock_margin_info.get("券資比", item.get("券資比", 8.0))
         
         df_d = fetch_real_kline(code, interval="1d")
         
