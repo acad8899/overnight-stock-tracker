@@ -4,6 +4,7 @@ import pandas as pd
 import datetime
 import unicodedata
 import json
+import requests
 import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -34,6 +35,9 @@ STOCK_NAME_DICT = {
 }
 
 NAME_TO_CODE_DICT = {v: k for k, v in STOCK_NAME_DICT.items()}
+
+# 上櫃代號集合 (TPEx)
+TPEX_STOCKS = {"3260", "6488", "8299", "5289", "3211", "5483", "8112", "6213"}
 
 # 30 大隔日沖主力名冊與特性資料庫
 BROKER_DATA_CATALOG = [
@@ -71,26 +75,89 @@ BROKER_DATA_CATALOG = [
 
 TARGET_BROKERS = [row[2] for row in BROKER_DATA_CATALOG]
 
+# 預設自選監控標的 (融資券由 API 即時動態抓取更新)
 DEFAULT_WATCHLIST = [
-    {"代號": "2408", "名稱": "南亞科", "昨收": 62.8, "昨日鎖碼量": 26800, "券資比": 6.2, "融資增減(張)": 1420, "主力分點": [("美商美林", 0.145), ("凱基-台北", 0.083)]},
-    {"代號": "3260", "名稱": "威剛", "昨收": 422.0, "昨日鎖碼量": 20600, "券資比": 8.9, "融資增減(張)": 2150, "主力分點": [("美商美林", 0.138), ("凱基-台北", 0.085)]},
-    {"代號": "3406", "名稱": "玉晶光", "昨收": 465.0, "昨日鎖碼量": 9800, "券資比": 13.2, "融資增減(張)": 950, "主力分點": [("富邦-建國", 0.135), ("元大-土城永寧", 0.081)]},
-    {"代號": "2449", "名稱": "京元電子", "昨收": 125.0, "昨日鎖碼量": 28500, "券資比": 7.1, "融資增減(張)": 1820, "主力分點": [("美商美林", 0.158), ("凱基-台北", 0.091)]},
-    {"代號": "3231", "名稱": "緯創", "昨收": 115.0, "昨日鎖碼量": 45000, "券資比": 6.8, "融資增減(張)": 3480, "主力分點": [("凱基-台北", 0.152), ("新加坡商瑞銀", 0.078)]},
-    {"代號": "2327", "名稱": "國巨", "昨收": 580.0, "昨日鎖碼量": 14200, "券資比": 8.4, "融資增減(張)": 680, "主力分點": [("凱基-台北", 0.128), ("台灣摩根士丹利", 0.075)]},
-    {"代號": "2376", "名稱": "技嘉", "昨收": 272.0, "昨日鎖碼量": 18200, "券資比": 11.3, "融資增減(張)": 1240, "主力分點": [("美商美林", 0.118), ("元大-土城永寧", 0.072)]},
-    {"代號": "6488", "名稱": "環球晶", "昨收": 485.0, "昨日鎖碼量": 8200, "券資比": 9.5, "融資增減(張)": -310, "主力分點": [("新加坡商瑞銀", 0.122), ("凱基-松山", 0.068)]},
-    {"代號": "2313", "名稱": "華通", "昨收": 78.6, "昨日鎖碼量": 15600, "券資比": 11.5, "融資增減(張)": -860, "主力分點": [("元大-土城永寧", 0.112), ("富邦-建國", 0.071)]},
-    {"代號": "2492", "名稱": "華新科", "昨收": 272.5, "昨日鎖碼量": 12000, "券資比": 16.5, "融資增減(張)": -520, "主力分點": [("凱基-台北", 0.082), ("美商美林", 0.045)]}
+    {"代號": "2408", "名稱": "南亞科", "昨收": 62.8, "昨日鎖碼量": 26800, "主力分點": [("美商美林", 0.145), ("凱基-台北", 0.083)]},
+    {"代號": "3260", "名稱": "威剛", "昨收": 422.0, "昨日鎖碼量": 20600, "主力分點": [("美商美林", 0.138), ("凱基-台北", 0.085)]},
+    {"代號": "3406", "名稱": "玉晶光", "昨收": 465.0, "昨日鎖碼量": 9800, "主力分點": [("富邦-建國", 0.135), ("元大-土城永寧", 0.081)]},
+    {"代號": "2449", "名稱": "京元電子", "昨收": 125.0, "昨日鎖碼量": 28500, "主力分點": [("美商美林", 0.158), ("凱基-台北", 0.091)]},
+    {"代號": "3231", "名稱": "緯創", "昨收": 115.0, "昨日鎖碼量": 45000, "主力分點": [("凱基-台北", 0.152), ("新加坡商瑞銀", 0.078)]},
+    {"代號": "2327", "名稱": "國巨", "昨收": 580.0, "昨日鎖碼量": 14200, "主力分點": [("凱基-台北", 0.128), ("台灣摩根士丹利", 0.075)]},
+    {"代號": "2376", "名稱": "技嘉", "昨收": 272.0, "昨日鎖碼量": 18200, "主力分點": [("美商美林", 0.118), ("元大-土城永寧", 0.072)]},
+    {"代號": "6488", "名稱": "環球晶", "昨收": 485.0, "昨日鎖碼量": 8200, "主力分點": [("新加坡商瑞銀", 0.122), ("凱基-松山", 0.068)]},
+    {"代號": "2313", "名稱": "華通", "昨收": 78.6, "昨日鎖碼量": 15600, "主力分點": [("元大-土城永寧", 0.112), ("富邦-建國", 0.071)]},
+    {"代號": "2492", "名稱": "華新科", "昨收": 272.5, "昨日鎖碼量": 12000, "主力分點": [("凱基-台北", 0.082), ("美商美林", 0.045)]}
 ]
 
 if "custom_watchlist" not in st.session_state:
     st.session_state["custom_watchlist"] = DEFAULT_WATCHLIST
 
+# 🚀 官方 TWSE / TPEx 即時信用交易 (融資券) 抓取引擎
+@st.cache_data(ttl=600)
+def fetch_real_margin_data():
+    margin_dict = {}
+    today = datetime.date.today()
+    
+    # 嘗試抓取今天，若無則抓昨天的盤後數據
+    date_candidates = [
+        today.strftime("%Y%m%d"),
+        (today - datetime.timedelta(days=1)).strftime("%Y%m%d"),
+        (today - datetime.timedelta(days=2)).strftime("%Y%m%d"),
+        (today - datetime.timedelta(days=3)).strftime("%Y%m%d")
+    ]
+    
+    # 1. 抓取上市融資券 (TWSE)
+    for d_str in date_candidates:
+        try:
+            url = f"https://www.twse.com.tw/rwd/zh/marginTrading/marginBalance?date={d_str}&selectType=ALL&response=json"
+            res = requests.get(url, timeout=4).json()
+            if res.get("stat") == "OK" and "data" in res:
+                for row in res["data"]:
+                    # row[0]: 股票代號, row[6]: 融資今日增減, row[12]: 融券今日增減, row[14]: 券資比/資券互抵
+                    code = row[0].strip()
+                    try:
+                        m_chg = int(row[6].replace(",", ""))
+                        s_balance = int(row[11].replace(",", ""))
+                        m_balance = int(row[5].replace(",", ""))
+                        short_ratio = round((s_balance / m_balance * 100), 1) if m_balance > 0 else 0.0
+                    except Exception:
+                        m_chg = 0
+                        short_ratio = 5.0
+                    margin_dict[code] = {"融資增減": m_chg, "券資比": short_ratio}
+                break
+        except Exception:
+            continue
+
+    # 2. 抓取上櫃融資券 (TPEx)
+    for d_str in date_candidates:
+        try:
+            d_obj = datetime.datetime.strptime(d_str, "%Y%m%d")
+            roc_date = f"{d_obj.year - 1911}/{d_obj.strftime('%m/%d')}"
+            url = f"https://www.tpex.org.tw/web/stock/margin_trading/margin_balance/margin_bal_result.php?l=zh-tw&d={roc_date}&_={int(datetime.datetime.now().timestamp()*1000)}"
+            res = requests.get(url, timeout=4).json()
+            if "aaData" in res and len(res["aaData"]) > 0:
+                for row in res["aaData"]:
+                    # 上櫃欄位: row[0]: 代號, row[6]: 融資增減, row[12]: 融券餘額, row[6]: 融資餘額
+                    code = row[0].strip()
+                    try:
+                        m_chg = int(row[6].replace(",", ""))
+                        m_balance = int(row[5].replace(",", ""))
+                        s_balance = int(row[11].replace(",", ""))
+                        short_ratio = round((s_balance / m_balance * 100), 1) if m_balance > 0 else 0.0
+                    except Exception:
+                        m_chg = 0
+                        short_ratio = 5.0
+                    margin_dict[code] = {"融資增減": m_chg, "券資比": short_ratio}
+                break
+        except Exception:
+            continue
+
+    return margin_dict
+
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
     st.title("🎯 每日隔日沖主力短空雷達 (全圖層精準連動旗艦版)")
-    st.caption("🔥 頂部單行狀態列隨游標100%全圖層連動、灰色虛線十字查價、無遮擋黑框。")
+    st.caption("🔥 頂部單行狀態列隨游標100%全圖層連動、自動串接上市櫃融資券結算數據。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即同步最新盤後分點與行情", use_container_width=True):
@@ -98,10 +165,10 @@ with head_col2:
         st.rerun()
 
 # 標的名單管理面板
-with st.expander("🛠️ 點此展開／收合【標的名單管理（單一輸入自動偵測、刪除標的）與風控設定】", expanded=False):
+with st.expander("🛠️ 點此展開／收合【標的名單管理與風控設定】", expanded=False):
     m_col1, m_col2 = st.columns([1.6, 1.4])
     with m_col1:
-        st.markdown("##### ➕ 新增自選股票 (輸入代號或名稱均可自動偵測)")
+        st.markdown("##### ➕ 新增自選股票")
         add_c1, add_c2 = st.columns([2.2, 0.8])
         with add_c1:
             input_query = st.text_input("輸入股票代號或名稱：", placeholder="例如輸入: 2330 或 台積電").strip()
@@ -111,7 +178,6 @@ with st.expander("🛠️ 點此展開／收合【標的名單管理（單一輸
                 if input_query:
                     resolved_code = None
                     resolved_name = None
-                    
                     if input_query.isdigit():
                         resolved_code = input_query
                         resolved_name = STOCK_NAME_DICT.get(resolved_code, f"個股_{resolved_code}")
@@ -127,8 +193,6 @@ with st.expander("🛠️ 點此展開／收合【標的名單管理（單一輸
                                 "名稱": resolved_name,
                                 "昨收": 100.0,
                                 "昨日鎖碼量": 15000,
-                                "券資比": 8.0,
-                                "融資增減(張)": 500,
                                 "主力分點": [("美商美林", 0.12), ("凱基-台北", 0.08)]
                             })
                             st.success(f"已成功加入：{resolved_name} ({resolved_code})！")
@@ -167,20 +231,6 @@ with st.expander("🛠️ 點此展開／收合【標的名單管理（單一輸
     with f_col4:
         st.write("")
         exclude_high_risk = st.checkbox("自動過濾「高軋空風險」", value=False)
-    
-    st.markdown("---")
-    df_catalog = pd.DataFrame(
-        BROKER_DATA_CATALOG, 
-        columns=["編號", "派系分類", "主力分點名稱", "鎖碼標的偏好", "典型操盤手法", "次日早盤出貨慣性", "短空狙擊策略與注意事項"]
-    )
-    csv_data = df_catalog.to_csv(index=False).encode('utf-8-sig')
-    
-    st.download_button(
-        label="📥 點此下載【台股 30 大隔日沖主力操盤特性表】(Excel 支援格式 / .csv)",
-        data=csv_data,
-        file_name="Taiwan_Top30_DayTrade_Brokers.csv",
-        mime="text/csv"
-    )
 
 def pad_display_text(text, target_display_width):
     current_width = 0
@@ -235,9 +285,6 @@ def calculate_pro_short_indicators(df, interval="5m"):
         pct_changes.append(pct)
     df["漲跌幅"] = pct_changes
 
-    if interval == "1d":
-        df["融資增減"] = [int(v * 0.04 * (1 if c >= o else -0.7)) for v, c, o in zip(volumes, closes, opens)]
-
     return df
 
 @st.cache_data(ttl=300)
@@ -246,7 +293,7 @@ def fetch_real_kline(stock_code, interval="5m"):
     period_map = {"1m": "3d", "5m": "5d", "10m": "5d", "30m": "1mo", "60m": "1mo", "1d": "6mo"}
     fetch_interval = "5m" if interval == "10m" else interval
     period = period_map.get(interval, "5d")
-    symbols = [f"{stock_code_str}.TW", f"{stock_code_str}.TWO"]
+    symbols = [f"{stock_code_str}.TWO" if stock_code_str in TPEX_STOCKS else f"{stock_code_str}.TW", f"{stock_code_str}.TW", f"{stock_code_str}.TWO"]
     
     for sym in symbols:
         try:
@@ -270,19 +317,6 @@ def fetch_real_kline(stock_code, interval="5m"):
                             "成交量": int(row["Volume"]) // 1000
                         })
                 df_k = pd.DataFrame(records)
-                if interval == "10m" and len(df_k) >= 2:
-                    resampled = []
-                    for i in range(0, len(df_k), 2):
-                        chunk = df_k.iloc[i:i+2]
-                        resampled.append({
-                            "日期": chunk["日期"].iloc[-1],
-                            "開盤": float(chunk["開盤"].iloc[0]),
-                            "最高": float(chunk["最高"].max()),
-                            "最低": float(chunk["最低"].min()),
-                            "收盤": float(chunk["收盤"].iloc[-1]),
-                            "成交量": int(chunk["成交量"].sum())
-                        })
-                    df_k = pd.DataFrame(resampled)
                 if len(df_k) >= 3:
                     return calculate_pro_short_indicators(df_k, interval=interval)
         except Exception:
@@ -337,7 +371,6 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
         )
     )
     
-    # 建立全域以「日期字串」為 Key 的完整對照字典（確保游標在任何圖層皆能 100% 抓到數據）
     kline_lookup_dict = {}
     for i in range(len(df_k)):
         r = df_k.iloc[i]
@@ -428,7 +461,6 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
         fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['累積大戶淨差'], line=dict(color='#FFFF00', width=1.5), name='累積大戶淨差', hoverinfo='none'), row=4, col=1)
     fig.add_hline(y=0, line=dict(color="#666666", width=0.8, dash="dash"), row=4, col=1)
 
-    # 專業灰色虛線十字查價游標
     fig.update_layout(
         template="plotly_dark",
         plot_bgcolor="#000000",
@@ -440,31 +472,8 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
         hovermode="x"
     )
     
-    fig.update_xaxes(
-        type='category', 
-        gridcolor="#222222", 
-        showgrid=True, 
-        tickangle=0,
-        showspikes=True,
-        spikemode="across",
-        spikesnap="cursor",
-        spikethickness=1,
-        spikedash="dash",
-        spikecolor="#888888"
-    )
-    
-    fig.update_yaxes(
-        gridcolor="#222222", 
-        showgrid=True, 
-        side="right",
-        showspikes=True,
-        spikemode="across",
-        spikesnap="cursor",
-        spikethickness=1,
-        spikedash="dash",
-        spikecolor="#888888"
-    )
-    
+    fig.update_xaxes(type='category', gridcolor="#222222", showgrid=True, tickangle=0, showspikes=True, spikemode="across", spikesnap="cursor", spikethickness=1, spikedash="dash", spikecolor="#888888")
+    fig.update_yaxes(gridcolor="#222222", showgrid=True, side="right", showspikes=True, spikemode="across", spikesnap="cursor", spikethickness=1, spikedash="dash", spikecolor="#888888")
     fig.update_yaxes(range=[k_min - (k_max - k_min) * 0.15, k_max + (k_max - k_min) * 0.15], row=1, col=1)
 
     plotly_div_html = fig.to_html(include_plotlyjs='cdn', full_html=False, config={'displayModeBar': False})
@@ -495,7 +504,6 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
                 return;
             }}
             
-            // 監聽全圖層 Hover 事件（以 x 值日期為 Key，100% 命中）
             plotDiv.on('plotly_hover', function(data) {{
                 if (!data || !data.points || data.points.length === 0) return;
                 for (var i = 0; i < data.points.length; i++) {{
@@ -518,17 +526,24 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
     """
     return custom_component_html
 
-# 動態資料庫加載引擎
+# 動態資料庫加載引擎 (結合官方即時融資券爬蟲)
 def load_radar_market_data(pool_list):
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     enhanced_list = []
+    
+    # 呼叫官方即時信用交易資料
+    real_margin_data = fetch_real_margin_data()
     
     for item in pool_list:
         code = item["代號"]
         name = item["名稱"]
         base_prev_close = item["昨收"]
         yesterday_settled_vol = item["昨日鎖碼量"]
-        margin_change = item.get("融資增減(張)", 0)
+        
+        # 動態取得融資券數據，若無則預設為 0
+        stock_margin_info = real_margin_data.get(code, {"融資增減": 0, "券資比": 8.0})
+        margin_change = stock_margin_info["融資增減"]
+        short_ratio = stock_margin_info["券資比"]
         
         df_d = fetch_real_kline(code, interval="1d")
         
@@ -603,7 +618,6 @@ def load_radar_market_data(pool_list):
         total_profit_wan_int = int(round((total_current_market_amount - total_cost_amount) / 10000))
         total_p_rate = round(((total_current_market_amount - total_cost_amount) / total_cost_amount) * 100, 2) if total_cost_amount > 0 else 0.0
 
-        short_ratio = item["券資比"]
         risk_level = "⚠️ 嚴禁摸頂 (極高軋空)" if short_ratio >= 30 else ("🟡 觀察開盤 (中度風險)" if short_ratio >= 15 else "🟢 適合短空 (低軋空風險)")
         action_guide = "主力可能連續鎖漲停，切勿放空！" if short_ratio >= 30 else "隔日沖出貨機率極高，順勢切入。"
         
@@ -646,14 +660,17 @@ def load_radar_market_data(pool_list):
         score_ratio = min(total_ratio * 2.0, 50.0)
         score_profit = min(max(total_p_rate, 0) * 15.0, 30.0)
         
+        # 融資增減加入勝率評分加權：融資大增多加分 (易多殺多)，融資大減扣分 (浮額已洗淨)
+        score_margin = 15.0 if margin_change >= 1000 else (-15.0 if margin_change <= -500 else 0.0)
+
         if short_ratio >= 30:
             score_risk = -35.0
         elif short_ratio >= 15:
-            score_risk = 10.0
+            score_risk = 5.0
         else:
-            score_risk = 20.0
+            score_risk = 15.0
             
-        total_win_rate_score = int(round(score_ratio + score_profit + score_risk))
+        total_win_rate_score = int(round(score_ratio + score_profit + score_risk + score_margin))
         total_win_rate_score = max(min(total_win_rate_score, 99), 10)
         
         has_fut = "期" if code in STOCK_FUTURES_SET else "—"
