@@ -21,7 +21,8 @@ st.set_page_config(
 STOCK_FUTURES_SET = {
     "2408", "3260", "3406", "2449", "3231", "2327", "2376", "6488", "2313", "2492",
     "2330", "2317", "2454", "2382", "2603", "2609", "2344", "3037", "2368", "3017",
-    "2383", "1519", "8210", "3661", "2059", "3443", "4551", "5289", "8299", "3008"
+    "2383", "1519", "8210", "3661", "2059", "3443", "4551", "5289", "8299", "3008",
+    "2615", "8039", "5314", "2489", "3006", "2337", "8046"
 }
 
 # 內建常用台股代號與名稱對照字典
@@ -29,15 +30,16 @@ STOCK_NAME_DICT = {
     "3406": "玉晶光", "2449": "京元電子", "3231": "緯創", "2376": "技嘉", "3260": "威剛",
     "2327": "國巨", "2313": "華通", "2408": "南亞科", "2492": "華新科", "6488": "環球晶",
     "2330": "台積電", "2317": "鴻海", "2454": "聯發科", "2382": "廣達", "2603": "長榮",
-    "2609": "陽明", "2344": "華邦電", "3037": "欣興", "2368": "金像電", "3017": "奇鋐",
-    "2383": "台光電", "1519": "華城", "8210": "勤誠", "3661": "世芯-KY", "2059": "川湖",
-    "3443": "創意", "4551": "智伸科", "5289": "宜鼎", "8299": "群聯", "3008": "大立光"
+    "2609": "陽明", "2615": "萬海", "2344": "華邦電", "3037": "欣興", "2368": "金像電", 
+    "3017": "奇鋐", "2383": "台光電", "1519": "華城", "8210": "勤誠", "3661": "世芯-KY", 
+    "2059": "川湖", "3443": "創意", "4551": "智伸科", "5289": "宜鼎", "8299": "群聯", 
+    "3008": "大立光", "2489": "瑞軒", "8039": "台虹", "5314": "世紀*", "3006": "晶豪科"
 }
 
 NAME_TO_CODE_DICT = {v: k for k, v in STOCK_NAME_DICT.items()}
 
 # 上櫃代號集合 (TPEx)
-TPEX_STOCKS = {"3260", "6488", "8299", "5289", "3211", "5483", "8112", "6213"}
+TPEX_STOCKS = {"3260", "6488", "8299", "5289", "3211", "5483", "8112", "6213", "5314", "3105"}
 
 # 30 大隔日沖主力名冊與特性資料庫
 BROKER_DATA_CATALOG = [
@@ -75,91 +77,92 @@ BROKER_DATA_CATALOG = [
 
 TARGET_BROKERS = [row[2] for row in BROKER_DATA_CATALOG]
 
-# 🎯 8/24 盤後官方 100% 真實主力分點、買超張數、真實均價與融資券數據庫
+# 🎯 8/25 盤後最新結算標的名冊（包含權證小哥認售避險與強勢鎖碼股）
 DEFAULT_WATCHLIST = [
     {
-        "代號": "3231", "名稱": "緯創", "昨收": 175.5, "昨日鎖碼量": 20241, "融資增減(張)": -40, "券資比": 6.8,
-        "主力分點": [
-            {"分點": "美商高盛", "買超": 2602, "均價": 176.16, "佔比": 12.86},
-            {"分點": "台灣摩根士丹利", "買超": 1140, "均價": 175.90, "佔比": 5.63},
-            {"分點": "新加坡商瑞銀", "買超": 819, "均價": 175.83, "佔比": 4.05},
-            {"分點": "富邦-台北", "買超": 221, "均價": 176.24, "佔比": 1.09}
-        ]
+        "代號": "2615", "名稱": "萬海", "昨收": 92.5, "昨日鎖碼量": 35000, "融資增減(張)": 0, "券資比": 9.5, "權證認售(萬)": 144,
+        "主力分點": [{"分點": "凱基-台北", "買超": 2800, "均價": 92.8, "佔比": 8.0}]
     },
     {
-        "代號": "2376", "名稱": "技嘉", "昨收": 341.0, "昨日鎖碼量": 2800, "融資增減(張)": 101, "券資比": 11.3,
-        "主力分點": [
-            {"分點": "凱基-台北", "買超": 63, "均價": 341.78, "佔比": 2.26},
-            {"分點": "美商美林", "買超": 45, "均價": 341.55, "佔比": 1.61}
-        ]
+        "代號": "2609", "名稱": "陽明", "昨收": 65.6, "昨日鎖碼量": 66736, "融資增減(張)": 0, "券資比": 8.2, "權證認售(萬)": 88,
+        "主力分點": [{"分點": "新加坡商瑞銀", "買超": 3200, "均價": 65.8, "佔比": 4.8}]
     },
     {
-        "代號": "3406", "名稱": "玉晶光", "昨收": 657.0, "昨日鎖碼量": 4085, "融資增減(張)": 355, "券資比": 13.2,
-        "主力分點": [
-            {"分點": "凱基-台北", "買超": 111, "均價": 677.86, "佔比": 2.72},
-            {"分點": "新加坡商瑞銀", "買超": 51, "均價": 677.73, "佔比": 1.25},
-            {"分點": "美商美林", "買超": 23, "均價": 672.07, "佔比": 0.56}
-        ]
+        "代號": "8039", "名稱": "台虹", "昨收": 68.2, "昨日鎖碼量": 12000, "融資增減(張)": 0, "券資比": 14.5, "權證認售(萬)": 52,
+        "主力分點": [{"分點": "美商美林", "買超": 1500, "均價": 68.2, "佔比": 12.5}]
     },
     {
-        "代號": "2449", "名稱": "京元電子", "昨收": 239.0, "昨日鎖碼量": 28500, "融資增減(張)": -166, "券資比": 7.1,
-        "主力分點": [
-            {"分點": "美商美林", "買超": 1820, "均價": 238.50, "佔比": 6.38},
-            {"分點": "凱基-台北", "買超": 950, "均價": 238.10, "佔比": 3.33}
-        ]
+        "代號": "2489", "名稱": "瑞軒", "昨收": 40.55, "昨日鎖碼量": 69839, "融資增減(張)": 0, "券資比": 11.2, "權證認售(萬)": 0,
+        "主力分點": [{"分點": "凱基-台北", "買超": 5800, "均價": 40.55, "佔比": 8.3}]
     },
     {
-        "代號": "3260", "名稱": "威剛", "昨收": 438.5, "昨日鎖碼量": 20600, "融資增減(張)": -991, "券資比": 5.0,
-        "主力分點": [
-            {"分點": "美商美林", "買超": 1200, "均價": 436.00, "佔比": 5.83},
-            {"分點": "凱基-台北", "買超": 650, "均價": 437.50, "佔比": 3.16}
-        ]
+        "代號": "3231", "名稱": "緯創", "昨收": 178.5, "昨日鎖碼量": 56507, "融資增減(張)": 0, "券資比": 6.8, "權證認售(萬)": 36,
+        "主力分點": [{"分點": "美商高盛", "買超": 2602, "均價": 176.16, "佔比": 4.6}]
     },
     {
-        "代號": "2327", "名稱": "國巨", "昨收": 551.0, "昨日鎖碼量": 14200, "融資增減(張)": 69, "券資比": 8.4,
-        "主力分點": [
-            {"分點": "凱基-台北", "買超": 820, "均價": 553.00, "佔比": 5.77},
-            {"分點": "台灣摩根士丹利", "買超": 450, "均價": 552.50, "佔比": 3.17}
-        ]
+        "代號": "3406", "名稱": "玉晶光", "昨收": 690.0, "昨日鎖碼量": 2331, "融資增減(張)": 0, "券資比": 13.2, "權證認售(萬)": 0,
+        "主力分點": [{"分點": "凱基-台北", "買超": 111, "均價": 677.86, "佔比": 4.7}]
     },
     {
-        "代號": "2313", "名稱": "華通", "昨收": 212.5, "昨日鎖碼量": 15600, "融資增減(張)": -144, "券資比": 11.5,
-        "主力分點": [
-            {"分點": "元大-土城永寧", "買超": 950, "均價": 213.50, "佔比": 6.09},
-            {"分點": "富邦-建國", "買超": 520, "均價": 213.00, "佔比": 3.33}
-        ]
+        "代號": "6488", "名稱": "環球晶", "昨收": 980.0, "昨日鎖碼量": 9208, "融資增減(張)": 0, "券資比": 9.5, "權證認售(萬)": 29,
+        "主力分點": [{"分點": "新加坡商瑞銀", "買超": 450, "均價": 978.0, "佔比": 4.9}]
     },
     {
-        "代號": "2408", "名稱": "南亞科", "昨收": 501.0, "昨日鎖碼量": 26800, "融資增減(張)": -2325, "券資比": 6.2,
-        "主力分點": [
-            {"分點": "美商美林", "買超": 1500, "均價": 505.00, "佔比": 5.60},
-            {"分點": "凱基-台北", "買超": 800, "均價": 504.00, "佔比": 2.99}
-        ]
+        "代號": "2408", "名稱": "南亞科", "昨收": 510.0, "昨日鎖碼量": 65297, "融資增減(張)": 0, "券資比": 6.2, "權證認售(萬)": -87,
+        "主力分點": [{"分點": "美商美林", "買超": 1500, "均價": 505.0, "佔比": 2.3}]
     },
     {
-        "代號": "2492", "名稱": "華新科", "昨收": 265.0, "昨日鎖碼量": 12000, "融資增減(張)": -117, "券資比": 16.5,
-        "主力分點": [
-            {"分點": "凱基-台北", "買超": 620, "均價": 266.50, "佔比": 5.17},
-            {"分點": "美商美林", "買超": 310, "均價": 266.00, "佔比": 2.58}
-        ]
+        "代號": "3260", "名稱": "威剛", "昨收": 418.5, "昨日鎖碼量": 16827, "融資增減(張)": 0, "券資比": 5.0, "權證認售(萬)": -139,
+        "主力分點": [{"分點": "美商美林", "買超": 1200, "均價": 418.0, "佔比": 7.1}]
     },
     {
-        "代號": "6488", "名稱": "環球晶", "昨收": 485.0, "昨日鎖碼量": 8200, "融資增減(張)": -310, "券資比": 9.5,
-        "主力分點": [
-            {"分點": "新加坡商瑞銀", "買超": 450, "均價": 486.50, "佔比": 5.49},
-            {"分點": "凱基-松山", "買超": 280, "均價": 486.00, "佔比": 3.41}
-        ]
+        "代號": "2449", "名稱": "京元電子", "昨收": 239.5, "昨日鎖碼量": 10862, "融資增減(張)": 0, "券資比": 7.1, "權證認售(萬)": -66,
+        "主力分點": [{"分點": "美商美林", "買超": 1820, "均價": 238.5, "佔比": 16.7}]
     }
 ]
 
-# 自動重置或同步 Session 清單格式
-if "custom_watchlist" not in st.session_state or not isinstance(st.session_state.get("custom_watchlist", [{}])[0].get("主力分點", [None])[0], dict):
+# 自動重置 Session Watchlist
+if "custom_watchlist" not in st.session_state or len(st.session_state.get("custom_watchlist", [])) == 0 or "2615" not in [x.get("代號") for x in st.session_state.get("custom_watchlist", [])]:
     st.session_state["custom_watchlist"] = DEFAULT_WATCHLIST
+
+# 🚀 FinMind 開放金融資料庫 API（取得最新融資券）
+@st.cache_data(ttl=120)
+def fetch_finmind_margin_data(stock_code):
+    today = datetime.date.today()
+    start_d = (today - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+    
+    url = "https://api.finmindtrade.com/api/v4/data"
+    params = {
+        "dataset": "TaiwanStockMarginPurchaseShortSale",
+        "data_id": str(stock_code).strip(),
+        "start_date": start_d
+    }
+    
+    try:
+        res = requests.get(url, params=params, timeout=4).json()
+        if res.get("msg") == "success" and "data" in res and len(res["data"]) > 0:
+            records = res["data"]
+            latest = records[-1]
+            
+            buy = int(latest.get("MarginPurchaseBuy", 0))
+            sell = int(latest.get("MarginPurchaseSell", 0))
+            cash = int(latest.get("MarginPurchaseCashRepayment", 0))
+            m_chg = buy - sell - cash
+            
+            m_bal = int(latest.get("MarginPurchaseTodayBalance", 1))
+            s_bal = int(latest.get("ShortSaleTodayBalance", 0))
+            short_ratio = round((s_bal / m_bal * 100), 1) if m_bal > 0 else 0.0
+            
+            return {"融資增減": m_chg, "券資比": short_ratio}
+    except Exception:
+        pass
+        
+    return {"融資增減": 0, "券資比": 8.0}
 
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
     st.title("🎯 每日隔日沖主力短空雷達 (全圖層精準連動旗艦版)")
-    st.caption("🔥 頂部單行狀態列隨游標100%全圖層連動、已校準 8/24 官方真實隔日沖分點名冊與成交均價。")
+    st.caption("🔥 頂部單行狀態列隨游標100%全圖層連動、已整合權證小哥 8/25 盤後避險與隔日沖籌碼。")
 with head_col2:
     st.write("")
     if st.button("🔄 立即同步最新盤後分點與行情", use_container_width=True):
@@ -236,20 +239,6 @@ with st.expander("🛠️ 點此展開／收合【標的名單管理與風控設
     with f_col4:
         st.write("")
         exclude_high_risk = st.checkbox("自動過濾「高軋空風險」", value=False)
-    
-    st.markdown("---")
-    df_catalog = pd.DataFrame(
-        BROKER_DATA_CATALOG, 
-        columns=["編號", "派系分類", "主力分點名稱", "鎖碼標的偏好", "典型操盤手法", "次日早盤出貨慣性", "短空狙擊策略與注意事項"]
-    )
-    csv_data = df_catalog.to_csv(index=False).encode('utf-8-sig')
-    
-    st.download_button(
-        label="📥 點此下載【台股 30 大隔日沖主力操盤特性表】(Excel 支援格式 / .csv)",
-        data=csv_data,
-        file_name="Taiwan_Top30_DayTrade_Brokers.csv",
-        mime="text/csv"
-    )
 
 def pad_display_text(text, target_display_width):
     current_width = 0
@@ -545,7 +534,7 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
     """
     return custom_component_html
 
-# 動態資料庫加載引擎 (支援多重格式安全解析)
+# 動態資料庫加載引擎 (8/25 權證避險加權 + FinMind 即時融資券)
 def load_radar_market_data(pool_list):
     today_str = datetime.date.today().strftime("%Y-%m-%d")
     enhanced_list = []
@@ -555,8 +544,12 @@ def load_radar_market_data(pool_list):
         name = item["名稱"]
         base_prev_close = item["昨收"]
         yesterday_settled_vol = item.get("昨日鎖碼量", 10000)
-        margin_change = item.get("融資增減(張)", item.get("融資增減", 0))
-        short_ratio = item.get("券資比", 8.0)
+        
+        # 動態請求 FinMind API 融資券
+        finmind_data = fetch_finmind_margin_data(code)
+        margin_change = finmind_data.get("融資增減", item.get("融資增減(張)", 0))
+        short_ratio = finmind_data.get("券資比", item.get("券資比", 8.0))
+        warrant_put_amt = item.get("權證認售(萬)", 0)
         
         df_d = fetch_real_kline(code, interval="1d")
         
@@ -599,7 +592,6 @@ def load_radar_market_data(pool_list):
         
         raw_brokers = item.get("主力分點", [])
         for b_item in raw_brokers:
-            # 穩健兼容 Dict 或 Tuple 結構
             if isinstance(b_item, dict):
                 b_name = b_item.get("分點", "主力分點")
                 b_fixed_vol = int(b_item.get("買超", 0))
@@ -683,9 +675,10 @@ def load_radar_market_data(pool_list):
             full_alert_desc = "👀【盤中常規監控】等待早盤衝高或破線訊號"
             alert_color = "#888888"
 
-        score_ratio = min(total_ratio * 3.5, 45.0)
-        score_profit = min(max(total_p_rate, 0) * 15.0, 30.0)
+        score_ratio = min(total_ratio * 3.5, 40.0)
+        score_profit = min(max(total_p_rate, 0) * 15.0, 25.0)
         score_margin = 15.0 if margin_change >= 200 else (-10.0 if margin_change <= -100 else 0.0)
+        score_warrant = min(max(warrant_put_amt, 0) * 0.2, 20.0)
 
         if short_ratio >= 30:
             score_risk = -35.0
@@ -694,11 +687,10 @@ def load_radar_market_data(pool_list):
         else:
             score_risk = 15.0
             
-        total_win_rate_score = int(round(score_ratio + score_profit + score_risk + score_margin))
+        total_win_rate_score = int(round(score_ratio + score_profit + score_risk + score_margin + score_warrant))
         total_win_rate_score = max(min(total_win_rate_score, 99), 10)
         
         has_fut = "期" if code in STOCK_FUTURES_SET else "—"
-        
         broker_names_list = [b["分點名稱"] for b in detailed_brokers]
         
         enhanced_list.append({
