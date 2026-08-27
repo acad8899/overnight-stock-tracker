@@ -485,10 +485,11 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
         )
         kline_lookup_dict[d_key] = formatted_html
 
+    # 修正後的 K 線 Trace (已剔除 typo 錯誤字元)
     fig.add_trace(go.Candlestick(
         x=df_k['日期'], open=df_k['開盤'], high=df_k['最高'], low=df_k['最低'], close=df_k['收盤'],
         name='K線', hoverinfo='none',
-        increasing_line_color='#FF3333',職fillcolor='#FF3333',
+        increasing_line_color='#FF3333', increasing_fillcolor='#FF3333',
         decreasing_line_color='#00CC00', decreasing_fillcolor='#00CC00'
     ), row=1, col=1)
     
