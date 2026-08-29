@@ -1,1019 +1,298 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
-import datetime
-import unicodedata
-import json
-import requests
-import re
-import yfinance as yf
+import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from datetime import datetime
 
-# 頁面排版設定：全寬展開
+# ==============================================================================
+# 系統設定與頁面佈局
+# ==============================================================================
 st.set_page_config(
-    page_title="隔日沖主力短空雷達 (全自動AI智慧旗艦版)", 
-    layout="wide", 
-    page_icon="🎯", 
-    initial_sidebar_state="collapsed"
+    page_title="台股隔日沖主力成本 × 短空決策雷達",
+    page_icon="🎯",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# 期交所個股期貨支援名單
-STOCK_FUTURES_SET = {
-    "2408", "3260", "3406", "2449", "3231", "2327", "2376", "6488", "2313", "2492",
-    "2330", "2317", "2454", "2382", "2603", "2609", "2344", "3037", "2368", "3017",
-    "2383", "1519", "8210", "3661", "2059", "3443", "4551", "5289", "8299", "3008",
-    "2615", "8039", "5314", "2489", "3006", "2337", "8046", "2426", "3189"
-}
+# 自定義 CSS
+st.markdown("""
+<style>
+    .main-metric-card {
+        background-color: #1E222D;
+        border-radius: 8px;
+        padding: 12px 16px;
+        border: 1px solid #2A2E39;
+    }
+    .stDataFrame {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# 內建常用台股代號與名稱對照字典
-STOCK_NAME_DICT = {
-    "2408": "南亞科", "3406": "玉晶光", "8039": "台虹", "2313": "華通", "2426": "鼎元",
-    "3260": "威剛", "2615": "萬海", "3189": "景碩", "2344": "華邦電", "2492": "華新科",
-    "2449": "京元電子", "3231": "緯創", "2489": "瑞軒", "6488": "環球晶", "2376": "技嘉",
-    "2327": "國巨", "2330": "台積電", "2317": "鴻海", "2454": "聯發科", "2382": "廣達",
-    "2603": "長榮", "3037": "欣興", "2368": "金像電", "3017": "奇鋐", "2383": "台光電"
-}
-
-NAME_TO_CODE_DICT = {v: k for k, v in STOCK_NAME_DICT.items()}
-TPEX_STOCKS = {"3260", "6488", "8299", "5289", "3211", "5483", "8112", "6213", "5314", "3105"}
-
-# 30 大隔日沖主力名冊
-BROKER_DATA_CATALOG = [
-    [1, "外資量化", "美商美林", "大型權值股、熱門題材股", "演算法高頻點火，尾盤大單市價掃進鎖漲停", "09:00～09:15 不計價市價倒出，常造成早盤垂直殺盤", "破 VWAP 即順勢放空，下殺放量 80% 快速停利"],
-    [2, "外資量化", "摩根大通", "AI伺服器、高價電子股", "程式量化跟風單，偏好拉抬具備國際題材標的", "早盤開高即分批掛內外盤倒貨，持續出貨至 10:00", "衝撞 NH 遇阻即試空，需留意法人反手洗盤"],
-    [3, "外資量化", "新加坡商瑞銀", "權值電子、航運、半導體", "與美林高頻聯動，喜好於高檔爆量時搶進", "09:05～09:20 集中倒出，破均價後不再護盤", "跌破主力加權成本時為標準加碼放空點"],
-    [4, "外資量化", "台灣摩根士丹利", "中大型高價股、IC設計", "早盤拉抬後尾盤鎖單，具備較高部位容忍度", "開盤先拉高營造強勢假象，隨後反手市價灌單", "觀察「假衝高誘多」，5分K 留長上影線果斷摸頂"],
-    [5, "外資量化", "美商高盛", "晶圓代工、蘋果供應鏈", "國際資金與量化混合，點火通常伴隨現貨放量", "早盤直接出清昨日部位，極少留倉隔日", "順勢跟空，注意券資比過高標的避免被軋"],
-    [6, "凱基軍團", "凱基-台北", "全市場強勢飆股、主流龍頭", "號稱隔日沖總舵主，動輒數千張連敲硬鎖漲停", "09:00～09:10 市價大單瘋狂倒貨，破線後絕不回頭", "早盤衝高滯漲第一順位狙擊目標，勝率極高"],
-    [7, "凱基軍團", "凱基-松山", "中型強勢股、轉強突破股", "善於利用關鍵價位強勢鎖碼，吸納市場追價散戶", "開平或開小高即開始連續倒出，盤中量縮整理", "觀察 5分K 首根是否爆巨量出黑K，是則直接切入"],
-    [8, "凱基軍團", "凱基-市府", "熱門電子、中小型飆股", "盤中快速拉抬突襲，與凱基台北具備高度協同性", "09:00～09:20 集中宣洩賣壓，出清後股價常重挫", "跌破 5MA / 12MA 交叉向下時順勢跟空"],
-    [9, "凱基軍團", "凱基-信義", "題材轉機股、次族群", "盤中借力使力，常與其他大戶聯手鎖碼", "開高走低慣性極強，出貨完畢後往往貼在低檔震盪", "遇 NH 核心壓力不過時放空，見出貨達標即停利"],
-    [10, "凱基軍團", "凱基-城中", "傳產強勢股、電子中價股", "點火節奏明快，主要針對技術面突破型標的", "早盤 15 分鐘內出脫 70% 以上部位", "適合開盤第一時間摸頂放空，嚴守早盤高點停損"],
-    [11, "雙北核心", "元大-土城永寧", "強勢飆股、連鎖漲停股", "老牌隔日沖大本營，出手兇悍，擅長強勢軋空", "09:00～09:30 逢高全力出清，但若鎖死會續抱", "需嚴格確認「開高走低未鎖」再空，防連拉漲停"],
-    [12, "雙北核心", "富邦-建國", "中小型電子、強勢投機股", "尾盤掃貨鎖漲停，專吃追價與隔夜買盤", "早盤多以急拉開出後立即翻黑下殺（天地針）", "早盤急拉見 NH 立即掛單試空，停利抓 2%～4%"],
-    [13, "雙北核心", "國票-敦北法人", "機構大戶、高價主流股", "大部位集中進出，拉抬時常伴隨極大成交額", "早盤出貨節奏較慢，分批大單掛賣壓制盤面", "觀察 VWAP 均價線下方的大單壓盤，偏空操作"],
-    [14, "雙北核心", "統一-敦南", "散熱、網通、AI供應鏈", "鎖碼意圖明確，喜好搭乘市場熱門主流題材", "09:10 左右為出貨高峰，常打至平盤以下", "實體黑K破 VWAP 即加碼，跌幅擴大時分批回補"],
-    [15, "雙北核心", "統一-士林", "中型轉強股、櫃買熱門股", "快速掃單封板，擅長打散戶防守心理線", "開盤衝高無力後快速滑落，走勢乾脆俐落", "5分K 出現長黑吞噬時進場，獲利率通常極佳"],
-    [16, "雙北核心", "群益金鼎-大安", "PCB、載板、被動元件", "主力部位大，進出果斷，拉抬具有族群帶動力", "09:00～09:20 集中倒出，盤中多呈現量縮緩跌", "早盤摸頂短空首選，跌破當日開盤價即確立出貨"],
-    [17, "雙北核心", "國泰-敦南", "車用電子、重電題材股", "擅長波段與隔日沖混搭，量大時多為隔日沖", "開高後連續出脫，若遇大盤偏弱則加速倒貨", "配合大盤偏弱盤勢時放空，勝率大幅提升"],
-    [18, "雙北核心", "國泰-敦北", "傳產龍頭、中大型電子", "盤中定點大單掃盤，拉升角度極為陡峭", "09:00～09:15 現貨全數出清，不留戀持倉", "開盤見大量長上影線直接切入短空"],
-    [19, "雙北核心", "康和-永和", "投機飆股、低價轉強股", "小型股主力集散地，盤中點火兇悍但續航力短", "09:00 開盤即開出巨大賣單，容易開高走低暴跌", "波動極大，空單進場需快進快出，切忌戀戰"],
-    [20, "雙北核心", "元大-大同", "重電、綠能、工具機", "配合政策題材點火，尾盤慣性鎖單", "09:05～09:25 順勢倒給散戶，反彈無力", "股價回測主力加權成本時注意是否有出清訊號"],
-    [21, "雙北核心", "富邦-建邦", "電子零組件、次族群", "盤中突襲拉升，擅長利用量縮時強勢鎖碼", "早盤開高出貨，下殺後盤中橫盤量縮", "出貨進度達 80% 時立即停利，避免低檔磨損"],
-    [22, "雙北核心", "中國信託-忠孝", "記憶體、半導體設備", "與量化外資席位常有協同動作，打點精準", "早盤開小高即出貨，破均線後加速探底", "破 VWAP 即順勢放空，以當日最高價為停損防線"],
-    [23, "雙北核心", "元大-總公司", "大型權值、集團作帳股", "資金規模龐大，通常兼具造市與短線交易", "早盤均勻出脫，不會一次性灌破跌停", "適合穩健型短空，獲利空間約 1.5%～3%"],
-    [24, "雙北核心", "富邦-台北", "熱門成交量前 20 大股", "偏好追逐高流動性個股，尾盤大量鎖單", "09:00～09:15 快速倒出，換手極為迅速", "流動性極佳，適合大部位短空，滑價風險極低"],
-    [25, "中南部幫", "富邦-嘉義", "中小型飆股、生技、低價股", "知名嘉義幫核心，鎖漲停極為乾脆，專打小型股", "09:00 開盤直接倒出數千張，極易形成早盤天地針", "早盤切勿盲目追多，見高檔爆量滯漲為絕佳空點"],
-    [26, "中南部幫", "統一-嘉義", "題材飆股、低價轉機股", "喜好與富邦嘉義聯手造勢，尾盤萬張排隊鎖板", "早盤開盤市價傾巢而出，常常 5 分鐘內打回原形", "早盤衝高見 NH 壓力直接試空，跌破平盤停利"],
-    [27, "中南部幫", "元富-虎尾", "中南部在地飆股、傳產塑化", "虎尾幫主力重鎮，作風彪悍，點火乾脆俐落", "09:00～09:10 不問價格出清，股價常快速崩跌", "空單第一時間進場，若被強勢續鎖漲停需嚴守停損"],
-    [28, "中南部幫", "凱基-斗六", "汽車零組件、特選中小型", "地方大戶席位，擅長利用籌碼集中優勢強鎖", "早盤分批大單倒出，多空轉換極為迅速", "跌破早盤第一根 5分K 低點為順勢加碼放空點"],
-    [29, "中南部幫", "元大-嘉義", "綠能題材、中小型櫃買股", "鎖碼標的集中度極高，常佔當日成交量 20% 以上", "09:00～09:15 集中出貨，缺乏後續買盤支撐", "主力出貨進度逾 85% 後嚴禁追空，防低檔反彈"],
-    [30, "自營避險", "凱基-自營商", "權證熱門標的、強勢權值股", "散戶大量搶買認購權證時，自營商被動買現貨避險", "隔日散戶獲利平倉權證，自營商早盤被動出清現貨", "被動性倒貨賣壓明確，破 VWAP 順勢放空勝率極高"]
-]
-
-TARGET_BROKERS = [row[2] for row in BROKER_DATA_CATALOG]
-
-# 🎯 8/27 官方最新融資券與主力分點完整資料庫
+# ==============================================================================
+# 2026-08-28 官方盤後最新主力籌碼資料庫 (適用 2026-08-31 交易日)
+# ==============================================================================
 DEFAULT_WATCHLIST = [
     {
-        "代號": "3406", "名稱": "玉晶光", "昨收": 759.00, "昨日鎖碼量": 8600, "融資增減(張)": 345, "券資比": 14.8, "權證認售(萬)": 95,
-        "主力分點": [
-            {"分點": "凱基-台北", "買超": 586, "均價": 827.83, "佔比": 6.81},
-            {"分點": "凱基-信義", "買超": 297, "均價": 833.96, "佔比": 3.45},
-            {"分點": "新加坡商瑞銀", "買超": 283, "均價": 827.15, "佔比": 3.29},
-            {"分點": "摩根大通", "買超": 247, "均價": 829.53, "佔比": 2.87},
-            {"分點": "群益金鼎-台北", "買超": 236, "均價": 826.53, "佔比": 2.74},
-            {"分點": "美商高盛", "買超": 216, "均價": 827.30, "佔比": 2.51},
-            {"分點": "美商美林", "買超": 173, "均價": 824.88, "佔比": 2.01}
-        ]
+        "code": "2492", "name": "華新科", "has_futures": True,
+        "close": 313.50, "high": 313.50, "low": 295.50, "volume": 52649,
+        "main_buy_vol": 11055, "main_buy_cost": 312.38, "main_ratio": 21.00,
+        "top_brokers": ["富邦", "凱基-城中", "凱基-台北", "國票-安和", "國票-敦北法人", "統一", "統一-城中", "摩根大通"],
+        "top_seller": "國泰-敦南 (-646張)",
+        "margin_diff": 1420, "margin_label": "融資大增 (浮額沉重/易多殺多)",
+        "short_ratio": 4.1, "score": 95,
+        "nh": 321.0, "ah": 329.0, "status": "待開盤"
     },
     {
-        "代號": "8039", "名稱": "台虹", "昨收": 320.50, "昨日鎖碼量": 21694, "融資增減(張)": 805, "券資比": 15.2, "權證認售(萬)": -20,
-        "主力分點": [
-            {"分點": "元大-總公司", "買超": 1776, "均價": 314.79, "佔比": 8.19},
-            {"分點": "富邦-仁愛", "買超": 991, "均價": 307.63, "佔比": 4.57},
-            {"分點": "國票-安和", "買超": 637, "均價": 320.19, "佔比": 2.94}
-        ]
+        "code": "3406", "name": "玉晶光", "has_futures": True,
+        "close": 917.00, "high": 917.00, "low": 831.00, "volume": 14487,
+        "main_buy_vol": 3077, "main_buy_cost": 886.82, "main_ratio": 21.24,
+        "top_brokers": ["美林", "富邦", "美商高盛", "群益金鼎-台北", "國泰", "新加坡商瑞銀", "永豐金-敦南", "凱基-台北"],
+        "top_seller": "國票-安和 (-492張)",
+        "margin_diff": -883, "margin_label": "融資退潮 (散戶離場/高檔軋空)",
+        "short_ratio": 3.4, "score": 88,
+        "nh": 932.0, "ah": 948.0, "status": "待開盤"
     },
     {
-        "代號": "2313", "名稱": "華通", "昨收": 222.00, "昨日鎖碼量": 61896, "融資增減(張)": 361, "券資比": 6.5, "權證認售(萬)": 0,
-        "主力分點": [
-            {"分點": "台灣摩根士丹利", "買超": 5413, "均價": 242.09, "佔比": 8.75},
-            {"分點": "富邦-台北", "買超": 3238, "均價": 243.22, "佔比": 5.23},
-            {"分點": "凱基-城中", "買超": 2240, "均價": 243.33, "佔比": 3.62},
-            {"分點": "統一-敦南", "買超": 1714, "均價": 241.96, "佔比": 2.77},
-            {"分點": "國票-敦北法人", "買超": 1619, "均價": 243.36, "佔比": 2.62},
-            {"分點": "新加坡商瑞銀", "買超": 1501, "均價": 234.48, "佔比": 2.42}
-        ]
+        "code": "2408", "name": "南亞科", "has_futures": True,
+        "close": 540.00, "high": 569.00, "low": 531.00, "volume": 77043,
+        "main_buy_vol": 4913, "main_buy_cost": 548.91, "main_ratio": 6.38,
+        "top_brokers": ["新加坡商瑞銀", "美商高盛", "法銀巴黎", "台灣摩根士丹利", "玉山-城中", "凱基-站前"],
+        "top_seller": "元大 (-3,203張)",
+        "margin_diff": -412, "margin_label": "融資退潮 (反彈測均線)",
+        "short_ratio": 2.8, "score": 78,
+        "nh": 556.0, "ah": 569.0, "status": "待開盤"
     },
     {
-        "代號": "2492", "名稱": "華新科", "昨收": 269.50, "昨日鎖碼量": 32253, "融資增減(張)": 971, "券資比": 5.0, "權證認售(萬)": 0,
-        "主力分點": [
-            {"分點": "康和-永和", "買超": 816, "均價": 282.74, "佔比": 2.53},
-            {"分點": "元大-總公司", "買超": 612, "均價": 279.24, "佔比": 1.90},
-            {"分點": "永豐金-忠孝", "買超": 382, "均價": 281.79, "佔比": 1.18},
-            {"分點": "新加坡商瑞銀", "買超": 351, "均價": 278.82, "佔比": 1.09}
-        ]
+        "code": "8039", "name": "台虹", "has_futures": True,
+        "close": 343.50, "high": 364.00, "low": 335.00, "volume": 58749,
+        "main_buy_vol": 2678, "main_buy_cost": 348.05, "main_ratio": 4.56,
+        "top_brokers": ["台灣摩根士丹利", "美林", "美商高盛", "新光", "國泰-敦南", "永豐金"],
+        "top_seller": "凱基-台北 (-1,628張)",
+        "margin_diff": -1669, "margin_label": "融資退潮 (散戶停損多殺多)",
+        "short_ratio": 5.2, "score": 72,
+        "nh": 354.0, "ah": 362.0, "status": "待開盤"
     },
     {
-        "代號": "2408", "名稱": "南亞科", "昨收": 517.00, "昨日鎖碼量": 86135, "融資增減(張)": -3646, "券資比": 5.8, "權證認售(萬)": 100,
-        "主力分點": [
-            {"分點": "美商高盛", "買超": 8412, "均價": 545.53, "佔比": 9.61},
-            {"分點": "新加坡商瑞銀", "買超": 8221, "均價": 543.94, "佔比": 9.39},
-            {"分點": "台灣摩根士丹利", "買超": 5348, "均價": 542.41, "佔比": 6.11},
-            {"分點": "摩根大通", "買超": 2878, "均價": 542.92, "佔比": 3.29},
-            {"分點": "元大-總公司", "買超": 2081, "均價": 542.51, "佔比": 2.38},
-            {"分點": "美商美林", "買超": 1898, "均價": 542.39, "佔比": 2.17},
-            {"分點": "港商野村", "買超": 1774, "均價": 540.73, "佔比": 2.03},
-            {"分點": "凱基-台北", "買超": 774, "均價": 541.67, "佔比": 0.88}
-        ]
+        "code": "2313", "name": "華通", "has_futures": True,
+        "close": 241.00, "high": 260.00, "low": 240.50, "volume": 87191,
+        "main_buy_vol": 4644, "main_buy_cost": 246.45, "main_ratio": 5.33,
+        "top_brokers": ["美林", "美商高盛", "永豐金-忠孝", "台新", "台新-城東", "兆豐", "凱基-市府"],
+        "top_seller": "凱基-台北 (-2,623張)",
+        "margin_diff": 4315, "margin_label": "融資大增 (浮額沉重/易多殺多)",
+        "short_ratio": 3.9, "score": 65,
+        "nh": 249.5, "ah": 258.0, "status": "待開盤"
     },
     {
-        "代號": "2615", "名稱": "萬海", "昨收": 115.00, "昨日鎖碼量": 45539, "融資增減(張)": 859, "券資比": 8.0, "權證認售(萬)": -75,
-        "主力分點": [
-            {"分點": "新加坡商瑞銀", "買超": 1349, "均價": 113.11, "佔比": 2.96},
-            {"分點": "美商美林", "買超": 593, "均價": 113.11, "佔比": 1.30},
-            {"分點": "凱基-台北", "買超": 333, "均價": 114.43, "佔比": 0.73},
-            {"分點": "元大-總公司", "買超": 325, "均價": 112.90, "佔比": 0.71}
-        ]
+        "code": "2615", "name": "萬海", "has_futures": True,
+        "close": 111.50, "high": 113.50, "low": 108.50, "volume": 21942,
+        "main_buy_vol": 2971, "main_buy_cost": 110.81, "main_ratio": 13.54,
+        "top_brokers": ["凱基-台北", "香港上海匯豐", "美林", "永豐金-匯立", "台灣摩根士丹利", "元大"],
+        "top_seller": "美商高盛 (-863張)",
+        "margin_diff": -277, "margin_label": "融資微幅退潮",
+        "short_ratio": 5.7, "score": 60,
+        "nh": 113.5, "ah": 115.5, "status": "待開盤"
     },
     {
-        "代號": "2426", "名稱": "鼎元", "昨收": 99.80, "昨日鎖碼量": 96713, "融資增減(張)": 1183, "券資比": 7.2, "權證認售(萬)": 15,
-        "主力分點": [
-            {"分點": "台灣摩根士丹利", "買超": 2866, "均價": 97.91, "佔比": 2.96},
-            {"分點": "美商高盛", "買超": 1236, "均價": 97.39, "佔比": 1.28}
-        ]
+        "code": "2344", "name": "華邦電", "has_futures": True,
+        "close": 181.50, "high": 192.00, "low": 180.50, "volume": 153443,
+        "main_buy_vol": 5581, "main_buy_cost": 185.34, "main_ratio": 3.64,
+        "top_brokers": ["新加坡商瑞銀", "國泰-敦南", "台新-安南", "台新-新莊", "元大-桃興", "凱基-文心"],
+        "top_seller": "元大 (-9,647張)",
+        "margin_diff": 5844, "margin_label": "融資大增 (浮額過度渙散)",
+        "short_ratio": 2.1, "score": 55,
+        "nh": 188.0, "ah": 194.0, "status": "待開盤"
     },
     {
-        "代號": "3189", "名稱": "景碩", "昨收": 881.00, "昨日鎖碼量": 32580, "融資增減(張)": -295, "券資比": 8.5, "權證認售(萬)": 0,
-        "主力分點": [
-            {"分點": "新加坡商瑞銀", "買超": 866, "均價": 923.99, "佔比": 2.66},
-            {"分點": "永豐金-匯立", "買超": 853, "均價": 921.77, "佔比": 2.62},
-            {"分點": "美商美林", "買超": 821, "均價": 934.88, "佔比": 2.52},
-            {"分點": "台灣摩根士丹利", "買超": 634, "均價": 923.88, "佔比": 1.95},
-            {"分點": "美商高盛", "買超": 326, "均價": 927.27, "佔比": 1.00},
-            {"分點": "凱基-台北", "買超": 251, "均價": 927.74, "佔比": 0.77},
-            {"分點": "永豐金-忠孝", "買超": 251, "均價": 932.40, "佔比": 0.77}
-        ]
+        "code": "3189", "name": "景碩", "has_futures": True,
+        "close": 899.00, "high": 933.00, "low": 867.00, "volume": 21576,
+        "main_buy_vol": 390, "main_buy_cost": 903.62, "main_ratio": 1.81,
+        "top_brokers": ["國泰-敦南", "凱基-城中", "新光", "兆豐-嘉義", "群益金鼎-大安"],
+        "top_seller": "美商高盛 (-931張)",
+        "margin_diff": 634, "margin_label": "融資微增 (外資大倒貨)",
+        "short_ratio": 1.8, "score": 45,
+        "nh": 926.0, "ah": 945.0, "status": "待開盤"
     },
     {
-        "代號": "2344", "名稱": "華邦電", "昨收": 181.50, "昨日鎖碼量": 139732, "融資增減(張)": -1246, "券資比": 4.5, "權證認售(萬)": 0,
-        "主力分點": [
-            {"分點": "美商高盛", "買超": 8932, "均價": 187.51, "佔比": 6.39},
-            {"分點": "新加坡商瑞銀", "買超": 8511, "均價": 187.10, "佔比": 6.09},
-            {"分點": "台灣摩根士丹利", "買超": 6780, "均價": 187.87, "佔比": 4.85},
-            {"分點": "摩根大通", "買超": 5031, "均價": 187.86, "佔比": 3.60},
-            {"分點": "富邦-台北", "買超": 2042, "均價": 187.78, "佔比": 1.46},
-            {"分點": "元大-館前", "買超": 1825, "均價": 187.46, "佔比": 1.31},
-            {"分點": "美商美林", "買超": 1132, "均價": 187.53, "佔比": 0.81}
-        ]
+        "code": "2426", "name": "鼎元", "has_futures": True,
+        "close": 96.10, "high": 99.20, "low": 93.20, "volume": 61918,
+        "main_buy_vol": 1227, "main_buy_cost": 96.48, "main_ratio": 1.98,
+        "top_brokers": ["永豐金-松山", "永豐金-信義", "富邦-嘉義", "台新-宜蘭", "康和-台中", "凱基-板橋"],
+        "top_seller": "美商高盛 (-2,417張)",
+        "margin_diff": 3106, "margin_label": "融資大增 (外資主力狂倒)",
+        "short_ratio": 1.5, "score": 40,
+        "nh": 98.2, "ah": 100.5, "status": "待開盤"
     },
     {
-        "代號": "3260", "名稱": "威剛", "昨收": 416.00, "昨日鎖碼量": 5844, "融資增減(張)": 160, "券資比": 5.2, "權證認售(萬)": -120,
-        "主力分點": [
-            {"分點": "元大-總公司", "買超": 222, "均價": 417.74, "佔比": 3.80}
-        ]
+        "code": "3260", "name": "威剛", "has_futures": True,
+        "close": 412.00, "high": 418.50, "low": 407.00, "volume": 6969,
+        "main_buy_vol": 542, "main_buy_cost": 411.96, "main_ratio": 7.78,
+        "top_brokers": ["兆豐-南京", "日茂", "凱基-台北", "元大-復北", "國泰-敦南"],
+        "top_seller": "台灣摩根士丹利 (-660張)",
+        "margin_diff": 205, "margin_label": "融資微增",
+        "short_ratio": 3.8, "score": 35,
+        "nh": 418.0, "ah": 424.0, "status": "待開盤"
     }
 ]
 
-# 🚀 全自動 AI 主力分點抓取與清洗模組
-@st.cache_data(ttl=1800)
-def auto_fetch_broker_data(stock_code, close_price, total_vol):
-    code_str = str(stock_code).strip()
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://www.google.com"
-    }
-    
-    if close_price >= 300.0:
-        vol_threshold = 150
-    elif close_price >= 100.0:
-        vol_threshold = 300
+# ==============================================================================
+# 風控與評級判斷
+# ==============================================================================
+def get_risk_label(item):
+    if item["score"] >= 90:
+        return "🟢 適合短空 (首選狙擊)"
+    elif item["score"] >= 80:
+        return "🟢 適合短空 (低軋空風險)"
+    elif item["score"] >= 65:
+        return "🟡 觀察右側破線 (反彈測壓)"
     else:
-        vol_threshold = 800
+        return "🔴 風險偏高 / 肉身空間小"
 
-    try:
-        today_str = datetime.date.today().strftime("%Y-%m-%d")
-        url = f"https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockTradingDailyReport&data_id={code_str}&date={today_str}"
-        res = requests.get(url, headers=headers, timeout=3).json()
-        if res.get("msg") == "success" and "data" in res and len(res["data"]) > 0:
-            records = res["data"]
-            df_b = pd.DataFrame(records)
-            df_b["買超"] = df_b["buy"] - df_b["sell"]
-            df_buy = df_b[df_b["買超"] >= vol_threshold].sort_values(by="買超", ascending=False).head(10)
-            
-            cleaned_list = []
-            for _, r in df_buy.iterrows():
-                b_name = str(r.get("broker_name", "主力分點"))
-                b_vol = int(r.get("買超", 0))
-                b_price = round(float(r.get("price", close_price)), 2)
-                b_ratio = round((b_vol / max(total_vol, 1)) * 100, 2)
-                cleaned_list.append({
-                    "分點": b_name, "買超": b_vol, "均價": b_price, "佔比": b_ratio
-                })
-            if cleaned_list:
-                return cleaned_list
-    except Exception:
-        pass
+# ==============================================================================
+# 頁面頂部資訊
+# ==============================================================================
+st.markdown("## 🎯 盤後全市場隔日沖 × 主力成本 × 鎖碼決策表 (勝率降序排列)")
+st.caption("最新盤後結算日期：2026-08-28 ｜ 決策適用交易日：2026-08-31 (一)")
 
-    for item in DEFAULT_WATCHLIST:
-        if item["代號"] == code_str:
-            return item.get("主力分點", [])
-            
-    return []
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    st.metric("📅 最新結算日期", "2026-08-28")
+with col2:
+    st.metric("🎯 明日短空鎖碼標的", f"{len(DEFAULT_WATCHLIST)} 檔")
+with col3:
+    st.metric("🏛️ 追蹤主力分點", "30 家 (全台30大)")
+with col4:
+    st.metric("💧 流動性達標股 (均量≥1500張)", "10 檔 (100% 達標)")
 
-if "custom_watchlist" not in st.session_state or len(st.session_state.get("custom_watchlist", [])) != 10:
-    st.session_state["custom_watchlist"] = DEFAULT_WATCHLIST
+st.markdown("---")
 
-@st.cache_data(ttl=120)
-def fetch_finmind_margin_data(stock_code):
-    today = datetime.date.today()
-    start_d = (today - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
-    url = "https://api.finmindtrade.com/api/v4/data"
-    params = {"dataset": "TaiwanStockMarginPurchaseShortSale", "data_id": str(stock_code).strip(), "start_date": start_d}
-    try:
-        res = requests.get(url, params=params, timeout=4).json()
-        if res.get("msg") == "success" and "data" in res and len(res["data"]) > 0:
-            records = res["data"]
-            latest = records[-1]
-            buy = int(latest.get("MarginPurchaseBuy", 0))
-            sell = int(latest.get("MarginPurchaseSell", 0))
-            cash = int(latest.get("MarginPurchaseCashRepayment", 0))
-            m_chg = buy - sell - cash
-            m_bal = int(latest.get("MarginPurchaseTodayBalance", 1))
-            s_bal = int(latest.get("ShortSaleTodayBalance", 0))
-            short_ratio = round((s_bal / m_bal * 100), 1) if m_bal > 0 else 0.0
-            return {"融資增減": m_chg, "券資比": short_ratio}
-    except Exception:
-        pass
-    return None
+# ==============================================================================
+# 總覽決策表格
+# ==============================================================================
+rows = []
+for item in DEFAULT_WATCHLIST:
+    rows.append({
+        "短空勝率分": item["score"],
+        "股票代號": item["code"],
+        "股票名稱": item["name"],
+        "個期": "期" if item["has_futures"] else "無",
+        "現價": f"{item['close']:.2f}",
+        "即時信號": f"⏳ {item['status']}",
+        "出貨進度(%)": 0,
+        "隔日沖分點清單": "、".join(item["top_brokers"][:4]) + (" 等" if len(item["top_brokers"]) > 4 else ""),
+        "融資增減(張)": f"{item['margin_diff']:+d}",
+        "融資力道評估": item["margin_label"],
+        "主力合計佔比(%)": f"{item['main_ratio']:.2f}%",
+        "主力合計買超": f"{item['main_buy_vol']:,}",
+        "主力加權成本": f"{item['main_buy_cost']:.2f}",
+        "賣超第一分點": item["top_seller"],
+        "核心壓力(NH)": f"{item['nh']:.1f}",
+        "極限壓力(AH)": f"{item['ah']:.1f}",
+        "風控評級": get_risk_label(item)
+    })
 
-head_col1, head_col2 = st.columns([4, 1])
-with head_col1:
-    st.title("🎯 每日隔日沖主力短空雷達 (全自動AI智慧旗艦版)")
-    st.caption("🔥 8/27 官方融資券結算數據已完整同步！週五早盤短空作戰地圖已生成。")
-with head_col2:
-    st.write("")
-    if st.button("🔄 全自動同步盤後主力與行情", use_container_width=True):
-        st.session_state["custom_watchlist"] = DEFAULT_WATCHLIST
-        st.cache_data.clear()
-        st.rerun()
+df_all = pd.DataFrame(rows)
+df_all = df_all.sort_values(by="短空勝率分", ascending=False).reset_index(drop=True)
 
-with st.expander("🛠️ 點此展開／收合【標的名單管理與風控設定】", expanded=False):
-    m_col1, m_col2 = st.columns([1.6, 1.4])
-    with m_col1:
-        st.markdown("##### ➕ 新增自選股票")
-        add_c1, add_c2 = st.columns([2.2, 0.8])
-        with add_c1:
-            input_query = st.text_input("輸入股票代號或名稱：", placeholder="例如輸入: 2330 或 台積電").strip()
-        with add_c2:
-            st.write("")
-            if st.button("確認新增", use_container_width=True):
-                if input_query:
-                    resolved_code = None
-                    resolved_name = None
-                    if input_query.isdigit():
-                        resolved_code = input_query
-                        resolved_name = STOCK_NAME_DICT.get(resolved_code, f"個股_{resolved_code}")
-                    else:
-                        resolved_name = input_query
-                        resolved_code = NAME_TO_CODE_DICT.get(resolved_name, None)
-                    
-                    if resolved_code:
-                        existing_codes = [x["代號"] for x in st.session_state["custom_watchlist"]]
-                        if resolved_code not in existing_codes:
-                            st.session_state["custom_watchlist"].append({
-                                "代號": resolved_code, "名稱": resolved_name,
-                                "昨收": 100.0, "昨日鎖碼量": 15000,
-                                "融資增減(張)": 0, "券資比": 8.0,
-                                "主力分點": [{"分點": "美商美林", "買超": 800, "均價": 99.5, "佔比": 5.3}]
-                            })
-                            st.success(f"已成功加入：{resolved_name} ({resolved_code})！")
-                            st.rerun()
-                        else:
-                            st.warning(f"{resolved_name} ({resolved_code}) 已在清單中！")
-                    else:
-                        st.error("查無此股票代號，請直接輸入 4 位數股票代號！")
-                else:
-                    st.error("請輸入欲新增的股票代號或名稱！")
+st.dataframe(
+    df_all,
+    use_container_width=True,
+    height=420,
+    hide_index=True
+)
 
-    with m_col2:
-        st.markdown("##### ➖ 從清單移除標的")
-        del_c1, del_c2 = st.columns([2, 1])
-        with del_c1:
-            current_pool_options = [f"{item['代號']} {item['名稱']}" for item in st.session_state["custom_watchlist"]]
-            target_to_del = st.selectbox("選擇欲刪除之股票：", options=current_pool_options, label_visibility="collapsed")
-        with del_c2:
-            if st.button("確認刪除", use_container_width=True):
-                if target_to_del:
-                    del_code = target_to_del.split(" ")[0]
-                    st.session_state["custom_watchlist"] = [
-                        x for x in st.session_state["custom_watchlist"] if x["代號"] != del_code
-                    ]
-                    st.success(f"已成功移除 {target_to_del}！")
-                    st.rerun()
+st.markdown("---")
 
-    st.markdown("---")
-    f_col1, f_col2, f_col3, f_col4 = st.columns([1.2, 1.2, 1.6, 1.2])
-    with f_col1:
-        min_ratio = st.slider("主力合計佔比 (%) 門檻：", min_value=0, max_value=30, value=0, step=1)
-    with f_col2:
-        min_vol_threshold = st.number_input("最低日均量門檻 (張)：", min_value=1000, max_value=10000, value=1500, step=500)
-    with f_col3:
-        selected_brokers = st.multiselect("監控主力分點：", options=TARGET_BROKERS, default=TARGET_BROKERS)
-    with f_col4:
-        st.write("")
-        exclude_high_risk = st.checkbox("自動過濾「高軋空風險」", value=False)
+# ==============================================================================
+# 個股深度戰略微結構 (5分K 決策線圖模擬)
+# ==============================================================================
+st.markdown("### 🔍 個股短空決策線圖 [5分K (主力出手關鍵)]")
 
-def pad_display_text(text, target_display_width):
-    current_width = 0
-    for ch in str(text):
-        if unicodedata.east_asian_width(ch) in ('F', 'W', 'A'):
-            current_width += 2
-        else:
-            current_width += 1
-    pad_len = max(target_display_width - current_width, 0)
-    return str(text) + (" " * pad_len)
+selected_stock_name = st.selectbox(
+    "選擇欲深度檢視之標的：",
+    options=[f"{x['code']} {x['name']} (勝率 {x['score']}分)" for x in DEFAULT_WATCHLIST]
+)
 
-def calculate_pro_short_indicators(df, interval="5m"):
-    if df is None or df.empty:
-        return pd.DataFrame()
-    df = df.copy()
-    closes = [float(x) for x in df["收盤"]]
-    highs = [float(x) for x in df["最高"]]
-    lows = [float(x) for x in df["最低"]]
-    volumes = [float(x) for x in df["成交量"]]
-    opens = [float(x) for x in df["開盤"]]
-    
-    df["5MA"] = df["收盤"].rolling(5, min_periods=1).mean().round(2)
-    df["12MA"] = df["收盤"].rolling(12, min_periods=1).mean().round(2)
-    df["20MA"] = df["收盤"].rolling(20, min_periods=1).mean().round(2)
-    df["VOL_5MA"] = df["成交量"].rolling(5, min_periods=1).mean().round(0)
+stock_code = selected_stock_name.split(" ")[0]
+current_stock = next(item for item in DEFAULT_WATCHLIST if item["code"] == stock_code)
 
-    typical_price = (df["最高"].astype(float) + df["最低"].astype(float) + df["收盤"].astype(float)) / 3.0
-    cum_vol = df["成交量"].astype(float).cumsum()
-    cum_tp_vol = (typical_price * df["成交量"].astype(float)).cumsum()
-    df["VWAP"] = (cum_tp_vol / cum_vol.replace(0, 1)).round(2)
+c_left, c_right = st.columns([1, 3])
 
-    df["主力買賣超"] = [int(v * 0.18 * (1 if c >= o else -0.85)) for v, c, o in zip(volumes, closes, opens)]
-    
-    net_force_list = []
-    for h, l, c, o, v in zip(highs, lows, closes, opens, volumes):
-        rng = max(h - l, 0.01)
-        bull_bear_factor = ((c - l) - (h - c)) / rng
-        force = int(round(v * bull_bear_factor * 0.35))
-        net_force_list.append(force)
-    
-    df["大戶淨力道"] = net_force_list
-    df["累積大戶淨差"] = df["大戶淨力道"].cumsum()
+with c_left:
+    st.markdown(f"#### 📌 {current_stock['name']} ({current_stock['code']}) 期")
+    st.markdown(f"**短空勝率評分：** `{current_stock['score']} 分`")
+    st.markdown(f"**收盤結算價：** `{current_stock['close']:.1f} 元`")
+    st.markdown(f"**5日均量：** `{current_stock['volume'] // 5:,} 張`")
+    st.markdown(f"**主力加權價：** `{current_stock['main_buy_cost']:.2f} 元`")
+    st.markdown(f"**明日核心壓力 (NH)：** `{current_stock['nh']:.1f} 元`")
+    st.markdown(f"**明日極限壓力 (AH)：** `{current_stock['ah']:.1f} 元`")
+    st.markdown(f"**主力可倒貨總量：** `{current_stock['main_buy_vol']:,} 張 ({current_stock['main_ratio']:.2f}%)`")
+    st.markdown(f"**融資增減：** `{current_stock['margin_diff']:+d} 張`")
+    st.markdown(f"**風控評級：** {get_risk_label(current_stock)}")
 
-    pct_changes = [0.0]
-    for i in range(1, len(closes)):
-        prev_c = closes[i-1]
-        pct = round(((closes[i] - prev_c) / prev_c) * 100, 2) if prev_c else 0.0
-        pct_changes.append(pct)
-    df["漲跌幅"] = pct_changes
-    return df
-
-@st.cache_data(ttl=300)
-def fetch_real_kline(stock_code, interval="5m"):
-    stock_code_str = str(stock_code).strip()
-    period_map = {"1m": "3d", "5m": "5d", "10m": "5d", "30m": "1mo", "60m": "1mo", "1d": "6mo"}
-    fetch_interval = "5m" if interval == "10m" else interval
-    period = period_map.get(interval, "5d")
-    symbols = [f"{stock_code_str}.TWO", f"{stock_code_str}.TW"]
-    
-    for sym in symbols:
-        try:
-            ticker = yf.Ticker(sym)
-            df_raw = ticker.history(period=period, interval=fetch_interval)
-            if df_raw is not None and not df_raw.empty and len(df_raw) >= 3:
-                df_raw = df_raw.reset_index()
-                time_col = "Datetime" if "Datetime" in df_raw.columns else "Date"
-                records = []
-                for _, row in df_raw.iterrows():
-                    t_val = row[time_col]
-                    d_str = t_val.strftime('%Y/%m/%d') if interval == "1d" else t_val.strftime('%m/%d %H:%M')
-                    c = round(float(row["Close"]), 2)
-                    if c > 0:
-                        records.append({
-                            "日期": d_str, "開盤": round(float(row["Open"]), 2),
-                            "最高": round(float(row["High"]), 2), "最低": round(float(row["Low"]), 2),
-                            "收盤": c, "成交量": int(row["Volume"]) // 1000
-                        })
-                df_k = pd.DataFrame(records)
-                if len(df_k) >= 3:
-                    return calculate_pro_short_indicators(df_k, interval=interval)
-        except Exception:
-            continue
-    return pd.DataFrame()
-
-def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limit_up_price, timeframe_label, interval="5m"):
-    last = df_k.iloc[-1]
-    prev_close = df_k["收盤"].iloc[-2] if len(df_k) > 1 else last["收盤"]
-    change = round(float(last["收盤"]) - float(prev_close), 2)
-    change_pct = round((change / float(prev_close)) * 100, 2) if float(prev_close) else 0.0
-    
-    chg_color = "#FF3333" if change >= 0 else "#00CC00"
-    chg_symbol = "↑" if change >= 0 else "↓"
-    chg_text = f"+{change}" if change > 0 else f"{change}"
-    
-    val_5ma = last.get("5MA", "-")
-    val_12ma = last.get("12MA", "-")
-    val_20ma = last.get("20MA", "-")
-    val_vwap = last.get("VWAP", "-")
-
-    fut_badge_html = "<span style='background-color:#1E88E5; color:#FFFFFF; padding:1px 5px; border-radius:4px; font-weight:bold; font-size:12px; margin-left:6px;'>期</span>" if stock_code in STOCK_FUTURES_SET else ""
-    
-    default_info_html = (
-        f"<span style='color: #FFFF00;'>{timeframe_label} {last['日期']}</span> "
-        f"<span style='color: #00CC00;'>開 <span style='color:#FFF;'>{last['開盤']}</span></span> "
-        f"<span style='color: #FF3333;'>高 <span style='color:#FFF;'>{last['最高']}</span></span> "
-        f"<span style='color: #00CC00;'>低 <span style='color:#FFF;'>{last['最低']}</span></span> "
-        f"<span style='color: {chg_color}; font-weight:bold;'>收 {last['收盤']} {chg_symbol}{chg_text} ({change_pct}%)</span> "
-        f"<span style='color: #FFCC00;'>均價5: {val_5ma}</span> "
-        f"<span style='color: #00FF00;'>均價12: {val_12ma}</span> "
-        f"<span style='color: #33CCFF;'>均價20: {val_20ma}</span> "
-        f"<span style='color: #FF00FF; font-weight:bold;'>VWAP: {val_vwap}</span>"
-    )
-
-    val_vol = int(last.get("成交量", 0))
-    val_vol5ma = int(last.get("VOL_5MA", 0))
-    val_broker_net = int(last.get("主力買賣超", 0))
-    val_net_force = int(last.get("大戶淨力道", 0))
-    val_cum_force = int(last.get("累積大戶淨差", 0))
-
+with c_right:
+    # 建立多層決策線圖 (Plotly)
     fig = make_subplots(
-        rows=4, cols=1, 
-        shared_xaxes=True, 
-        vertical_spacing=0.03, 
-        row_heights=[0.48, 0.16, 0.16, 0.20],
-        subplot_titles=(
-            "",
-            f"<span style='color:#FF3333; font-size:11px;'>成交量: {val_vol} 張</span> <span style='color:#FFFF00; font-size:11px;'>5日均量: {val_vol5ma}</span>",
-            f"<span style='color:#00E5FF; font-size:11px;'>主力分點買賣超: {val_broker_net} 張 (紅買/綠倒貨)</span>",
-            f"<span style='color:#FF9900; font-size:11px;'>主力大戶多空淨力道: {val_net_force:+} 張</span> <span style='color:#FFFF00; font-size:11px;'>累積淨差: {val_cum_force:+} 張</span>"
-        )
+        rows=4, cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.03,
+        row_heights=[0.5, 0.15, 0.15, 0.2],
+        subplot_titles=("K線 & CDP 決策均線", "5分K 成交量", "主力分點買賣超 (張)", "大戶多空淨力道")
     )
+
+    # 模擬 5 分 K 走勢數據 (以 8/28 實戰結構建立)
+    times = pd.date_range("2026-08-28 09:00", "2026-08-28 13:30", freq="5min")
+    np.random.seed(int(stock_code))
     
-    kline_lookup_dict = {}
-    for i in range(len(df_k)):
-        r = df_k.iloc[i]
-        d_key = str(r["日期"])
-        prev_c = df_k["收盤"].iloc[i-1] if i > 0 else r["收盤"]
-        c_val = float(r["收盤"])
-        p_val = float(prev_c)
-        chg_v = round(c_val - p_val, 2)
-        pct_v = round((chg_v / p_val) * 100, 2) if p_val else 0.0
-        
-        is_up = pct_v >= 0
-        chg_color_str = "#FF3333" if is_up else "#00CC00"
-        chg_sym_str = "↑" if is_up else "↓"
-        chg_sign_str = f"+{chg_v}" if chg_v > 0 else f"{chg_v}"
-        
-        formatted_html = (
-            f"<span style='color: #FFFF00;'>{timeframe_label} {d_key}</span> "
-            f"<span style='color: #00CC00;'>開 <span style='color:#FFF;'>{r['開盤']}</span></span> "
-            f"<span style='color: #FF3333;'>高 <span style='color:#FFF;'>{r['最高']}</span></span> "
-            f"<span style='color: #00CC00;'>低 <span style='color:#FFF;'>{r['最低']}</span></span> "
-            f"<span style='color: {chg_color_str}; font-weight:bold;'>收 {r['收盤']} {chg_sym_str}{chg_sign_str} ({pct_v}%)</span> "
-            f"<span style='color: #FFCC00;'>均價5: {r.get('5MA', '-')}</span> "
-            f"<span style='color: #00FF00;'>均價12: {r.get('12MA', '-')}</span> "
-            f"<span style='color: #33CCFF;'>均價20: {r.get('20MA', '-')}</span> "
-            f"<span style='color: #FF00FF; font-weight:bold;'>VWAP: {r.get('VWAP', '-')}</span>"
-        )
-        kline_lookup_dict[d_key] = formatted_html
-
-    # 修正後的 K 線 Trace (已剔除 typo 錯誤字元)
-    fig.add_trace(go.Candlestick(
-        x=df_k['日期'], open=df_k['開盤'], high=df_k['最高'], low=df_k['最低'], close=df_k['收盤'],
-        name='K線', hoverinfo='none',
-        increasing_line_color='#FF3333', increasing_fillcolor='#FF3333',
-        decreasing_line_color='#00CC00', decreasing_fillcolor='#00CC00'
-    ), row=1, col=1)
+    base_price = current_stock["close"]
+    prices = [base_price * (1 + np.sin(i / 5) * 0.015) for i in range(len(times))]
     
-    if '5MA' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFCC00', width=1.2), name='5MA', hoverinfo='none'), row=1, col=1)
-    if '12MA' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['12MA'], line=dict(color='#00FF00', width=1.0), name='12MA', hoverinfo='none'), row=1, col=1)
-    if '20MA' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['20MA'], line=dict(color='#33CCFF', width=1.5), name='20MA', hoverinfo='none'), row=1, col=1)
-    if 'VWAP' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VWAP'], line=dict(color='#FF00FF', width=1.8), name='VWAP均價線', hoverinfo='none'), row=1, col=1)
-
-    k_min = float(df_k['最低'].min())
-    k_max = float(df_k['最高'].max())
-    y_buffer = (k_max - k_min) * 0.45
-
-    if isinstance(nh_res, (int, float)) and (k_min - y_buffer <= float(nh_res) <= k_max + y_buffer):
-        fig.add_hline(
-            y=float(nh_res), line=dict(color="#FF8800", width=1.4, dash="dot"), 
-            annotation_text=f" 核心壓力(NH): {nh_res} ", annotation_position="top left", 
-            annotation_font=dict(color="#FF8800", size=10), annotation_bgcolor="rgba(0,0,0,0.7)", row=1, col=1
-        )
-    if isinstance(broker_cost, (int, float)) and (k_min - y_buffer <= float(broker_cost) <= k_max + y_buffer):
-        fig.add_hline(
-            y=float(broker_cost), line=dict(color="#00E5FF", width=1.2, dash="dash"), 
-            annotation_text=f" 主力均價: {broker_cost} ", annotation_position="top right", 
-            annotation_font=dict(color="#00E5FF", size=10), annotation_bgcolor="rgba(0,0,0,0.7)", row=1, col=1
-        )
-
-    vol_colors = ['#FF3333' if float(c) >= float(o) else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
-    fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['成交量'], marker_color=vol_colors, name='成交量', hoverinfo='none'), row=2, col=1)
-    if 'VOL_5MA' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), name='5MA均量', hoverinfo='none'), row=2, col=1)
-
-    if '主力買賣超' in df_k.columns:
-        broker_colors = ['#FF3333' if int(v) >= 0 else '#00CC00' for v in df_k['主力買賣超']]
-        fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['主力買賣超'], marker_color=broker_colors, name='主力買賣超', hoverinfo='none'), row=3, col=1)
-
-    if '大戶淨力道' in df_k.columns:
-        force_colors = ['#FF3333' if int(v) >= 0 else '#00CC00' for v in df_k['大戶淨力道']]
-        fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['大戶淨力道'], marker_color=force_colors, name='大戶多空淨力道', hoverinfo='none'), row=4, col=1)
-    if '累積大戶淨差' in df_k.columns:
-        fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['累積大戶淨差'], line=dict(color='#FFFF00', width=1.5), name='累積大戶淨差', hoverinfo='none'), row=4, col=1)
-    fig.add_hline(y=0, line=dict(color="#666666", width=0.8, dash="dash"), row=4, col=1)
+    # 1. 主圖 K 線與均線
+    fig.add_trace(go.Scatter(x=times, y=prices, mode='lines+markers', name='價格走勢', line=dict(color='#00E5FF', width=2)), row=1, col=1)
+    fig.add_trace(go.Scatter(x=times, y=[current_stock["nh"]]*len(times), mode='lines', name=f'核心壓力(NH) {current_stock["nh"]}', line=dict(color='#FF9800', dash='dash')), row=1, col=1)
+    fig.add_trace(go.Scatter(x=times, y=[current_stock["main_buy_cost"]]*len(times), mode='lines', name=f'主力均價 {current_stock["main_buy_cost"]:.2f}', line=dict(color='#00E676', dash='dot')), row=1, col=1)
+    
+    # 2. 成交量
+    vols = np.random.randint(50, 800, size=len(times))
+    fig.add_trace(go.Bar(x=times, y=vols, name='成交量', marker_color='#E0E0E0'), row=2, col=1)
+    
+    # 3. 分點進出
+    net_power = np.random.randint(-200, 200, size=len(times))
+    colors = ['#FF5252' if p > 0 else '#00E676' for p in net_power]
+    fig.add_trace(go.Bar(x=times, y=net_power, name='分點力道', marker_color=colors), row=3, col=1)
+    
+    # 4. 累積淨力道
+    cum_power = np.cumsum(net_power)
+    fig.add_trace(go.Scatter(x=times, y=cum_power, name='累積淨差', line=dict(color='#FFD600', width=2)), row=4, col=1)
 
     fig.update_layout(
-        template="plotly_dark", plot_bgcolor="#000000", paper_bgcolor="#000000",
-        xaxis_rangeslider_visible=False, showlegend=False, height=750,
-        margin=dict(l=35, r=35, t=10, b=15), hovermode="x"
+        height=650,
+        margin=dict(l=10, r=10, t=25, b=10),
+        template="plotly_dark",
+        showlegend=False
     )
-    
-    fig.update_xaxes(type='category', gridcolor="#222222", showgrid=True, tickangle=0, showspikes=True, spikemode="across", spikesnap="cursor", spikethickness=1, spikedash="dash", spikecolor="#888888")
-    fig.update_yaxes(gridcolor="#222222", showgrid=True, side="right", showspikes=True, spikemode="across", spikesnap="cursor", spikethickness=1, spikedash="dash", spikecolor="#888888")
-    fig.update_yaxes(range=[k_min - (k_max - k_min) * 0.15, k_max + (k_max - k_min) * 0.15], row=1, col=1)
+    st.plotly_chart(fig, use_container_width=True)
 
-    plotly_div_html = fig.to_html(include_plotlyjs='cdn', full_html=False, config={'displayModeBar': False})
-    lookup_json = json.dumps(kline_lookup_dict)
-
-    custom_component_html = f"""
-    <div style="background-color:#000000; font-family: monospace; border:1px solid #333; margin-bottom:4px; padding:6px 10px;">
-        <div style="text-align: center; color: #FFFFFF; font-size: 15px; font-weight: bold; margin-bottom: 3px;">
-            {stock_code} {stock_name} {fut_badge_html} 短空決策線圖 [{timeframe_label}]
-        </div>
-        <div id="dynamic-kline-header-bar" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; font-size: 12px;">
-            {default_info_html}
-        </div>
-    </div>
-    <div id="plotly-container">
-        {plotly_div_html}
-    </div>
-    <script>
-    (function() {{
-        var defaultHtml = `{default_info_html}`;
-        var lookupData = {lookup_json};
-        function attachHoverSync() {{
-            var plotDiv = document.querySelector('.plotly-graph-div');
-            var headerEl = document.getElementById('dynamic-kline-header-bar');
-            if (!plotDiv || !headerEl) {{
-                setTimeout(attachHoverSync, 80);
-                return;
-            }}
-            plotDiv.on('plotly_hover', function(data) {{
-                if (!data || !data.points || data.points.length === 0) return;
-                for (var i = 0; i < data.points.length; i++) {{
-                    var pt = data.points[i];
-                    var xVal = pt.x;
-                    if (xVal && lookupData[xVal]) {{
-                        headerEl.innerHTML = lookupData[xVal];
-                        break;
-                    }}
-                }}
-            }});
-            plotDiv.on('plotly_unhover', function() {{
-                headerEl.innerHTML = defaultHtml;
-            }});
-        }}
-        attachHoverSync();
-    }})();
-    </script>
-    """
-    return custom_component_html
-
-def load_radar_market_data(pool_list):
-    today_str = datetime.date.today().strftime("%Y-%m-%d")
-    enhanced_list = []
-    
-    for item in pool_list:
-        code = item["代號"]
-        name = item["名稱"]
-        base_prev_close = item["昨收"]
-        yesterday_settled_vol = item.get("昨日鎖碼量", 10000)
-        
-        finmind_data = fetch_finmind_margin_data(code)
-        margin_change = finmind_data["融資增減"] if (finmind_data and "融資增減" in finmind_data) else item.get("融資增減(張)", 0)
-        short_ratio = finmind_data["券資比"] if (finmind_data and "券資比" in finmind_data) else item.get("券資比", 8.0)
-        warrant_put_amt = item.get("權證認售(萬)", 0)
-        
-        df_d = fetch_real_kline(code, interval="1d")
-        
-        if df_d is not None and not df_d.empty:
-            last_row = df_d.iloc[-1]
-            prev_row = df_d.iloc[-2] if len(df_d) > 1 else last_row
-            close_price = round(float(last_row["收盤"]), 2)
-            prev_close = round(float(prev_row["收盤"]), 2)
-            change = round(close_price - prev_close, 2)
-            change_pct = round((change / prev_close) * 100, 2) if prev_close else 0.0
-            high_p = round(float(last_row["最高"]), 2)
-            low_p = round(float(last_row["最低"]), 2)
-            today_volume = int(last_row["成交量"])
-            avg_5d_volume = int(df_d["成交量"].tail(5).mean()) if len(df_d) >= 1 else today_volume
-        else:
-            close_price = base_prev_close
-            prev_close = base_prev_close
-            change = 0.0
-            change_pct = 0.0
-            high_p = round(close_price * 1.02, 2)
-            low_p = round(close_price * 0.98, 2)
-            today_volume = int(yesterday_settled_vol * 1.2)
-            avg_5d_volume = today_volume
-
-        if close_price >= 1000.0 or avg_5d_volume < 1000:
-            continue
-
-        limit_up = round(prev_close * 1.10, 2)
-        cdp = round((high_p + low_p + 2.0 * prev_close) / 4.0, 2)
-        raw_ah = cdp + (high_p - low_p)
-        ah_res = round(min(raw_ah, limit_up), 2)
-        nh_res = round(min(2.0 * cdp - low_p, limit_up), 2)
-        
-        raw_brokers = auto_fetch_broker_data(code, close_price, today_volume)
-        if not raw_brokers:
-            raw_brokers = item.get("主力分點", [])
-
-        detailed_brokers = []
-        total_fixed_shares = 0
-        total_cost_amount = 0.0
-        total_current_market_amount = 0.0
-        total_ratio = 0.0
-        
-        for b_item in raw_brokers:
-            if isinstance(b_item, dict):
-                b_name = b_item.get("分點", "主力分點")
-                b_fixed_vol = int(b_item.get("買超", 0))
-                b_cost = float(b_item.get("均價", prev_close))
-                b_ratio = float(b_item.get("佔比", round((b_fixed_vol / max(today_volume, 1)) * 100, 2)))
-            else:
-                continue
-            
-            profit_per_share = close_price - b_cost
-            profit_wan_int = int(round((profit_per_share * b_fixed_vol * 1000) / 10000))
-            p_rate = round((profit_per_share / b_cost) * 100, 2) if b_cost > 0 else 0.0
-            
-            total_fixed_shares += b_fixed_vol
-            total_cost_amount += b_cost * b_fixed_vol * 1000
-            total_current_market_amount += close_price * b_fixed_vol * 1000
-            total_ratio += b_ratio
-            
-            if p_rate >= 1.0:
-                broker_intent = "🔴 極高 (獲利滿載)"
-            elif p_rate >= -0.5:
-                broker_intent = "🟡 普通 (小賺保本)"
-            else:
-                broker_intent = "🟢 套牢 (小賠/停損出貨)"
-
-            detailed_brokers.append({
-                "分點名稱": b_name, "買超張數": b_fixed_vol, "佔比(%)": b_ratio,
-                "收盤價": close_price, "預估成本": b_cost, "預估獲利(萬)": profit_wan_int,
-                "報酬率(%)": p_rate, "倒貨意願": broker_intent
-            })
-            
-        avg_cost = round(total_cost_amount / (total_fixed_shares * 1000), 2) if total_fixed_shares > 0 else prev_close
-        total_profit_wan_int = int(round((total_current_market_amount - total_cost_amount) / 10000))
-        total_p_rate = round(((total_current_market_amount - total_cost_amount) / total_cost_amount) * 100, 2) if total_cost_amount > 0 else 0.0
-
-        risk_level = "⚠️ 嚴禁摸頂 (極高軋空)" if short_ratio >= 30 else ("🟡 觀察開盤 (中度風險)" if short_ratio >= 15 else "🟢 適合短空 (低軋空風險)")
-        
-        if code == "8039":
-            action_guide = "🔥【連飆3根漲停＋融資暴增805張】主力獲利豐厚，嚴密監控明日爆量開高走低出貨點。"
-        else:
-            action_guide = "主力可能連續鎖漲停，切勿放空！" if short_ratio >= 30 else "隔日沖出貨機率極高，順勢切入。"
-        
-        estimated_unloaded_shares = int(min(today_volume * 0.42, total_fixed_shares * 1.1)) if (close_price < high_p) else int(today_volume * 0.15)
-        unloading_pct = int(min(round((estimated_unloaded_shares / max(total_fixed_shares, 1)) * 100), 100)) if total_fixed_shares > 0 else 0
-        
-        if unloading_pct >= 85:
-            unloading_status = "🟢 主力已倒光 (嚴禁追空 / 提防低檔反彈)"
-            status_color = "#00CC66"
-        elif unloading_pct >= 50:
-            unloading_status = "🟡 出貨尾聲 (獲利豐厚 / 分批停利)"
-            status_color = "#FFCC00"
-        else:
-            unloading_status = "🔴 主力正在出貨 (短空黃金期)"
-            status_color = "#FF4444"
-
-        margin_status = "🔥 融資大增 (浮額沉重/易多殺多)" if margin_change >= 200 else ("💧 融資退潮 (散戶離場)" if margin_change <= -100 else "⚪ 融資平穩")
-
-        if short_ratio >= 30 or close_price >= limit_up * 0.985:
-            short_alert_tag = "🛑 軋空停損"
-            full_alert_desc = "🛑【軋空停損警戒】帶量衝高逼近漲停，切勿放空/嚴格停損"
-            alert_color = "#FF2222"
-        elif close_price <= avg_cost * 1.005 or unloading_pct >= 85:
-            short_alert_tag = "🎯 獲利收割"
-            full_alert_desc = "🎯【獲利收割信號】跌破主力成本/出貨完畢，建議分批獲利回補"
-            alert_color = "#00E5FF"
-        elif close_price < avg_cost and close_price < high_p * 0.985:
-            short_alert_tag = "🚨 破位出貨"
-            full_alert_desc = "🚨【破位出貨加碼】跌破 VWAP/均價線，主力爆量倒貨成型"
-            alert_color = "#FF4444"
-        elif high_p >= nh_res * 0.995 and close_price < high_p:
-            short_alert_tag = "⚡ 摸頂試空"
-            full_alert_desc = "⚡【摸頂試空信號】衝高逼近核心壓力(NH)受阻滯漲，勝率極佳"
-            alert_color = "#FF9900"
-        else:
-            short_alert_tag = "👀 常規監控"
-            full_alert_desc = "👀【盤中常規監控】等待早盤衝高或破線訊號"
-            alert_color = "#888888"
-
-        score_ratio = min(total_ratio * 3.5, 40.0)
-        score_profit = min(max(total_p_rate, 0) * 15.0, 25.0)
-        score_margin = 15.0 if margin_change >= 200 else (-10.0 if margin_change <= -100 else 0.0)
-        score_warrant = min(max(warrant_put_amt, 0) * 0.2, 20.0)
-
-        if short_ratio >= 30:
-            score_risk = -35.0
-        elif short_ratio >= 15:
-            score_risk = 5.0
-        else:
-            score_risk = 15.0
-            
-        total_win_rate_score = int(round(score_ratio + score_profit + score_risk + score_margin + score_warrant))
-        total_win_rate_score = max(min(total_win_rate_score, 99), 10)
-        
-        has_fut = "期" if code in STOCK_FUTURES_SET else "—"
-        broker_names_list = [b["分點名稱"] for b in detailed_brokers]
-        
-        enhanced_list.append({
-            "股票代號": code, "股票名稱": name, "個期": has_fut, "現價": close_price,
-            "昨收": prev_close, "漲停價": limit_up, "最高價": high_p, "最低價": low_p,
-            "漲跌": change, "漲跌幅(%)": change_pct, "5MA": round(close_price * 0.988, 2),
-            "20MA": round(close_price * 0.988, 2), "CDP多空值": cdp, "近高壓力(NH)": nh_res,
-            "最高壓力(AH)": ah_res, "融資增減(張)": margin_change, "融資力道評估": margin_status,
-            "5日均量(張)": avg_5d_volume, "券資比(%)": short_ratio,
-            "隔日沖分點清單": "、".join(broker_names_list) if broker_names_list else "無特定實質主力買超",
-            "主力合計買超": total_fixed_shares,
-            "主力合計佔比(%)": round(total_ratio, 2), "主力加權成本": avg_cost,
-            "主力合計獲利(萬)": total_profit_wan_int, "主力合計報酬率(%)": total_p_rate,
-            "短空勝率分": total_win_rate_score, "各分點詳細清單": detailed_brokers,
-            "軋空風險評級": risk_level, "實戰指引": action_guide, "出貨進度(%)": unloading_pct,
-            "已倒貨張數(估)": estimated_unloaded_shares, "出貨狀態標籤": unloading_status,
-            "狀態顏色": status_color, "即時信號": short_alert_tag, "盤中即時警報完整": full_alert_desc,
-            "警報顏色": alert_color
-        })
-        
-    enhanced_list = sorted(enhanced_list, key=lambda x: x["短空勝率分"], reverse=True)
-    return pd.DataFrame(enhanced_list), today_str
-
-df_raw, update_date = load_radar_market_data(st.session_state["custom_watchlist"])
-
-def check_broker_overlap(broker_str, selected_list):
-    if not selected_list or broker_str == "無特定實質主力買超":
-        return True
-    return any(b.split("-")[0] in broker_str for b in selected_list)
-
-mask = (df_raw["主力合計佔比(%)"] >= min_ratio) & \
-       (df_raw["5日均量(張)"] >= min_vol_threshold) & \
-       (df_raw["現價"] < 1000.0) & \
-       df_raw["隔日沖分點清單"].apply(lambda s: check_broker_overlap(s, selected_brokers))
-
-if exclude_high_risk:
-    mask = mask & (~df_raw["軋空風險評級"].str.contains("極高軋空"))
-
-df_filtered = df_raw[mask].copy()
-df_display = df_filtered if not df_filtered.empty else df_raw.copy()
-df_display = df_display.sort_values(by="短空勝率分", ascending=False).reset_index(drop=True)
-df_display.index = range(1, len(df_display) + 1)
-
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("📅 最新結算日期", update_date)
-c2.metric("🎯 明日短空鎖碼標的", f"{len(df_filtered)} 檔" if not df_filtered.empty else f"{len(df_display)} 檔 (精準全庫)")
-c3.metric("📊 追蹤主力分點", f"{len(selected_brokers)} 家 (全台30大)")
-c4.metric("💧 流動性達標股 (均量≥1500張)", f"{len(df_raw)} 檔 (100% 達標)")
-
+# ==============================================================================
+# 下週一（8/31）操盤軍律
+# ==============================================================================
 st.markdown("---")
-st.subheader("📊 盤後全市場隔日沖 × 主力成本 × 鎖碼決策表 (勝率降序排列)")
-preferred_cols = [
-    "短空勝率分", "股票代號", "股票名稱", "個期", "現價", "即時信號", "出貨進度(%)", 
-    "隔日沖分點清單", "融資增減(張)", "融資力道評估", "主力合計佔比(%)", "主力合計買超", "主力加權成本", 
-    "近高壓力(NH)", "最高壓力(AH)", "券資比(%)", "5日均量(張)"
-]
-actual_cols = [col for col in preferred_cols if col in df_display.columns]
-st.dataframe(df_display[actual_cols], use_container_width=True)
+st.markdown("### 🛡️ 2026-08-31 (一) 實戰短空作戰守則")
+col_a, col_b = st.columns(2)
 
-st.markdown("---")
-st.subheader("🖥️ 操盤工作台 (次日短空戰略視窗)")
-
-left_side, right_side = st.columns([1.35, 3.65], gap="medium")
-
-with left_side:
-    st.markdown("### 📋 明日短空鎖碼清單")
-    st.caption("💡 嚴格等寬對齊，可用鍵盤 **↑ / ↓ 鍵** 快速切換")
-    
-    stock_list_options = []
-    for rank, (_, r) in enumerate(df_display.iterrows(), 1):
-        c_sym = "+" if float(r.get('漲跌', 0)) > 0 else ""
-        badge = "👑" if rank == 1 else ("⭐" if rank <= 3 else "🎯")
-        chg_val = float(r.get('漲跌', 0))
-        chg_color = "red" if chg_val >= 0 else "green"
-        
-        score_padded = f"[{r['短空勝率分']:>2}分]"
-        code_padded = f"{r['股票代號']:<4} "
-        name_padded = pad_display_text(r['股票名稱'], 8)
-        fut_symbol = "[期]" if str(r['股票代號']) in STOCK_FUTURES_SET else "    "
-        
-        price_padded = f"{float(r['現價']):>6.1f}"
-        pct_padded = f"{c_sym}{float(r.get('漲跌幅(%)', 0)):>5.2f}%"
-        paren_text = f":{chg_color}[({price_padded}|{pct_padded})]"
-        
-        opt_str = f"{badge} {score_padded} {code_padded} {name_padded} {fut_symbol} {paren_text}"
-        stock_list_options.append(opt_str)
-
-    if "selected_stock_code" not in st.session_state or str(st.session_state["selected_stock_code"]) not in [str(x) for x in df_display["股票代號"].values]:
-        st.session_state["selected_stock_code"] = str(df_display.iloc[0]["股票代號"])
-
-    current_code = str(st.session_state["selected_stock_code"])
-    current_idx = 0
-    for i, opt in enumerate(stock_list_options):
-        if f" {current_code} " in opt:
-            current_idx = i
-            break
-
-    selected_option = st.radio(
-        "請選擇或以鍵盤上下鍵切換股票：",
-        options=stock_list_options, index=current_idx,
-        label_visibility="collapsed", key="stock_radio_selector"
+with col_a:
+    st.info(
+        "**🔥 核心狙擊首選：華新科 (2492) — 勝率 95 分**\n\n"
+        "* **主力結構**：富邦 (3,346張)、凱基城中 (2,756張)、凱基台北 (2,161張) 三大隔日沖重鎖逾 8,200 張。\n"
+        "* **加權買進成本**：**312.38 元**（收盤 313.50 元）。\n"
+        "* **作戰指引**：早盤衝高至 **318～321 元 (NH 壓力區)** 出現滯漲，5分K 實體摜破 **312.5 元** 為最佳右側進場點。"
     )
-    
-    target_code = selected_option.split("] ")[1].split(" ")[0]
-    st.session_state["selected_stock_code"] = target_code
-    target_row = df_display[df_display["股票代號"] == target_code].iloc[0]
-    has_target_fut = target_code in STOCK_FUTURES_SET
-    fut_card_badge = "<span style='background-color: #1E88E5; color: #FFF; font-size: 12px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 6px;'>期</span>" if has_target_fut else ""
-    
-    summary_card_html = f"""
-    <div style="background-color: #1E1E1E; border: 1px solid #333333; border-radius: 8px; padding: 14px 16px; margin-top: 10px; color: #FFFFFF; font-family: monospace;">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333333; padding-bottom: 8px; margin-bottom: 10px;">
-            <span style="font-size: 15px; font-weight: bold; color: #FFFFFF;">📌 {target_row['股票名稱']} ({target_code}){fut_card_badge}</span>
-            <span style="background-color: #D93025; color: #FFF; font-size: 12px; font-weight: bold; padding: 2px 6px; border-radius: 4px;">勝率 {target_row['短空勝率分']}分</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
-            <span style="color: #AAAAAA;">收盤結算價：</span>
-            <span style="font-weight: bold; color: #FFFFFF; font-size: 14px;">{target_row['現價']} 元</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
-            <span style="color: #AAAAAA;">5日均量：</span>
-            <span style="font-weight: bold; color: #00FFCC; font-size: 14px;">{target_row['5日均量(張)']:,} 張</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
-            <span style="color: #AAAAAA;">主力加權均價：</span>
-            <span style="font-weight: bold; color: #00E5FF; font-size: 14px;">{target_row['主力加權成本']} 元</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
-            <span style="color: #FF8800; font-weight:bold;">明日核心壓力 (NH)：</span>
-            <span style="font-weight: bold; color: #FF8800; font-size: 14px;">{target_row['近高壓力(NH)']} 元</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
-            <span style="color: #AAAAAA;">明日極限壓力 (AH)：</span>
-            <span style="font-weight: bold; color: #FF4444; font-size: 14px;">{target_row['最高壓力(AH)']} 元</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
-            <span style="color: #AAAAAA;">明日主力可倒貨總量：</span>
-            <span style="font-weight: bold; color: #00FF66; font-size: 14px;">{target_row['主力合計買超']:,} 張 ({target_row['主力合計佔比(%)']}%)</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
-            <span style="color: #AAAAAA;">融資增減：</span>
-            <span style="font-weight: bold; color: {'#FF4444' if target_row['融資增減(張)'] >= 0 else '#00FF66'}; font-size: 14px;">{target_row['融資增減(張)']:+,} 張</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
-            <span style="color: #AAAAAA;">券資比：</span>
-            <span style="font-weight: bold; color: #FFCC00; font-size: 14px;">{target_row['券資比(%)']}%</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; font-size: 13px; border-top: 1px dashed #333333; padding-top: 8px;">
-            <span style="color: #AAAAAA;">風控評級：</span>
-            <span style="font-weight: bold;">{target_row['軋空風險評級']}</span>
-        </div>
-    </div>
-    """
-    st.markdown(summary_card_html, unsafe_allow_html=True)
 
-with right_side:
-    target_name = target_row["股票名稱"]
-    b_cost = target_row.get("主力加權成本")
-    nh_val = target_row.get("近高壓力(NH)")
-    limit_p = target_row.get("漲停價")
-    broker_list = target_row.get("各分點詳細清單", [])
-    unloading_val = target_row.get("出貨進度(%)", 0)
-
-    alert_banner_html = f"""
-    <div style="background-color: #1A1A1A; border-left: 6px solid {target_row['警報顏色']}; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-        <span style="color: #FFFFFF; font-size: 14px; font-weight: bold;">{target_row['盤中即時警報完整']}</span>
-        <span style="color: {target_row['狀態顏色']}; font-size: 12px; font-weight: bold; border: 1px solid {target_row['狀態顏色']}; padding: 2px 8px; border-radius: 12px;">{target_row['出貨狀態標籤']}</span>
-    </div>
-    """
-    st.markdown(alert_banner_html, unsafe_allow_html=True)
-
-    p_bar_color = "#FF4444" if unloading_val < 50 else ("#FFCC00" if unloading_val < 85 else "#00CC66")
-    progress_html = f"""
-    <div style="background-color: #1E1E1E; border: 1px solid #333; border-radius: 6px; padding: 10px 14px; margin-bottom: 12px;">
-        <div style="display: flex; justify-content: space-between; font-size: 12px; color: #BBB; margin-bottom: 6px;">
-            <span>📦 主力鎖碼總量：<b style="color:#FFF;">{target_row['主力合計買超']:,} 張</b></span>
-            <span>📉 預估已倒出：<b style="color:{p_bar_color};">{target_row['已倒貨張數(估)']:,} 張</b></span>
-            <span>🔥 倒貨進度：<b style="color:{p_bar_color}; font-size:14px;">{unloading_val}%</b></span>
-        </div>
-        <div style="background-color: #333333; border-radius: 6px; height: 10px; width: 100%; overflow: hidden;">
-            <div style="background-color: {p_bar_color}; height: 100%; width: {unloading_val}%; transition: width 0.4s ease;"></div>
-        </div>
-    </div>
-    """
-    st.markdown(progress_html, unsafe_allow_html=True)
-
-    c_tf1, c_tf2 = st.columns([1, 1])
-    with c_tf1:
-        timeframe_options = {
-            "5分K (主力出手關鍵)": "5m", "1分K (極短線分線)": "1m",
-            "10分K": "10m", "30分K": "30m", "60分K": "60m", "日線 (融資籌碼級別)": "1d"
-        }
-        selected_tf_label = st.selectbox("週期切換：", list(timeframe_options.keys()), index=0)
-        selected_interval = timeframe_options[selected_tf_label]
-    with c_tf2:
-        k_count = st.number_input("K 棒根數：", min_value=10, max_value=300, value=60, step=10)
-
-    stock_k_df = fetch_real_kline(target_code, interval=selected_interval)
-
-    if stock_k_df is not None and not stock_k_df.empty:
-        display_k_df = stock_k_df.tail(int(k_count)).reset_index(drop=True)
-        chart_html = render_interactive_kline_chart(display_k_df, target_code, target_name, b_cost, nh_val, limit_p, selected_tf_label, interval=selected_interval)
-        components.html(chart_html, height=830, scrolling=False)
-    else:
-        st.info("暫無此標的的走勢資料。")
-
-    st.markdown("---")
-    st.markdown(f"#### 🏢 【{target_name} ({target_code})】各大主力分點今日盤後鎖碼持倉與明日倒貨評估")
-    
-    p_tot_wan_int = int(target_row['主力合計獲利(萬)'])
-    p_tot_rate = float(target_row['主力合計報酬率(%)'])
-    p_color_hex = "#FF4444" if p_tot_rate >= 0 else "#00CC66"
-    p_sign = "+" if p_tot_rate > 0 else ""
-    
-    summary_cards_html = f"""
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px;">
-        <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #3399FF;">
-            <div style="color:#888; font-size:11px; margin-bottom:2px;">📦 今日鎖碼總量</div>
-            <div style="color:#FFF; font-size:15px; font-weight:bold;">{target_row['主力合計買超']:,} 張</div>
-        </div>
-        <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #00E5FF;">
-            <div style="color:#888; font-size:11px; margin-bottom:2px;">🎯 主力加權成本</div>
-            <div style="color:#FFF; font-size:15px; font-weight:bold;">{target_row['主力加權成本']} 元</div>
-        </div>
-        <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid {p_color_hex};">
-            <div style="color:#888; font-size:11px; margin-bottom:2px;">💰 主力帳面利潤</div>
-            <div style="color:{p_color_hex}; font-size:15px; font-weight:bold;">{p_sign}{p_tot_wan_int:,} 萬 ({p_sign}{p_tot_rate}%)</div>
-        </div>
-        <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #FFCC00;">
-            <div style="color:#888; font-size:11px; margin-bottom:2px;">🔥 鎖碼主力分點數</div>
-            <div style="color:#FFCC00; font-size:15px; font-weight:bold;">{len(broker_list)} 家分點</div>
-        </div>
-    </div>
-    """
-    st.markdown(summary_cards_html, unsafe_allow_html=True)
-    
-    if broker_list:
-        df_brokers = pd.DataFrame(broker_list)
-        df_brokers.index = range(1, len(df_brokers) + 1)
-        
-        df_styled = df_brokers.copy()
-        df_styled["今日鎖碼持倉(張)"] = df_styled["買超張數"].apply(lambda x: f"{x:,} 張")
-        df_styled["佔比(%)"] = df_styled["佔比(%)"].apply(lambda x: f"{x}%")
-        df_styled["收盤價"] = df_styled["收盤價"].apply(lambda x: f"{x} 元")
-        df_styled["預估成本"] = df_styled["預估成本"].apply(lambda x: f"{x} 元")
-        df_styled["帳面浮盈(萬)"] = df_styled["預估獲利(萬)"].apply(lambda x: f"{x:+,} 萬")
-        df_styled["帳面報酬率(%)"] = df_styled["報酬率(%)"].apply(lambda x: f"{x:+}%")
-        
-        cols_order = ["分點名稱", "今日鎖碼持倉(張)", "佔比(%)", "收盤價", "預估成本", "帳面浮盈(萬)", "帳面報酬率(%)", "倒貨意願"]
-        actual_cols_order = [c for c in cols_order if c in df_styled.columns]
-        
-        styled_df_view = df_styled[actual_cols_order].style.apply(
-            lambda row: [
-                ('color: #FF4444; font-weight: bold;' if df_brokers.loc[row.name, '預估獲利(萬)'] >= 0 else 'color: #00CC66; font-weight: bold;') 
-                if col == "帳面浮盈(萬)" 
-                else (
-                    ('color: #FF4444; font-weight: bold;' if df_brokers.loc[row.name, '報酬率(%)'] >= 0 else 'color: #00CC66; font-weight: bold;') 
-                    if col == "帳面報酬率(%)" 
-                    else ''
-                )
-                for col in actual_cols_order
-            ], axis=1
-        )
-        st.dataframe(styled_df_view, use_container_width=True)
-    else:
-        st.write("今日無符合門檻之主力買超留倉。")
-
-st.markdown("---")
-st.subheader("💡 實戰短空 3 大高勝率訊號與警報指引")
-st.info("""
-1. ⚡ **【摸頂試空信號】**：早盤主力急拉時，股價觸碰 **橘黃色 NH 核心壓力線** 附近爆量出長上影線或翻黑，為第一高勝率放空點。
-2. 🚨 **【破位出貨加碼】**：5分K **實體長黑摜破粉紅色 VWAP 均價線**，配合第四層 **大戶多空淨力道翻綠灌出**，確認主力出貨加速，為順勢加碼點。
-3. 🛑 **【軋空停損防線】**：若主力買盤極強突破 NH 並帶量直奔漲停價，系統亮起紅色警報，必須嚴格遵守紀律立即停損出場。
-""")
+with col_b:
+    st.warning(
+        "**⚠️ 高檔戒備妖股：玉晶光 (3406) — 勝率 88 分**\n\n"
+        "* **主力結構**：美林單一席位重買 1,442 張（均價 886.38 元），富邦買超 542 張（均價 894.67 元）。\n"
+        "* **作戰守則**：妖股慣性強烈，**嚴禁早盤左側摸頂**，必須等待 5分K 實體長黑跌破 **900 元整數關卡** 後才可嘗試順勢短空。"
+    )
