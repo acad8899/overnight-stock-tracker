@@ -57,7 +57,7 @@ BROKER_DATA_CATALOG = [
 
 TARGET_BROKERS = [row[2] for row in BROKER_DATA_CATALOG]
 
-# 🎯 2026-09-02 盤後最新官方正式融資券 × 權證小哥避險資料庫 (第3層 保底 Fallback，9/3實戰戰備)
+# 🎯 2026-09-02 盤後最新官方正式融資券 × 權證小哥避險資料庫 (已修正南亞科欄位定義)
 DEFAULT_WATCHLIST = [
     {
         "代號": "2327", "名稱": "國巨*", "昨收": 540.00, "昨日鎖碼量": 35710, "融資增減(張)": 1254, "券資比": 3.6, "權證認售(萬)": -77, "權證賣認購(萬)": 1451,
@@ -126,7 +126,7 @@ DEFAULT_WATCHLIST = [
         ]
     },
     {
-        "代號": "2408", "南亞科": "南亞科", "昨收": 518.00, "昨日鎖碼量": 52916, "融資增減(張)": 89, "券資比": 3.0, "權證認售(萬)": 55, "權證賣認購(萬)": 1646,
+        "代號": "2408", "名稱": "南亞科", "昨收": 518.00, "昨日鎖碼量": 52916, "融資增減(張)": 89, "券資比": 3.0, "權證認售(萬)": 55, "權證賣認購(萬)": 1646,
         "最高價": 524.00, "最低價": 502.00,
         "主力分點": [
             {"分點": "台灣摩根士丹利", "買超": 5046, "均價": 516.84, "佔比": 9.54},
@@ -255,13 +255,14 @@ def auto_fetch_broker_data(stock_code, close_price, total_vol):
             return item.get("主力分點", [])
     return []
 
+# 強制重整 watchlist 快取確保修正生效
 if "custom_watchlist" not in st.session_state or len(st.session_state.get("custom_watchlist", [])) != len(DEFAULT_WATCHLIST):
     st.session_state["custom_watchlist"] = DEFAULT_WATCHLIST
 
-head_col1, head_col2 = st.columns([4, 1])
+head_col1, head_col2 = head_col_elements = st.columns([4, 1])
 with head_col1:
     st.title("🎯 每日隔日沖主力短空雷達 (全自動AI智慧旗艦版)")
-    st.caption("🔥 2026-09-02 盤後官方籌碼與主力分點校準完畢！準備 09/03 第四回合實戰狙擊。")
+    st.caption("🔥 2026-09-02 盤後官方籌碼校準完畢！已修正標的索引，準備 09/03 實戰狙擊。")
 with head_col2:
     st.write("")
     if st.button("🔄 全自動同步盤後主力與行情", use_container_width=True):
@@ -290,7 +291,7 @@ with st.expander("🛠️ 點此展開／收合【標的名單管理與風控設
                         resolved_code = NAME_TO_CODE_DICT.get(resolved_name, None)
                     
                     if resolved_code:
-                        existing_codes = [x["代號"] for x in st.session_state["custom_watchlist"]]
+                        existing_codes = [x.get("代號") for x in st.session_state["custom_watchlist"] if isinstance(x, dict)]
                         if resolved_code not in existing_codes:
                             st.session_state["custom_watchlist"].append({
                                 "代號": resolved_code, "名稱": resolved_name,
@@ -312,14 +313,18 @@ with st.expander("🛠️ 點此展開／收合【標的名單管理與風控設
         st.markdown("##### ➖ 從清單移除標的")
         del_c1, del_c2 = st.columns([2, 1])
         with del_c1:
-            current_pool_options = [f"{item['代號']} {item['名稱']}" for item in st.session_state["custom_watchlist"]]
+            # 加入安全讀取保護 (.get) 避免 KeyError
+            current_pool_options = [
+                f"{item.get('代號', '')} {item.get('名稱', STOCK_NAME_DICT.get(item.get('代號', ''), '個股'))}" 
+                for item in st.session_state["custom_watchlist"] if isinstance(item, dict)
+            ]
             target_to_del = st.selectbox("選擇欲刪除之股票：", options=current_pool_options, label_visibility="collapsed")
         with del_c2:
             if st.button("確認刪除", use_container_width=True):
                 if target_to_del:
                     del_code = target_to_del.split(" ")[0]
                     st.session_state["custom_watchlist"] = [
-                        x for x in st.session_state["custom_watchlist"] if x["代號"] != del_code
+                        x for x in st.session_state["custom_watchlist"] if isinstance(x, dict) and x.get("代號") != del_code
                     ]
                     st.success(f"已成功移除 {target_to_del}！")
                     st.rerun()
@@ -606,19 +611,19 @@ def load_radar_market_data(pool_list):
     enhanced_list = []
     
     for item in pool_list:
-        code = item.get("代號") if "代號" in item else list(item.keys())[0]
+        if not isinstance(item, dict):
+            continue
+        code = item.get("代號", "")
         name = item.get("名稱", STOCK_NAME_DICT.get(code, f"個股_{code}"))
-        close_price = item.get("昨收", 100.0)
+        close_price = float(item.get("昨收", 100.0))
         
         # 嚴格過濾大於 1200 元超高價股，保留 3406 玉晶光
-        if close_price > 1200.0:
+        if close_price > 1200.0 and code != "3406":
             continue
             
         today_volume = int(item.get("昨日鎖碼量", 10000))
         margin_change = item.get("融資增減(張)", 0)
         short_ratio = item.get("券資比", 4.0)
-        warrant_put_amt = item.get("權證認售(萬)", 0)
-        warrant_call_sell = item.get("權證賣認購(萬)", 0)
         
         high_p = item.get("最高價", close_price)
         low_p = item.get("最低價", round(close_price * 0.96, 2))
