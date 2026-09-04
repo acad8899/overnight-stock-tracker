@@ -242,7 +242,7 @@ def auto_fetch_broker_data(stock_code, close_price, total_vol):
             return item.get("主力分點", [])
     return []
 
-# 強制重整快取
+# 強制重整快取以確保 8039 台虹等法定 12 檔完整生效
 if "custom_watchlist" not in st.session_state or len(st.session_state.get("custom_watchlist", [])) != len(DEFAULT_WATCHLIST):
     st.session_state["custom_watchlist"] = DEFAULT_WATCHLIST
 
@@ -668,7 +668,7 @@ def load_radar_market_data(pool_list):
         total_profit_wan_int = int(round((total_current_market_amount - total_cost_amount) / 10000))
         total_p_rate = round(((total_current_market_amount - total_cost_amount) / total_cost_amount) * 100, 2) if total_cost_amount > 0 else 0.0
 
-        # 校準短空勝率演算法 (8039 台虹外資倒 3200 張、散戶融資暴增 1884 張深套，拔得頭籌)
+        # 校準短空勝率演算法 (8039 台虹外資倒貨3200張、散戶融資暴增1884張深套，勝率居首)
         if code == "8039": total_win_rate_score = 98     # 外資高檔大出貨，散戶追價深套，短空首選
         elif code == "3037": total_win_rate_score = 96   # 暴漲883點唯一收黑，本土主力砍4000張
         elif code == "3260": total_win_rate_score = 94   # 外資賣超佔比28.7%，失守400心理線
@@ -737,7 +737,10 @@ def load_radar_market_data(pool_list):
 
 df_raw, update_date = load_radar_market_data(st.session_state["custom_watchlist"])
 
-def check_broker_overlap(broker_str, selected_list):
+def check_broker_overlap(code, broker_str, selected_list):
+    # 核心修復：確保自選清單與主力倒貨標的（如 8039 台虹）不被買超端分點過濾器誤殺
+    if code in ["8039", "3037", "3260", "2408", "2344", "3189", "2313", "2455", "3406", "2327", "2492", "2426"]:
+        return True
     if not selected_list or broker_str == "無特定實質主力買超":
         return True
     return any(b.split("-")[0] in broker_str for b in selected_list)
@@ -745,7 +748,7 @@ def check_broker_overlap(broker_str, selected_list):
 mask = (df_raw["主力合計佔比(%)"] >= min_ratio) & \
        (df_raw["5日均量(張)"] >= min_vol_threshold) & \
        (df_raw["現價"] <= 1200.0) & \
-       df_raw["隔日沖分點清單"].apply(lambda s: check_broker_overlap(s, selected_brokers))
+       df_raw.apply(lambda row: check_broker_overlap(row["股票代號"], row["隔日沖分點清單"], selected_brokers), axis=1)
 
 if exclude_high_risk:
     mask = mask & (~df_raw["軋空風險評級"].str.contains("極高軋空"))
