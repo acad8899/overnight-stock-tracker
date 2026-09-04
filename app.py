@@ -19,10 +19,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 法定 12 檔核心股票代號集合 (絕對保證 100% 顯示，不被任何濾網過濾)
-CORE_12_CODES = {"8039", "3037", "3260", "2408", "2344", "3189", "2313", "2455", "3406", "2327", "2492", "2426"}
+# 🚀 強制版本控制破除 Streamlit 舊快取
+DATA_VERSION = "20260904_R3_FINAL"
 
-# 期交所個股期貨支援名單 (確保包含 8039 台虹)
+# 期交所個股期貨支援名單
 STOCK_FUTURES_SET = {
     "8039", "2408", "3260", "2449", "3231", "2327", "2376", "6488", "2313", "2492",
     "2330", "2317", "2454", "2382", "2603", "2609", "2344", "3037", "2368", "3017",
@@ -60,7 +60,7 @@ BROKER_DATA_CATALOG = [
 
 TARGET_BROKERS = [row[2] for row in BROKER_DATA_CATALOG]
 
-# 🎯 2026-09-04 官方盤後精準校準資料庫 (法定完整 12 檔)
+# 🎯 2026-09-04 官方盤後精準校準資料庫 (法定完整 12 檔，8039 台虹置首)
 DEFAULT_WATCHLIST = [
     {
         "代號": "8039", "名稱": "台虹", "昨收": 297.50, "昨日鎖碼量": 40392, "融資增減(張)": 1884, "券資比": 4.9, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
@@ -169,102 +169,23 @@ DEFAULT_WATCHLIST = [
     }
 ]
 
-# 取得分點數據：法定 12 檔直接使用內建官方數據，其他自選才走爬蟲
-def get_stock_broker_data(stock_code, close_price, total_vol):
-    code_str = str(stock_code).strip()
-    for item in DEFAULT_WATCHLIST:
-        if item.get("代號") == code_str:
-            return item.get("主力分點", [])
-    return []
-
-# 強制重置 Session 快取，確保 12 檔完整在列且 8039 不被遺漏
-current_saved_codes = set()
-if "custom_watchlist" in st.session_state and isinstance(st.session_state["custom_watchlist"], list):
-    current_saved_codes = {x.get("代號") for x in st.session_state["custom_watchlist"] if isinstance(x, dict)}
-
-if "8039" not in current_saved_codes or len(current_saved_codes) < 12:
+# 🔥 終極殺手鐧：暴力覆寫 Session，徹底粉碎任何舊版瀏覽器快取！
+if st.session_state.get("APP_VERSION_KEY") != DATA_VERSION:
     st.session_state["custom_watchlist"] = DEFAULT_WATCHLIST
+    st.session_state["APP_VERSION_KEY"] = DATA_VERSION
+    st.session_state["selected_stock_code"] = "8039"
 
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
     st.title("🎯 每日隔日沖主力短空雷達 (全自動AI智慧旗艦版)")
-    st.caption("🔥 2026-09-04 盤後官方融資券 × 權證避險校準完畢！法定 12 檔全數到位。")
+    st.caption("🔥 2026-09-04 盤後官方融資券 × 權證避險校準完畢！8039 台虹短空首選鎖定。")
 with head_col2:
     st.write("")
-    if st.button("🔄 重置並同步法定 12 檔完整清單", use_container_width=True):
+    if st.button("🔄 強制重整法定 12 檔資料庫", use_container_width=True):
         st.session_state["custom_watchlist"] = DEFAULT_WATCHLIST
+        st.session_state["selected_stock_code"] = "8039"
         st.cache_data.clear()
         st.rerun()
-
-with st.expander("🛠️ 點此展開／收合【標的名單管理與風控設定】", expanded=False):
-    m_col1, m_col2 = st.columns([1.6, 1.4])
-    with m_col1:
-        st.markdown("##### ➕ 新增自選股票")
-        add_c1, add_c2 = st.columns([2.2, 0.8])
-        with add_c1:
-            input_query = st.text_input("輸入股票代號或名稱：", placeholder="例如輸入: 2330 或 台積電").strip()
-        with add_c2:
-            st.write("")
-            if st.button("確認新增", use_container_width=True):
-                if input_query:
-                    resolved_code = None
-                    resolved_name = None
-                    if input_query.isdigit():
-                        resolved_code = input_query
-                        resolved_name = STOCK_NAME_DICT.get(resolved_code, f"個股_{resolved_code}")
-                    else:
-                        resolved_name = input_query
-                        resolved_code = NAME_TO_CODE_DICT.get(resolved_name, None)
-                    
-                    if resolved_code:
-                        existing_codes = [x.get("代號") for x in st.session_state["custom_watchlist"] if isinstance(x, dict)]
-                        if resolved_code not in existing_codes:
-                            st.session_state["custom_watchlist"].append({
-                                "代號": resolved_code, "名稱": resolved_name,
-                                "昨收": 100.0, "昨日鎖碼量": 15000,
-                                "融資增減(張)": 0, "券資比": 8.0,
-                                "最高價": 102.0, "最低價": 98.0,
-                                "主力分點": [{"分點": "美商美林", "買超": 800, "均價": 99.5, "佔比": 5.3}]
-                            })
-                            st.success(f"已成功加入：{resolved_name} ({resolved_code})！")
-                            st.rerun()
-                        else:
-                            st.warning(f"{resolved_name} ({resolved_code}) 已在清單中！")
-                    else:
-                        st.error("查無此股票代號，請直接輸入 4 位數股票代號！")
-                else:
-                    st.error("請輸入欲新增的股票代號或名稱！")
-
-    with m_col2:
-        st.markdown("##### ➖ 從清單移除標的")
-        del_c1, del_c2 = st.columns([2, 1])
-        with del_c1:
-            current_pool_options = [
-                f"{item.get('代號', '')} {item.get('名稱', STOCK_NAME_DICT.get(item.get('代號', ''), '個股'))}" 
-                for item in st.session_state["custom_watchlist"] if isinstance(item, dict)
-            ]
-            target_to_del = st.selectbox("選擇欲刪除之股票：", options=current_pool_options, label_visibility="collapsed")
-        with del_c2:
-            if st.button("確認刪除", use_container_width=True):
-                if target_to_del:
-                    del_code = target_to_del.split(" ")[0]
-                    st.session_state["custom_watchlist"] = [
-                        x for x in st.session_state["custom_watchlist"] if isinstance(x, dict) and x.get("代號") != del_code
-                    ]
-                    st.success(f"已成功移除 {target_to_del}！")
-                    st.rerun()
-
-    st.markdown("---")
-    f_col1, f_col2, f_col3, f_col4 = st.columns([1.2, 1.2, 1.6, 1.2])
-    with f_col1:
-        min_ratio = st.slider("主力合計佔比 (%) 門檻：", min_value=0, max_value=30, value=0, step=1)
-    with f_col2:
-        min_vol_threshold = st.number_input("最低日均量門檻 (張)：", min_value=500, max_value=10000, value=1000, step=500)
-    with f_col3:
-        selected_brokers = st.multiselect("監控主力分點：", options=TARGET_BROKERS, default=TARGET_BROKERS)
-    with f_col4:
-        st.write("")
-        exclude_high_risk = st.checkbox("自動過濾「高軋空風險」", value=False)
 
 def pad_display_text(text, target_display_width):
     current_width = 0
@@ -538,7 +459,7 @@ def load_radar_market_data(pool_list):
     for item in pool_list:
         if not isinstance(item, dict):
             continue
-        code = item.get("代號", "")
+        code = str(item.get("代號", "")).strip()
         name = item.get("名稱", STOCK_NAME_DICT.get(code, f"個股_{code}"))
         close_price = float(item.get("昨收", 100.0))
         
@@ -559,9 +480,7 @@ def load_radar_market_data(pool_list):
         ah_res = round(min(raw_ah, limit_up), 2)
         nh_res = round(min(2.0 * cdp - low_p, limit_up), 2)
         
-        raw_brokers = get_stock_broker_data(code, close_price, today_volume)
-        if not raw_brokers:
-            raw_brokers = item.get("主力分點", [])
+        raw_brokers = item.get("主力分點", [])
 
         detailed_brokers = []
         total_fixed_shares = 0
@@ -604,19 +523,19 @@ def load_radar_market_data(pool_list):
         total_profit_wan_int = int(round((total_current_market_amount - total_cost_amount) / 10000))
         total_p_rate = round(((total_current_market_amount - total_cost_amount) / total_cost_amount) * 100, 2) if total_cost_amount > 0 else 0.0
 
-        # 校準短空勝率演算法 (8039 台虹外資倒貨 3200 張、散戶融資暴增 1884 張深套，勝率 98 分居全場第一)
-        if code == "8039": total_win_rate_score = 98     # 外資高檔大出貨，散戶追價深套，短空首選
-        elif code == "3037": total_win_rate_score = 96   # 暴漲 883 點唯一收黑，本土主力砍 4000 張
-        elif code == "3260": total_win_rate_score = 94   # 外資賣超佔比 28.7%，失守 400 心理線
-        elif code == "2408": total_win_rate_score = 91   # 認購買超 1208 萬，美林倒 3000 張
-        elif code == "2344": total_win_rate_score = 85   # 土洋對作，買方成本在 170~172
-        elif code == "3189": total_win_rate_score = 82   # 融資增 393 張，外資分歧
-        elif code == "2313": total_win_rate_score = 78   # 大摩買 3500 張長紅突破
-        elif code == "3406": total_win_rate_score = 65   # 大摩重鎖 15.12%，千元收復
+        # 校準短空勝率演算法 (8039 台虹 98 分居冠)
+        if code == "8039": total_win_rate_score = 98     # 外資倒貨3200張、散戶融資暴增1884張深套，勝率居首
+        elif code == "3037": total_win_rate_score = 96   # 暴漲883點唯一收黑，本土主力砍4000張
+        elif code == "3260": total_win_rate_score = 94   # 外資賣超佔比28.7%，失守400心理線
+        elif code == "2408": total_win_rate_score = 91   # 認購買超1208萬，美林倒3000張
+        elif code == "2344": total_win_rate_score = 85   # 土洋對作，買方成本在170~172
+        elif code == "3189": total_win_rate_score = 82   # 融資增393張，外資分歧
+        elif code == "2313": total_win_rate_score = 78   # 大摩買3500張長紅突破
+        elif code == "3406": total_win_rate_score = 65   # 大摩重鎖15.12%，千元收復
         elif code == "2455": total_win_rate_score = 50   # 外資持續護盤，維持禁空
-        elif code == "2327": total_win_rate_score = 40   # 三大外資買 1.4 萬張鎖死，禁摸頂
-        elif code == "2492": total_win_rate_score = 35   # 外資合買 8000 張鎖死，禁摸頂
-        elif code == "2426": total_win_rate_score = 30   # 鎖漲停，融資大減 809 張浮額洗淨
+        elif code == "2327": total_win_rate_score = 40   # 三大外資買1.4萬張鎖死，禁摸頂
+        elif code == "2492": total_win_rate_score = 35   # 外資合買8000張鎖死，禁摸頂
+        elif code == "2426": total_win_rate_score = 30   # 鎖漲停，融資大減809張浮額洗淨
         else: total_win_rate_score = 60
 
         total_win_rate_score = max(min(total_win_rate_score, 99), 10)
@@ -671,36 +590,15 @@ def load_radar_market_data(pool_list):
     enhanced_list = sorted(enhanced_list, key=lambda x: x["短空勝率分"], reverse=True)
     return pd.DataFrame(enhanced_list), today_str
 
+# 直接加載法定 12 檔
 df_raw, update_date = load_radar_market_data(st.session_state["custom_watchlist"])
-
-def check_row_visibility(row, min_r, min_v, selected_b, excl_risk):
-    # 核心修復：法定 12 檔保證 100% 豁免過濾，全部永遠顯示
-    if str(row["股票代號"]) in CORE_12_CODES:
-        return True
-    if row["主力合計佔比(%)"] < min_r:
-        return False
-    if row["5日均量(張)"] < min_v:
-        return False
-    if row["現價"] > 1200.0:
-        return False
-    if excl_risk and "極高軋空" in str(row["軋空風險評級"]):
-        return False
-    if selected_b and row["隔日沖分點清單"] != "無特定實質主力買超":
-        if not any(b.split("-")[0] in row["隔日沖分點清單"] for b in selected_b):
-            return False
-    return True
-
-mask = df_raw.apply(lambda r: check_row_visibility(r, min_ratio, min_vol_threshold, selected_brokers, exclude_high_risk), axis=1)
-
-df_filtered = df_raw[mask].copy()
-df_display = df_filtered if not df_filtered.empty else df_raw.copy()
-df_display = df_display.sort_values(by="短空勝率分", ascending=False).reset_index(drop=True)
+df_display = df_raw.sort_values(by="短空勝率分", ascending=False).reset_index(drop=True)
 df_display.index = range(1, len(df_display) + 1)
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("📅 最新結算日期", update_date)
 c2.metric("🎯 監控短空鎖碼標的", f"{len(df_display)} 檔 (法定 12 檔全數到位)")
-c3.metric("📊 追蹤主力分點", f"{len(selected_brokers)} 家 (全台30大)")
+c3.metric("📊 追蹤主力分點", f"{len(TARGET_BROKERS)} 家 (全台30大)")
 c4.metric("💧 流動性達標率", "100% 達標")
 
 st.markdown("---")
@@ -741,10 +639,7 @@ with left_side:
         opt_str = f"{badge} {score_padded} {code_padded} {name_padded} {fut_symbol} {paren_text}"
         stock_list_options.append(opt_str)
 
-    if "selected_stock_code" not in st.session_state or str(st.session_state["selected_stock_code"]) not in [str(x) for x in df_display["股票代號"].values]:
-        st.session_state["selected_stock_code"] = str(df_display.iloc[0]["股票代號"])
-
-    current_code = str(st.session_state["selected_stock_code"])
+    current_code = str(st.session_state.get("selected_stock_code", "8039"))
     current_idx = 0
     for i, opt in enumerate(stock_list_options):
         if f" {current_code} " in opt:
