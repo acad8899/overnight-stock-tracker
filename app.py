@@ -19,18 +19,18 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 期交所個股期貨支援名單 (過濾大於 1200 元超高價股，保留 3406 玉晶光，已剔除 6933)
+# 期交所個股期貨支援名單 (確保包含 8039 台虹)
 STOCK_FUTURES_SET = {
-    "2408", "3260", "2449", "3231", "2327", "2376", "6488", "2313", "2492",
+    "8039", "2408", "3260", "2449", "3231", "2327", "2376", "6488", "2313", "2492",
     "2330", "2317", "2454", "2382", "2603", "2609", "2344", "3037", "2368", "3017",
     "2383", "1519", "8210", "2059", "4551", "5289", "8299", "3406",
-    "2615", "8039", "5314", "2489", "3006", "2337", "8046", "2426", "2455", "3189",
+    "2615", "5314", "2489", "3006", "2337", "8046", "2426", "2455", "3189",
     "3374", "6239"
 }
 
-# 內建常用台股代號與名稱對照字典 (法定 12 檔池完全繼承)
+# 內建常用台股代號與名稱對照字典
 STOCK_NAME_DICT = {
-    "2327": "國巨*", "2455": "全新", "2492": "華新科", "8039": "台虹", "3189": "景碩",
+    "8039": "台虹", "2327": "國巨*", "2455": "全新", "2492": "華新科", "3189": "景碩",
     "3037": "欣興", "2408": "南亞科", "2313": "華通", "3406": "玉晶光", "2344": "華邦電",
     "2426": "鼎元", "3260": "威剛", "2615": "萬海", "2449": "京元電子",
     "3231": "緯創", "2489": "瑞軒", "6488": "環球晶", "2376": "技嘉", "2330": "台積電",
@@ -57,7 +57,7 @@ BROKER_DATA_CATALOG = [
 
 TARGET_BROKERS = [row[2] for row in BROKER_DATA_CATALOG]
 
-# 🎯 2026-09-04 官方融資券 × 權證小哥避險 × 主力分點最新校準資料庫 (法定 12 檔)
+# 🎯 2026-09-04 官方融資券 × 權證避險 × 主力分點最新校準資料庫 (包含 8039 台虹)
 DEFAULT_WATCHLIST = [
     {
         "代號": "8039", "名稱": "台虹", "昨收": 297.50, "昨日鎖碼量": 40392, "融資增減(張)": 1884, "券資比": 4.9, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
@@ -242,14 +242,14 @@ def auto_fetch_broker_data(stock_code, close_price, total_vol):
             return item.get("主力分點", [])
     return []
 
-# 強制重整 watchlist 快取確保最新 9/4 官方數據生效
+# 強制重整快取
 if "custom_watchlist" not in st.session_state or len(st.session_state.get("custom_watchlist", [])) != len(DEFAULT_WATCHLIST):
     st.session_state["custom_watchlist"] = DEFAULT_WATCHLIST
 
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
     st.title("🎯 每日隔日沖主力短空雷達 (全自動AI智慧旗艦版)")
-    st.caption("🔥 2026-09-04 盤後官方融資融券與避險籌碼校準完畢！準備 09/07 (Round 3) 實戰狙擊。")
+    st.caption("🔥 2026-09-04 盤後官方融資券 × 權證避險校準完畢！8039 台虹短空首選鎖定。")
 with head_col2:
     st.write("")
     if st.button("🔄 全自動同步盤後主力與行情", use_container_width=True):
@@ -668,8 +668,8 @@ def load_radar_market_data(pool_list):
         total_profit_wan_int = int(round((total_current_market_amount - total_cost_amount) / 10000))
         total_p_rate = round(((total_current_market_amount - total_cost_amount) / total_cost_amount) * 100, 2) if total_cost_amount > 0 else 0.0
 
-        # 校準短空勝率演算法 (9/4 官方最新校準：融資暴增+外資出貨 8039/3037 居首，漲停鎖死降評)
-        if code == "8039": total_win_rate_score = 98     # 外資倒3200張，融資暴增+1884張全套
+        # 校準短空勝率演算法 (8039 台虹外資倒 3200 張、散戶融資暴增 1884 張深套，拔得頭籌)
+        if code == "8039": total_win_rate_score = 98     # 外資高檔大出貨，散戶追價深套，短空首選
         elif code == "3037": total_win_rate_score = 96   # 暴漲883點唯一收黑，本土主力砍4000張
         elif code == "3260": total_win_rate_score = 94   # 外資賣超佔比28.7%，失守400心理線
         elif code == "2408": total_win_rate_score = 91   # 認購買超1208萬，美林倒3000張
