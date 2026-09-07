@@ -19,8 +19,8 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 🚀 強制版本控制破除 Streamlit 舊快取
-DATA_VERSION = "20260904_R3_FINAL"
+# 🚀 強制版本控制金鑰：更新即可徹底清除 Streamlit Session 舊快取
+DATA_VERSION = "20260908_R4_LOCKED"
 
 # 期交所個股期貨支援名單
 STOCK_FUTURES_SET = {
@@ -31,18 +31,16 @@ STOCK_FUTURES_SET = {
     "3374", "6239"
 }
 
-# 內建常用台股代號與名稱對照字典
+# 內建台股代號與名稱對照字典
 STOCK_NAME_DICT = {
-    "8039": "台虹", "2327": "國巨*", "2455": "全新", "2492": "華新科", "3189": "景碩",
-    "3037": "欣興", "2408": "南亞科", "2313": "華通", "3406": "玉晶光", "2344": "華邦電",
-    "2426": "鼎元", "3260": "威剛", "2615": "萬海", "2449": "京元電子",
-    "3231": "緯創", "2489": "瑞軒", "6488": "環球晶", "2376": "技嘉", "2330": "台積電",
-    "2317": "鴻海", "2454": "聯發科", "2382": "廣達", "2603": "長榮", "2368": "金像電",
-    "3017": "奇鋐", "2383": "台光電", "5314": "世紀*", "2059": "川湖", "6239": "力成"
+    "2313": "華通", "2426": "鼎元", "8039": "台虹", "3189": "景碩", "3406": "玉晶光",
+    "2455": "全新", "3037": "欣興", "3260": "威剛", "2408": "南亞科", "2327": "國巨*",
+    "2492": "華新科", "2344": "華邦電", "2303": "聯電", "3008": "大立光", "5274": "信驊",
+    "2330": "台積電", "2317": "鴻海", "2454": "聯發科", "2382": "廣達", "2603": "長榮"
 }
 
 NAME_TO_CODE_DICT = {v: k for k, v in STOCK_NAME_DICT.items()}
-TPEX_STOCKS = {"3260", "6488", "8299", "5289", "3211", "5483", "8112", "6213", "5314", "3105", "3374"}
+TPEX_STOCKS = {"3260", "6488", "8299", "5289", "3211", "5483", "8112", "6213", "5314", "3105", "3374", "5274"}
 
 # 30 大隔日沖主力名冊
 BROKER_DATA_CATALOG = [
@@ -52,138 +50,151 @@ BROKER_DATA_CATALOG = [
     [4, "外資量化", "台灣摩根士丹利", "中大型高價股、IC設計", "早盤拉抬後尾盤鎖單，具備較高部位容忍度", "開盤先拉高營造強勢假象，隨後反手市價灌單", "觀察「假衝高誘多」，5分K 留長上影線果斷摸頂"],
     [5, "外資量化", "美商高盛", "晶圓代工、蘋果供應鏈", "國際資金與量化混合，點火通常伴隨現貨放量", "早盤直接出清昨日部位，極少留倉隔日", "順勢跟空，注意券資比過高標的避免被軋"],
     [6, "凱基軍團", "凱基-台北", "全市場強勢飆股、主流龍頭", "號稱隔日沖總舵主，動輒數千張連敲硬鎖漲停", "09:00～09:10 市價大單瘋狂倒貨，破線後絕不回頭", "早盤衝高滯漲第一順位狙擊目標，勝率極高"],
-    [7, "凱基軍團", "凱基-站前", "強勢突破股、集團股", "擅長關鍵點位重鎖，常與外資聯動進出", "早盤迅速宣洩持倉，跌破成本即不再護盤", "開盤見爆量黑K直接順勢短空"],
+    [7, "凱基軍團", "凱基-信義", "強勢突破飆股、關鍵重鎖", "擅長漲停板排隊重鎖，次日早盤開高反手傾瀉", "開盤開高衝刺後若現急單倒貨，破開盤價順勢跟空", "配合現貨量能竭盡放空，勝率極高"],
     [8, "雙北核心", "元大", "權值股、強勢鎖碼股", "資金規模龐大，通常兼具造市與短線交易", "早盤均勻出脫，若遇大盤偏弱則加速倒貨", "適合穩健型短空，獲利空間約 1.5%～3%"],
-    [9, "雙北核心", "國票-敦北法人", "機構大戶、高價主流股", "大部位集中進出，拉抬時常伴隨極大成交額", "早盤出貨節奏較慢，分批大單掛賣壓制盤面", "觀察 VWAP 均價線下方的大單壓盤，偏空操作"],
+    [9, "雙北核心", "富邦", "大型權值股、強勢轉折股", "主導單一飆股隔日沖，具備極強定價破壞力", "早盤開盤即分批倒貨，一旦翻黑絕不留戀", "跌破當日開盤價與均線為最標準空點"],
     [10, "雙北核心", "國泰-敦南", "車用電子、重電題材股", "擅長波段與隔日沖混搭，量大時多為隔日沖", "開高後連續出脫，若遇大盤偏弱則加速倒貨", "配合大盤偏弱盤勢時放空，勝率大幅提升"]
 ]
 
 TARGET_BROKERS = [row[2] for row in BROKER_DATA_CATALOG]
 
-# 🎯 2026-09-04 官方盤後精準校準資料庫 (法定完整 12 檔，8039 台虹置首)
+# 🎯 2026-09-07 盤後官方融資券 × 權證避險 × 主力分點最新校準資料庫 (Round 4 法定 12 檔)
 DEFAULT_WATCHLIST = [
     {
-        "代號": "8039", "名稱": "台虹", "昨收": 297.50, "昨日鎖碼量": 40392, "融資增減(張)": 1884, "券資比": 4.9, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
-        "最高價": 321.00, "最低價": 295.50,
+        "代號": "2313", "名稱": "華通", "昨收": 240.00, "昨日鎖碼量": 56818, "融資增減(張)": 2954, "券資比": 4.1, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
+        "最高價": 258.00, "最低價": 239.00,
         "主力分點": [
-            {"分點": "統一", "買超": 682, "均價": 310.80, "佔比": 1.69},
-            {"分點": "永豐金-內湖", "買超": 320, "均價": 311.03, "佔比": 0.79},
-            {"分點": "永豐金-信義", "買超": 235, "均價": 308.20, "佔比": 0.58}
+            {"分點": "台灣摩根士丹利", "買超": -5860, "均價": 245.07, "佔比": -10.31},
+            {"分點": "元大", "買超": -4153, "均價": 245.44, "佔比": -7.31},
+            {"分點": "美商高盛", "買超": -3191, "均價": 244.64, "佔比": -5.62},
+            {"分點": "新加坡商瑞銀", "買超": -2311, "均價": 243.39, "佔比": -4.07},
+            {"分點": "凱基-台北", "買超": -1916, "均價": 247.66, "佔比": -3.37}
         ]
     },
     {
-        "代號": "3037", "名稱": "欣興", "昨收": 902.00, "昨日鎖碼量": 40890, "融資增減(張)": 575, "券資比": 5.0, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
-        "最高價": 940.00, "最低價": 873.00,
+        "代號": "2426", "名稱": "鼎元", "昨收": 99.10, "昨日鎖碼量": 61028, "融資增減(張)": 602, "券資比": 3.2, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
+        "最高價": 109.50, "最低價": 99.10,
         "主力分點": [
-            {"分點": "台灣摩根士丹利", "買超": 1851, "均價": 893.09, "佔比": 4.53},
-            {"分點": "摩根大通", "買超": 1098, "均價": 891.06, "佔比": 2.69},
-            {"分點": "新加坡商瑞銀", "買超": 915, "均價": 893.89, "佔比": 2.24}
+            {"分點": "美商高盛", "買超": -3651, "均價": 103.62, "佔比": -5.98},
+            {"分點": "台灣摩根士丹利", "買超": -3131, "均價": 103.53, "佔比": -5.13},
+            {"分點": "摩根大通", "買超": -1686, "均價": 103.09, "佔比": -2.76},
+            {"分點": "元大", "買超": -1421, "均價": 104.98, "佔比": -2.33},
+            {"分點": "港商野村", "買超": -1210, "均價": 102.61, "佔比": -1.98}
         ]
     },
     {
-        "代號": "3260", "名稱": "威剛", "昨收": 400.50, "昨日鎖碼量": 4877, "融資增減(張)": 114, "券資比": 4.2, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
-        "最高價": 404.50, "最低價": 390.50,
+        "代號": "8039", "名稱": "台虹", "昨收": 327.00, "昨日鎖碼量": 22298, "融資增減(張)": 608, "券資比": 5.2, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
+        "最高價": 327.00, "最低價": 306.00,
         "主力分點": [
-            {"分點": "合庫", "買超": 272, "均價": 397.82, "佔比": 5.58},
-            {"分點": "永豐金", "買超": 129, "均價": 395.04, "佔比": 2.65},
-            {"分點": "元大", "買超": 110, "均價": 398.15, "佔比": 2.26}
+            {"分點": "富邦", "買超": 2258, "均價": 326.78, "佔比": 10.13},
+            {"分點": "凱基-信義", "買超": 1494, "均價": 327.00, "佔比": 6.70},
+            {"分點": "統一", "買超": 671, "均價": 326.68, "佔比": 3.01},
+            {"分點": "凱基-台北", "買超": 545, "均價": 321.83, "佔比": 2.44}
         ]
     },
     {
-        "代號": "2408", "名稱": "南亞科", "昨收": 496.00, "昨日鎖碼量": 75118, "融資增減(張)": 360, "券資比": 3.0, "權證認售(萬)": -81, "權證賣認購(萬)": -1208,
-        "最高價": 496.00, "最低價": 470.00,
+        "代號": "3189", "名稱": "景碩", "昨收": 813.00, "昨日鎖碼量": 17014, "融資增減(張)": 642, "券資比": 4.5, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
+        "最高價": 831.00, "最低價": 805.00,
         "主力分點": [
-            {"分點": "新加坡商瑞銀", "買超": 1815, "均價": 486.34, "佔比": 2.42},
-            {"分點": "元大-松江", "買超": 1745, "均價": 492.95, "佔比": 2.32},
-            {"分點": "富邦-虎尾", "買超": 1101, "均價": 479.47, "佔比": 1.47}
+            {"分點": "富邦", "買超": -559, "均價": 811.58, "佔比": -3.29},
+            {"分點": "摩根大通", "買超": -536, "均價": 816.77, "佔比": -3.15},
+            {"分點": "美商高盛", "買超": -496, "均價": 815.29, "佔比": -2.92},
+            {"分點": "元大", "買超": -451, "均價": 815.41, "佔比": -2.65},
+            {"分點": "新加坡商瑞銀", "買超": -410, "均價": 816.21, "佔比": -2.41}
         ]
     },
     {
-        "代號": "2344", "名稱": "華邦電", "昨收": 174.00, "昨日鎖碼量": 100505, "融資增減(張)": -58, "券資比": 2.5, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
-        "最高價": 176.00, "最低價": 165.50,
+        "代號": "3406", "名稱": "玉晶光", "昨收": 987.00, "昨日鎖碼量": 2303, "融資增減(張)": -141, "券資比": 5.1, "權證認售(萬)": -49, "權證賣認購(萬)": 0,
+        "最高價": 1040.00, "最低價": 961.00,
         "主力分點": [
-            {"分點": "元大-松江", "買超": 2936, "均價": 170.24, "佔比": 2.92},
-            {"分點": "香港上海滙豐", "買超": 2651, "均價": 170.48, "佔比": 2.64},
-            {"分點": "新加坡商瑞銀", "買超": 2337, "均價": 172.06, "佔比": 2.33}
+            {"分點": "台灣摩根士丹利", "買超": 100, "均價": 986.54, "佔比": 4.34},
+            {"分點": "國泰", "買超": -91, "均價": 986.27, "佔比": -3.95},
+            {"分點": "凱基-台北", "買超": -68, "均價": 1005.99, "佔比": -2.95}
         ]
     },
     {
-        "代號": "3189", "名稱": "景碩", "昨收": 819.00, "昨日鎖碼量": 19778, "融資增減(張)": 393, "券資比": 4.2, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
-        "最高價": 828.00, "最低價": 766.00,
+        "代號": "2455", "名稱": "全新", "昨收": 500.00, "昨日鎖碼量": 3476, "融資增減(張)": -627, "券資比": 5.9, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
+        "最高價": 525.00, "最低價": 491.00,
         "主力分點": [
-            {"分點": "元大", "買超": 934, "均價": 803.19, "佔比": 4.72},
-            {"分點": "美商高盛", "買超": 793, "均價": 797.02, "佔比": 4.01},
-            {"分點": "台灣摩根士丹利", "買超": 457, "均價": 799.56, "佔比": 2.31}
+            {"分點": "美林", "買超": 323, "均價": 506.75, "佔比": 9.29},
+            {"分點": "富邦", "買超": -406, "均價": 496.91, "佔比": -11.68},
+            {"分點": "富邦-陽明", "買超": -190, "均價": 503.15, "佔比": -5.47}
         ]
     },
     {
-        "代號": "2313", "名稱": "華通", "昨收": 249.50, "昨日鎖碼量": 51923, "融資增減(張)": 161, "券資比": 4.0, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
-        "最高價": 255.00, "最低價": 238.00,
+        "代號": "3037", "名稱": "欣興", "昨收": 949.00, "昨日鎖碼量": 21830, "融資增減(張)": -377, "券資比": 4.8, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
+        "最高價": 965.00, "最低價": 911.00,
         "主力分點": [
-            {"分點": "台灣摩根士丹利", "買超": 3504, "均價": 249.78, "佔比": 6.75},
-            {"分點": "美商高盛", "買超": 1120, "均價": 251.62, "佔比": 2.16}
+            {"分點": "美林", "買超": 1392, "均價": 945.50, "佔比": 6.27},
+            {"分點": "台灣摩根士丹利", "買超": 522, "均價": 943.98, "佔比": 2.35},
+            {"分點": "摩根大通", "買超": -439, "均價": 948.80, "佔比": -1.98}
         ]
     },
     {
-        "代號": "2455", "名稱": "全新", "昨收": 528.00, "昨日鎖碼量": 24125, "融資增減(張)": -9, "券資比": 6.2, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
-        "最高價": 548.00, "最低價": 492.50,
+        "代號": "3260", "名稱": "威剛", "昨收": 412.00, "昨日鎖碼量": 6454, "融資增減(張)": -405, "券資比": 3.8, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
+        "最高價": 419.00, "最低價": 410.00,
         "主力分點": [
-            {"分點": "台灣摩根士丹利", "買超": 1135, "均價": 512.13, "佔比": 4.70},
-            {"分點": "美林", "買超": 841, "均價": 520.67, "佔比": 3.49}
+            {"分點": "台灣摩根士丹利", "買超": 791, "均價": 413.96, "佔比": 12.26},
+            {"分點": "美商高盛", "買超": 774, "均價": 414.05, "佔比": 11.99},
+            {"分點": "新加坡商瑞銀", "買超": 305, "均價": 415.58, "佔比": 4.73}
         ]
     },
     {
-        "代號": "3406", "名稱": "玉晶光", "昨收": 1055.00, "昨日鎖碼量": 2626, "融資增減(張)": 159, "券資比": 5.4, "權證認售(萬)": 34, "權證賣認購(萬)": -1013,
-        "最高價": 1070.00, "最低價": 962.00,
+        "代號": "2408", "南亞科": "南亞科", "名稱": "南亞科", "昨收": 517.00, "昨日鎖碼量": 57088, "融資增減(張)": -644, "券資比": 2.8, "權證認售(萬)": 71, "權證賣認購(萬)": -1271,
+        "最高價": 525.00, "最低價": 508.00,
         "主力分點": [
-            {"分點": "台灣摩根士丹利", "買超": 397, "均價": 1013.38, "佔比": 15.12},
-            {"分點": "美商高盛", "買超": 110, "均價": 1014.07, "佔比": 4.19}
+            {"分點": "台灣摩根士丹利", "買超": 3235, "均價": 517.79, "佔比": 5.67},
+            {"分點": "美商高盛", "買超": 2689, "均價": 518.81, "佔比": 4.71},
+            {"分點": "凱基-台北", "買超": 2270, "均價": 518.53, "佔比": 3.98}
         ]
     },
     {
-        "代號": "2327", "名稱": "國巨*", "昨收": 562.00, "昨日鎖碼量": 57702, "融資增減(張)": 1185, "券資比": 3.6, "權證認售(萬)": 218, "權證賣認購(萬)": 0,
-        "最高價": 562.00, "最低價": 532.00,
+        "代號": "2327", "名稱": "國巨*", "昨收": 589.00, "昨日鎖碼量": 71286, "融資增減(張)": 5567, "券資比": 3.4, "權證認售(萬)": 239, "權證賣認購(萬)": 1245,
+        "最高價": 605.00, "最低價": 570.00,
         "主力分點": [
-            {"分點": "台灣摩根士丹利", "買超": 6598, "均價": 550.68, "佔比": 11.43},
-            {"分點": "美商高盛", "買超": 3948, "均價": 550.07, "佔比": 6.84},
-            {"分點": "新加坡商瑞銀", "買超": 3634, "均價": 550.95, "佔比": 6.30}
+            {"分點": "港商麥格理", "買超": 3147, "均價": 588.56, "佔比": 4.41},
+            {"分點": "富邦-新店", "買超": 2753, "均價": 591.05, "佔比": 3.86},
+            {"分點": "摩根大通", "買超": 2313, "均價": 589.21, "佔比": 3.24}
         ]
     },
     {
-        "代號": "2492", "名稱": "華新科", "昨收": 298.50, "昨日鎖碼量": 27375, "融資增減(張)": -560, "券資比": 3.1, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
-        "最高價": 298.50, "最低價": 282.50,
+        "代號": "2492", "名稱": "華新科", "昨收": 323.00, "昨日鎖碼量": 47400, "融資增減(張)": 962, "券資比": 3.0, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
+        "最高價": 328.00, "最低價": 309.50,
         "主力分點": [
-            {"分點": "美商高盛", "買超": 2296, "均價": 294.01, "佔比": 8.39},
-            {"分點": "台灣摩根士丹利", "買超": 2225, "均價": 294.46, "佔比": 8.13},
-            {"分點": "新加坡商瑞銀", "買超": 2091, "均價": 294.18, "佔比": 7.64}
+            {"分點": "美商高盛", "買超": 2927, "均價": 321.54, "佔比": 6.18},
+            {"分點": "台灣摩根士丹利", "買超": 1597, "均價": 321.05, "佔比": 3.37},
+            {"分點": "摩根大通", "買超": 990, "均價": 321.61, "佔比": 2.09}
         ]
     },
     {
-        "代號": "2426", "名稱": "鼎元", "昨收": 104.50, "昨日鎖碼量": 62192, "融資增減(張)": -809, "券資比": 2.9, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
-        "最高價": 104.50, "最低價": 95.20,
+        "代號": "2344", "名稱": "華邦電", "昨收": 180.00, "昨日鎖碼量": 118922, "融資增減(張)": -2876, "券資比": 2.2, "權證認售(萬)": 35, "權證賣認購(萬)": 0,
+        "最高價": 183.50, "最低價": 178.00,
         "主力分點": [
-            {"分點": "美商高盛", "買超": 2870, "均價": 102.50, "佔比": 4.61},
-            {"分點": "台灣摩根士丹利", "買超": 2756, "均價": 102.14, "佔比": 4.43},
-            {"分點": "摩根大通", "買超": 2333, "均價": 102.40, "佔比": 3.75}
+            {"分點": "元大", "買超": 9031, "均價": 180.93, "佔比": 7.59},
+            {"分點": "新加坡商瑞銀", "買超": 8610, "均價": 181.17, "佔比": 7.24},
+            {"分點": "摩根大通", "買超": 7690, "均價": 181.28, "佔比": 6.47},
+            {"分點": "美林", "買超": 7266, "均價": 181.09, "佔比": 6.11},
+            {"分點": "美商高盛", "買超": 6584, "均價": 180.92, "佔比": 5.54},
+            {"分點": "台灣摩根士丹利", "買超": 5925, "均價": 181.14, "佔比": 4.98}
         ]
     }
 ]
 
-# 🔥 終極殺手鐧：暴力覆寫 Session，徹底粉碎任何舊版瀏覽器快取！
-if st.session_state.get("APP_VERSION_KEY") != DATA_VERSION:
+# 🔥 核心快取覆寫機制
+if st.session_state.get("APP_DATA_VERSION") != DATA_VERSION:
     st.session_state["custom_watchlist"] = DEFAULT_WATCHLIST
-    st.session_state["APP_VERSION_KEY"] = DATA_VERSION
-    st.session_state["selected_stock_code"] = "8039"
+    st.session_state["APP_DATA_VERSION"] = DATA_VERSION
+    st.session_state["selected_stock_code"] = "2313"
 
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
     st.title("🎯 每日隔日沖主力短空雷達 (全自動AI智慧旗艦版)")
-    st.caption("🔥 2026-09-04 盤後官方融資券 × 權證避險校準完畢！8039 台虹短空首選鎖定。")
+    st.caption("🔥 2026-09-07 盤後官方融資券 × 權證避險 × 分點資料庫完整封存！9/8 Round 4 正式鎖定。")
 with head_col2:
     st.write("")
-    if st.button("🔄 強制重整法定 12 檔資料庫", use_container_width=True):
+    if st.button("🔄 強制重整 R4 盤後資料庫", use_container_width=True):
         st.session_state["custom_watchlist"] = DEFAULT_WATCHLIST
-        st.session_state["selected_stock_code"] = "8039"
+        st.session_state["selected_stock_code"] = "2313"
         st.cache_data.clear()
         st.rerun()
 
@@ -453,7 +464,7 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
     return custom_component_html
 
 def load_radar_market_data(pool_list):
-    today_str = "2026-09-04"
+    today_str = "2026-09-07"
     enhanced_list = []
     
     for item in pool_list:
@@ -493,7 +504,7 @@ def load_radar_market_data(pool_list):
                 b_name = b_item.get("分點", "主力分點")
                 b_fixed_vol = int(b_item.get("買超", 0))
                 b_cost = float(b_item.get("均價", close_price))
-                b_ratio = float(b_item.get("佔比", round((b_fixed_vol / max(today_volume, 1)) * 100, 2)))
+                b_ratio = float(b_item.get("佔比", round((abs(b_fixed_vol) / max(today_volume, 1)) * 100, 2)))
             else:
                 continue
             
@@ -502,16 +513,16 @@ def load_radar_market_data(pool_list):
             p_rate = round((profit_per_share / b_cost) * 100, 2) if b_cost > 0 else 0.0
             
             total_fixed_shares += b_fixed_vol
-            total_cost_amount += b_cost * b_fixed_vol * 1000
-            total_current_market_amount += close_price * b_fixed_vol * 1000
+            total_cost_amount += b_cost * abs(b_fixed_vol) * 1000
+            total_current_market_amount += close_price * abs(b_fixed_vol) * 1000
             total_ratio += b_ratio
             
-            if p_rate >= 1.0:
-                broker_intent = "🔴 極高 (獲利滿載)"
-            elif p_rate >= -0.5:
-                broker_intent = "🟡 普通 (小賺保本)"
+            if b_fixed_vol < 0:
+                broker_intent = "🟢 拋售 (主力清倉出貨)"
+            elif p_rate >= 1.0:
+                broker_intent = "🔴 極高 (獲利滿載/隔日沖)"
             else:
-                broker_intent = "🟢 套牢 (小賠/停損出貨)"
+                broker_intent = "🟡 普通 (平盤保本)"
 
             detailed_brokers.append({
                 "分點名稱": b_name, "買超張數": b_fixed_vol, "佔比(%)": b_ratio,
@@ -519,52 +530,53 @@ def load_radar_market_data(pool_list):
                 "報酬率(%)": p_rate, "倒貨意願": broker_intent
             })
             
-        avg_cost = round(total_cost_amount / (total_fixed_shares * 1000), 2) if total_fixed_shares > 0 else close_price
+        abs_shares = sum([abs(int(b.get("買超", 0))) for b in raw_brokers])
+        avg_cost = round(total_cost_amount / (abs_shares * 1000), 2) if abs_shares > 0 else close_price
         total_profit_wan_int = int(round((total_current_market_amount - total_cost_amount) / 10000))
         total_p_rate = round(((total_current_market_amount - total_cost_amount) / total_cost_amount) * 100, 2) if total_cost_amount > 0 else 0.0
 
-        # 校準短空勝率演算法 (8039 台虹 98 分居冠)
-        if code == "8039": total_win_rate_score = 98     # 外資倒貨3200張、散戶融資暴增1884張深套，勝率居首
-        elif code == "3037": total_win_rate_score = 96   # 暴漲883點唯一收黑，本土主力砍4000張
-        elif code == "3260": total_win_rate_score = 94   # 外資賣超佔比28.7%，失守400心理線
-        elif code == "2408": total_win_rate_score = 91   # 認購買超1208萬，美林倒3000張
-        elif code == "2344": total_win_rate_score = 85   # 土洋對作，買方成本在170~172
-        elif code == "3189": total_win_rate_score = 82   # 融資增393張，外資分歧
-        elif code == "2313": total_win_rate_score = 78   # 大摩買3500張長紅突破
-        elif code == "3406": total_win_rate_score = 65   # 大摩重鎖15.12%，千元收復
-        elif code == "2455": total_win_rate_score = 50   # 外資持續護盤，維持禁空
-        elif code == "2327": total_win_rate_score = 40   # 三大外資買1.4萬張鎖死，禁摸頂
-        elif code == "2492": total_win_rate_score = 35   # 外資合買8000張鎖死，禁摸頂
-        elif code == "2426": total_win_rate_score = 30   # 鎖漲停，融資大減809張浮額洗淨
-        else: total_win_rate_score = 60
+        # 🎯 2026/09/07 盤後官方短空勝率演算法核心標定 (9/8 R4 實戰)
+        if code == "2313": total_win_rate_score = 99     # 外資倒貨1.7萬張 + 融資暴增2,954張，破底多殺多首選
+        elif code == "2426": total_win_rate_score = 98   # 外資合倒1.1萬張，跌破百元長黑K，買盤全為散戶接刀
+        elif code == "8039": total_win_rate_score = 95   # 隔日沖富邦/凱基台北鎖碼5000張，早盤開高必有慣性倒貨
+        elif code == "3189": total_win_rate_score = 92   # 外資小摩高盛全數翻空賣超，融資增642張
+        elif code == "3406": total_win_rate_score = 88   # 大立光跌停提款效應，失守千元大關，接盤薄弱
+        elif code == "2455": total_win_rate_score = 75   # 富邦大賣，失守500大關，回抽測壓
+        elif code == "3037": total_win_rate_score = 55   # 美林買超1392張逆勢反彈，震盪偏多
+        elif code == "3260": total_win_rate_score = 40   # 大摩高盛買超24%鎖碼，融資減，嚴禁做空
+        elif code == "2408": total_win_rate_score = 35   # 大摩高盛凱基台北大買8000張，嚴禁摸頂
+        elif code == "2327": total_win_rate_score = 25   # 融資暴增5567張 + 認購權證大買1245萬，極高軋空
+        elif code == "2492": total_win_rate_score = 20   # 高盛大摩持續買超護盤，多頭主升段禁空
+        elif code == "2344": total_win_rate_score = 15   # 六大外資暴買4.5萬張，融資大減2876張，絕對禁空
+        else: total_win_rate_score = 50
 
         total_win_rate_score = max(min(total_win_rate_score, 99), 10)
 
-        # 盤前訊號定調
-        if code in ["2327", "2492", "2426", "2455"]:
+        # 盤前信號定調
+        if code in ["2327", "2492", "2344", "2408", "3260"]:
             short_alert_tag = "🛑 NO SHORT"
-            full_alert_desc = f"🛑【強勢鎖碼禁摸頂】{name} 外資重倉鎖死或籌碼乾淨，嚴禁左側逆勢放空"
+            full_alert_desc = f"🛑【極高軋空嚴禁摸頂】{name} 法人重倉鎖死或融資大減浮額洗淨，不可逆勢做空"
             alert_color = "#FF0000"
             risk_level = "🔴 極高軋空 (嚴禁做空)"
-            action_guide = "外資暴力鎖碼或浮額洗淨，不可逆勢摸頂。"
+            action_guide = "多頭主升段或外資強勢護盤，嚴禁逆勢摸頂。"
         elif total_win_rate_score >= 90:
             short_alert_tag = "⚡ 首選狙擊"
-            full_alert_desc = f"⚡【核心空方標的】散戶融資大追價/主力高檔出貨，5分K實體跌破順勢開空"
+            full_alert_desc = f"⚡【核心空方破綻】外資大倒貨 / 融資套牢踩踏，5分K實體跌破順勢開空"
             alert_color = "#00E5FF"
-            risk_level = "🟢 適合短空 (高集中度)"
-            action_guide = "散戶追價深套，早盤衝高不過昨收或破支撐即順勢擊發。"
+            risk_level = "🟢 適合短空 (出貨明確)"
+            action_guide = "外資倒貨且融資追價深套，跌破關鍵門檻順勢擊發。"
         else:
             short_alert_tag = "⚡ 次選待機"
-            full_alert_desc = "⚡【反抽測壓標的】等待反彈測主力加權成本或 VWAP 壓力不過放空"
+            full_alert_desc = "⚡【反抽測壓標的】等待反彈測主力成本或 VWAP 不過時偏空放空"
             alert_color = "#00E5FF"
             risk_level = "🟡 觀察右側 (反彈測壓)"
-            action_guide = "等待反彈不過均價線偏空操作。"
+            action_guide = "等待反彈不過均線壓力偏空操作。"
 
         estimated_unloaded_shares = 0
         unloading_pct = 0
         unloading_status = "⏳ 待開盤 (籌碼鎖定中)"
         status_color = "#3399FF"
-        margin_status = "🔥 融資暴增 (散戶追價/易多殺多)" if margin_change >= 500 else ("🔥 融資增加 (浮額沉重)" if margin_change >= 200 else ("💧 融資退潮 (散戶離場/籌碼沉澱)" if margin_change <= -400 else "⚪ 融資平穩"))
+        margin_status = "🔥 融資暴增 (散戶接刀/多殺多)" if margin_change >= 1000 else ("🔥 融資增加 (浮額沉重)" if margin_change >= 400 else ("💧 融資退潮 (散戶離場/浮額洗淨)" if margin_change <= -400 else "⚪ 融資平穩"))
 
         has_fut = "期" if code in STOCK_FUTURES_SET else "—"
         broker_names_list = [b["分點名稱"] for b in detailed_brokers]
@@ -576,7 +588,7 @@ def load_radar_market_data(pool_list):
             "20MA": round(close_price * 0.985, 2), "CDP多空值": cdp, "近高壓力(NH)": nh_res,
             "最高壓力(AH)": ah_res, "融資增減(張)": margin_change, "融資力道評估": margin_status,
             "5日均量(張)": avg_5d_volume, "券資比(%)": short_ratio,
-            "隔日沖分點清單": "、".join(broker_names_list) if broker_names_list else "無特定實質主力買超",
+            "隔日沖分點清單": "、".join(broker_names_list) if broker_names_list else "無特定主力",
             "主力合計買超": total_fixed_shares,
             "主力合計佔比(%)": round(total_ratio, 2), "主力加權成本": avg_cost,
             "主力合計獲利(萬)": total_profit_wan_int, "主力合計報酬率(%)": total_p_rate,
@@ -590,16 +602,15 @@ def load_radar_market_data(pool_list):
     enhanced_list = sorted(enhanced_list, key=lambda x: x["短空勝率分"], reverse=True)
     return pd.DataFrame(enhanced_list), today_str
 
-# 直接加載法定 12 檔
 df_raw, update_date = load_radar_market_data(st.session_state["custom_watchlist"])
 df_display = df_raw.sort_values(by="短空勝率分", ascending=False).reset_index(drop=True)
 df_display.index = range(1, len(df_display) + 1)
 
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("📅 最新結算日期", update_date)
-c2.metric("🎯 監控短空鎖碼標的", f"{len(df_display)} 檔 (法定 12 檔全數到位)")
+c2.metric("🎯 監控短空鎖碼標的", f"{len(df_display)} 檔 (R4 法定全數到位)")
 c3.metric("📊 追蹤主力分點", f"{len(TARGET_BROKERS)} 家 (全台30大)")
-c4.metric("💧 流動性達標率", "100% 達標")
+c4.metric("💧 籌碼覆蓋率", "100% 官方校準")
 
 st.markdown("---")
 st.subheader("📊 盤後全市場隔日沖 × 主力成本 × 鎖碼決策表 (勝率降序排列)")
@@ -617,8 +628,8 @@ st.subheader("🖥️ 操盤工作台 (次日短空戰略視窗)")
 left_side, right_side = st.columns([1.35, 3.65], gap="medium")
 
 with left_side:
-    st.markdown("### 📋 明日短空鎖碼清單")
-    st.caption("💡 嚴格等寬對齊，可用鍵盤 **↑ / ↓ 鍵** 快速切換")
+    st.markdown("### 📋 R4 短空鎖碼清單")
+    st.caption("💡 依勝率排序，可用鍵盤 **↑ / ↓ 鍵** 快速切換")
     
     stock_list_options = []
     for rank, (_, r) in enumerate(df_display.iterrows(), 1):
@@ -639,7 +650,7 @@ with left_side:
         opt_str = f"{badge} {score_padded} {code_padded} {name_padded} {fut_symbol} {paren_text}"
         stock_list_options.append(opt_str)
 
-    current_code = str(st.session_state.get("selected_stock_code", "8039"))
+    current_code = str(st.session_state.get("selected_stock_code", "2313"))
     current_idx = 0
     for i, opt in enumerate(stock_list_options):
         if f" {current_code} " in opt:
@@ -685,8 +696,8 @@ with left_side:
             <span style="font-weight: bold; color: #FF4444; font-size: 14px;">{target_row['最高壓力(AH)']} 元</span>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
-            <span style="color: #AAAAAA;">明日主力可倒貨總量：</span>
-            <span style="font-weight: bold; color: #00FF66; font-size: 14px;">{target_row['主力合計買超']:,} 張 ({target_row['主力合計佔比(%)']}%)</span>
+            <span style="color: #AAAAAA;">主力淨進出總量：</span>
+            <span style="font-weight: bold; color: {'#FF4444' if target_row['主力合計買超'] >= 0 else '#00FF66'}; font-size: 14px;">{target_row['主力合計買超']:+,} 張</span>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
             <span style="color: #AAAAAA;">融資增減：</span>
@@ -724,9 +735,9 @@ with right_side:
     progress_html = f"""
     <div style="background-color: #1E1E1E; border: 1px solid #333; border-radius: 6px; padding: 10px 14px; margin-bottom: 12px;">
         <div style="display: flex; justify-content: space-between; font-size: 12px; color: #BBB; margin-bottom: 6px;">
-            <span>📦 主力鎖碼總量：<b style="color:#FFF;">{target_row['主力合計買超']:,} 張</b></span>
+            <span>📦 主力鎖碼/出貨量：<b style="color:#FFF;">{target_row['主力合計買超']:+,} 張</b></span>
             <span>📉 預估已倒出：<b style="color:{p_bar_color};">{target_row['已倒貨張數(估)']:,} 張</b></span>
-            <span>🔥 倒貨進度：<b style="color:{p_bar_color}; font-size:14px;">{unloading_val}%</b></span>
+            <span>🔥 出貨進度：<b style="color:{p_bar_color}; font-size:14px;">{unloading_val}%</b></span>
         </div>
         <div style="background-color: #333333; border-radius: 6px; height: 10px; width: 100%; overflow: hidden;">
             <div style="background-color: {p_bar_color}; height: 100%; width: {unloading_val}%; transition: width 0.4s ease;"></div>
@@ -756,7 +767,7 @@ with right_side:
         st.info("暫無此標的的走勢資料。")
 
     st.markdown("---")
-    st.markdown(f"#### 🏢 【{target_name} ({target_code})】各大主力分點今日盤後鎖碼持倉與明日倒貨評估")
+    st.markdown(f"#### 🏢 【{target_name} ({target_code})】各大主力分點今日盤後鎖碼/拋售明細")
     
     p_tot_wan_int = int(target_row['主力合計獲利(萬)'])
     p_tot_rate = float(target_row['主力合計報酬率(%)'])
@@ -766,19 +777,19 @@ with right_side:
     summary_cards_html = f"""
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 12px;">
         <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #3399FF;">
-            <div style="color:#888; font-size:11px; margin-bottom:2px;">📦 今日鎖碼總量</div>
-            <div style="color:#FFF; font-size:15px; font-weight:bold;">{target_row['主力合計買超']:,} 張</div>
+            <div style="color:#888; font-size:11px; margin-bottom:2px;">📦 今日主力淨進出</div>
+            <div style="color:{'#FF4444' if target_row['主力合計買超']>=0 else '#00FF66'}; font-size:15px; font-weight:bold;">{target_row['主力合計買超']:+,} 張</div>
         </div>
         <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #00E5FF;">
             <div style="color:#888; font-size:11px; margin-bottom:2px;">🎯 主力加權成本</div>
             <div style="color:#FFF; font-size:15px; font-weight:bold;">{target_row['主力加權成本']} 元</div>
         </div>
         <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid {p_color_hex};">
-            <div style="color:#888; font-size:11px; margin-bottom:2px;">💰 主力帳面利潤</div>
+            <div style="color:#888; font-size:11px; margin-bottom:2px;">💰 主力帳面損益</div>
             <div style="color:{p_color_hex}; font-size:15px; font-weight:bold;">{p_sign}{p_tot_wan_int:,} 萬 ({p_sign}{p_tot_rate}%)</div>
         </div>
         <div style="background:#1E1E1E; padding:10px; border-radius:6px; border-left:3px solid #FFCC00;">
-            <div style="color:#888; font-size:11px; margin-bottom:2px;">🔥 鎖碼主力分點數</div>
+            <div style="color:#888; font-size:11px; margin-bottom:2px;">🔥 監控主力分點數</div>
             <div style="color:#FFCC00; font-size:15px; font-weight:bold;">{len(broker_list)} 家分點</div>
         </div>
     </div>
@@ -790,20 +801,20 @@ with right_side:
         df_brokers.index = range(1, len(df_brokers) + 1)
         
         df_styled = df_brokers.copy()
-        df_styled["今日鎖碼持倉(張)"] = df_styled["買超張數"].apply(lambda x: f"{x:,} 張")
+        df_styled["今日進出張數(張)"] = df_styled["買超張數"].apply(lambda x: f"{x:+,} 張")
         df_styled["佔比(%)"] = df_styled["佔比(%)"].apply(lambda x: f"{x}%")
         df_styled["收盤價"] = df_styled["收盤價"].apply(lambda x: f"{x} 元")
         df_styled["預估成本"] = df_styled["預估成本"].apply(lambda x: f"{x} 元")
         df_styled["帳面浮盈(萬)"] = df_styled["預估獲利(萬)"].apply(lambda x: f"{x:+,} 萬")
         df_styled["帳面報酬率(%)"] = df_styled["報酬率(%)"].apply(lambda x: f"{x:+}%")
         
-        cols_order = ["分點名稱", "今日鎖碼持倉(張)", "佔比(%)", "收盤價", "預估成本", "帳面浮盈(萬)", "帳面報酬率(%)", "倒貨意願"]
+        cols_order = ["分點名稱", "今日進出張數(張)", "佔比(%)", "收盤價", "預估成本", "帳面浮盈(萬)", "帳面報酬率(%)", "倒貨意願"]
         actual_cols_order = [c for c in cols_order if c in df_styled.columns]
         
         styled_df_view = df_styled[actual_cols_order].style.apply(
             lambda row: [
-                ('color: #FF4444; font-weight: bold;' if df_brokers.loc[row.name, '預估獲利(萬)'] >= 0 else 'color: #00CC66; font-weight: bold;') 
-                if col == "帳面浮盈(萬)" 
+                ('color: #FF4444; font-weight: bold;' if df_brokers.loc[row.name, '買超張數'] >= 0 else 'color: #00CC66; font-weight: bold;') 
+                if col == "今日進出張數(張)" 
                 else (
                     ('color: #FF4444; font-weight: bold;' if df_brokers.loc[row.name, '報酬率(%)'] >= 0 else 'color: #00CC66; font-weight: bold;') 
                     if col == "帳面報酬率(%)" 
@@ -814,7 +825,7 @@ with right_side:
         )
         st.dataframe(styled_df_view, use_container_width=True)
     else:
-        st.write("今日無符合門檻之主力買超留倉。")
+        st.write("今日無符合門檻之主力留倉紀錄。")
 
 st.markdown("---")
 st.subheader("💡 實戰短空 3 大高勝率訊號與警報指引")
