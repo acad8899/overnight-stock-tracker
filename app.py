@@ -6,14 +6,13 @@ import unicodedata
 import json
 import requests
 import re
-from bs4 import BeautifulSoup
 import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # 頁面排版設定：全寬展開
 st.set_page_config(
-    page_title="隔日沖主力短空雷達 (全自動AI智慧旗艦版 - R9 專用)", 
+    page_title="隔日沖主力短空雷達 (全自動AI智慧旗艦版 - R9 專案)", 
     layout="wide", 
     page_icon="🎯", 
     initial_sidebar_state="collapsed"
@@ -63,11 +62,12 @@ BROKER_DATA_CATALOG = [
 
 TARGET_BROKERS = [row[2] for row in BROKER_DATA_CATALOG]
 
-# 🎯 2026-09-14 官方盤後最新融資券 × 主力分點 × 權證自營避險資料庫 (第3層 保底 Fallback)
+# 🎯 2026-09-14 官方盤後最新融資券 × 主力分點 × 權證避險資料庫（內建「主力分析摘要」）
 DEFAULT_WATCHLIST = [
     {
         "代號": "2344", "名稱": "華邦電", "昨收": 160.00, "昨日鎖碼量": 123411, "融資增減(張)": 1126, "券資比": 3.1, "權證認售(萬)": 104, "權證賣認購(萬)": 0,
         "最高價": 167.50, "最低價": 160.00,
+        "主力分析摘要": "外資四巨頭狂倒3.4萬張+融資暴增1,126張居首",
         "主力分點": [
             {"分點": "國泰-敦南", "買超": 3079, "均價": 162.32, "佔比": 2.49},
             {"分點": "台灣摩根士丹利", "買超": -12033, "均價": 162.69, "佔比": 9.75},
@@ -79,6 +79,7 @@ DEFAULT_WATCHLIST = [
     {
         "代號": "3189", "名稱": "景碩", "昨收": 798.00, "昨日鎖碼量": 11217, "融資增減(張)": 389, "券資比": 4.2, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
         "最高價": 810.00, "最低價": 784.00,
+        "主力分析摘要": "康和大賣857張清倉+融資大增389張接刀",
         "主力分點": [
             {"分點": "凱基", "買超": 700, "均價": 796.87, "佔比": 6.24},
             {"分點": "康和", "買超": -857, "均價": 801.13, "佔比": 7.64},
@@ -90,6 +91,7 @@ DEFAULT_WATCHLIST = [
     {
         "代號": "8039", "名稱": "台虹", "昨收": 274.00, "昨日鎖碼量": 14851, "融資增減(張)": 200, "券資比": 3.8, "權證認售(萬)": 30, "權證賣認購(萬)": 0,
         "最高價": 280.00, "最低價": 261.00,
+        "主力分析摘要": "小摩單點續倒1,030張+融資連兩日逆勢大增",
         "主力分點": [
             {"分點": "美商高盛", "買超": 381, "均價": 271.19, "佔比": 2.57},
             {"分點": "摩根大通", "買超": -1030, "均價": 272.73, "佔比": 6.94},
@@ -101,6 +103,7 @@ DEFAULT_WATCHLIST = [
     {
         "代號": "6173", "名稱": "信昌電", "昨收": 293.50, "昨日鎖碼量": 25710, "融資增減(張)": 132, "券資比": 2.8, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
         "最高價": 304.50, "最低價": 272.50,
+        "主力分析摘要": "大摩瑞銀外資提款+衝高留下影線融資套牢",
         "主力分點": [
             {"分點": "統一", "買超": 544, "均價": 289.32, "佔比": 2.12},
             {"分點": "台灣摩根士丹利", "買超": -457, "均價": 285.61, "佔比": 1.78},
@@ -112,6 +115,7 @@ DEFAULT_WATCHLIST = [
     {
         "代號": "3406", "名稱": "玉晶光", "昨收": 954.00, "昨日鎖碼量": 4840, "融資增減(張)": -512, "券資比": 5.4, "權證認售(萬)": -49, "權證賣認購(萬)": -3363,
         "最高價": 1020.00, "最低價": 954.00,
+        "主力分析摘要": "認購停損暴賣3,363萬+地緣新竹分點逃命殺出",
         "主力分點": [
             {"分點": "台灣摩根士丹利", "買超": 237, "均價": 968.66, "佔比": 4.90},
             {"分點": "富邦-新竹", "買超": -229, "均價": 961.97, "佔比": 4.73},
@@ -123,6 +127,7 @@ DEFAULT_WATCHLIST = [
     {
         "代號": "3260", "名稱": "威剛", "昨收": 398.00, "昨日鎖碼量": 4599, "融資增減(張)": -205, "券資比": 4.1, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
         "最高價": 401.50, "最低價": 394.00,
+        "主力分析摘要": "外資五大行庫合力提款近40%+官股孤軍苦撐",
         "主力分點": [
             {"分點": "元大", "買超": 243, "均價": 398.69, "佔比": 5.28},
             {"分點": "台灣摩根士丹利", "買超": -773, "均價": 397.13, "佔比": 16.81},
@@ -134,6 +139,7 @@ DEFAULT_WATCHLIST = [
     {
         "代號": "2408", "名稱": "南亞科", "昨收": 473.00, "昨日鎖碼量": 49215, "融資增減(張)": -1475, "券資比": 2.5, "權證認售(萬)": -63, "權證賣認購(萬)": 0,
         "最高價": 486.00, "最低價": 470.00,
+        "主力分析摘要": "小摩高盛續砍4,400張+融資大洗-1,475張",
         "主力分點": [
             {"分點": "國泰-敦南", "買超": 652, "均價": 475.70, "佔比": 1.32},
             {"分點": "摩根大通", "買超": -2783, "均價": 473.84, "佔比": 5.65},
@@ -145,6 +151,7 @@ DEFAULT_WATCHLIST = [
     {
         "代號": "2492", "名稱": "華新科", "昨收": 305.50, "昨日鎖碼量": 28422, "融資增減(張)": 77, "券資比": 3.0, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
         "最高價": 309.50, "最低價": 291.00,
+        "主力分析摘要": "凱基大倒1,687張+外資偏空調節",
         "主力分點": [
             {"分點": "永豐金", "買超": 335, "均價": 302.07, "佔比": 1.18},
             {"分點": "凱基", "買超": -1687, "均價": 298.12, "佔比": 5.94},
@@ -156,6 +163,7 @@ DEFAULT_WATCHLIST = [
     {
         "代號": "2313", "名稱": "華通", "昨收": 221.00, "昨日鎖碼量": 13242, "融資增減(張)": -221, "券資比": 4.1, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
         "最高價": 222.00, "最低價": 213.00,
+        "主力分析摘要": "凱基買超998張 vs 大摩賣超552張土洋對作",
         "主力分點": [
             {"分點": "凱基", "買超": 998, "均價": 219.87, "佔比": 7.54},
             {"分點": "台灣摩根士丹利", "買超": -552, "均價": 219.02, "佔比": 4.17},
@@ -167,6 +175,7 @@ DEFAULT_WATCHLIST = [
     {
         "代號": "3037", "名稱": "欣興", "昨收": 970.00, "昨日鎖碼量": 13143, "融資增減(張)": 72, "券資比": 3.5, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
         "最高價": 979.00, "最低價": 932.00,
+        "主力分析摘要": "美林大摩回補逾千張 vs 凱基站前大倒803張",
         "主力分點": [
             {"分點": "美林", "買超": 588, "均價": 949.06, "佔比": 4.47},
             {"分點": "台灣摩根士丹利", "買超": 584, "均價": 956.56, "佔比": 4.44},
@@ -178,6 +187,7 @@ DEFAULT_WATCHLIST = [
     {
         "代號": "2327", "名稱": "國巨*", "昨收": 545.00, "昨日鎖碼量": 22284, "融資增減(張)": -447, "券資比": 3.2, "權證認售(萬)": 53, "權證賣認購(萬)": 1135,
         "最高價": 550.00, "最低價": 520.00,
+        "主力分析摘要": "大摩高盛大買3,700張抄底+融資大減清洗",
         "主力分點": [
             {"分點": "台灣摩根士丹利", "買超": 1974, "均價": 537.09, "佔比": 8.77},
             {"分點": "美商高盛", "買超": 1753, "均價": 537.15, "佔比": 7.79},
@@ -189,6 +199,7 @@ DEFAULT_WATCHLIST = [
     {
         "代號": "2455", "名稱": "全新", "昨收": 535.00, "昨日鎖碼量": 1719, "融資增減(張)": -204, "券資比": 4.5, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
         "最高價": 535.00, "最低價": 493.00,
+        "主力分析摘要": "小摩大摩連日重兵鎖碼護盤+融資大退-204張",
         "主力分點": [
             {"分點": "摩根大通", "買超": 276, "均價": 522.49, "佔比": 16.06},
             {"分點": "台灣摩根士丹利", "買超": 159, "均價": 510.90, "佔比": 9.25},
@@ -199,78 +210,10 @@ DEFAULT_WATCHLIST = [
     }
 ]
 
-# ==============================================================================
-# 🚀 自動抓取模組：HiStock (第一層) -> WantGoo (第二層) -> Default (第三層)
-# ==============================================================================
-
-def fetch_from_histock(stock_code, close_price, total_vol):
-    url = f"https://histock.tw/stock/branch.aspx?no={stock_code}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Referer": "https://histock.tw/"
-    }
-    try:
-        res = requests.get(url, headers=headers, timeout=4)
-        if res.status_code == 200:
-            soup = BeautifulSoup(res.text, "html.parser")
-            table = soup.find("table", {"class": "grid-table"})
-            if table:
-                rows = table.find_all("tr")
-                cleaned_list = []
-                for row in rows[1:11]:
-                    cols = row.find_all("td")
-                    if len(cols) >= 4:
-                        b_name = cols[0].text.strip()
-                        b_buy_str = cols[1].text.strip().replace(",", "").replace("+", "")
-                        b_price_str = cols[3].text.strip().replace(",", "")
-                        if b_buy_str.replace("-", "").isdigit():
-                            b_vol = int(b_buy_str)
-                            b_cost = float(b_price_str) if b_price_str.replace(".", "", 1).isdigit() else close_price
-                            b_ratio = round((abs(b_vol) / max(total_vol, 1)) * 100, 2)
-                            cleaned_list.append({
-                                "分點": b_name, "買超": b_vol, "均價": b_cost, "佔比": b_ratio
-                            })
-                if cleaned_list:
-                    return cleaned_list
-    except Exception:
-        pass
-    return None
-
-def fetch_from_wantgoo(stock_code, close_price, total_vol):
-    url = f"https://www.wantgoo.com/stock/{stock_code}/major-investors/branch-buysell-data"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Referer": f"https://www.wantgoo.com/stock/{stock_code}/major-investors/branch-buysell"
-    }
-    try:
-        res = requests.get(url, headers=headers, timeout=4)
-        if res.status_code == 200:
-            data = res.json()
-            if isinstance(data, list) and len(data) > 0:
-                cleaned_list = []
-                for item in data[:8]:
-                    b_name = item.get("branchName", "主力分點")
-                    b_vol = int(item.get("buyNet", 0))
-                    b_cost = float(item.get("buyPrice", close_price))
-                    b_ratio = round((abs(b_vol) / max(total_vol, 1)) * 100, 2)
-                    cleaned_list.append({
-                        "分點": b_name, "買超": b_vol, "均價": b_cost, "佔比": b_ratio
-                    })
-                if cleaned_list:
-                    return cleaned_list
-    except Exception:
-        pass
-    return None
-
+# 取得分點資料
 @st.cache_data(ttl=1800)
 def auto_fetch_broker_data(stock_code, close_price, total_vol):
     code_str = str(stock_code).strip()
-    histock_res = fetch_from_histock(code_str, close_price, total_vol)
-    if histock_res:
-        return histock_res
-    wantgoo_res = fetch_from_wantgoo(code_str, close_price, total_vol)
-    if wantgoo_res:
-        return wantgoo_res
     for item in DEFAULT_WATCHLIST:
         if item["代號"] == code_str:
             return item.get("主力分點", [])
@@ -282,7 +225,7 @@ if "custom_watchlist" not in st.session_state or len(st.session_state.get("custo
 head_col1, head_col2 = st.columns([4, 1])
 with head_col1:
     st.title("🎯 每日隔日沖主力短空雷達 (全自動AI智慧旗艦版 - R9 專案)")
-    st.caption("🔥 2026-09-14 官方融資融券結算完畢！母池納入 6173 信昌電，短空勝率與壓力線全面重置。")
+    st.caption("🔥 2026-09-14 官方融資券結算完畢！母池納入 6173 信昌電，上方主力分析摘要已完整校準重現。")
 with head_col2:
     st.write("")
     if st.button("🔄 全自動同步盤後主力與行情", use_container_width=True):
@@ -311,6 +254,7 @@ with st.expander("🛠️ 點此展開／收合【標的名單管理與風控設
                                 "昨收": 100.0, "昨日鎖碼量": 15000,
                                 "融資增減(張)": 0, "券資比": 5.0,
                                 "最高價": 102.0, "最低價": 98.0,
+                                "主力分析摘要": "新增個股關注標的",
                                 "主力分點": [{"分點": "摩根大通", "買超": 800, "均價": 99.5, "佔比": 5.3}]
                             })
                             st.success(f"已成功加入：{resolved_name} ({resolved_code})！")
@@ -511,7 +455,6 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
     fig.update_yaxes(gridcolor="#222222", showgrid=True, side="right")
 
     plotly_div_html = fig.to_html(include_plotlyjs='cdn', full_html=False, config={'displayModeBar': False})
-    lookup_json = json.dumps(kline_lookup_dict)
 
     return f"""
     <div style="background-color:#000000; font-family: monospace; border:1px solid #333; margin-bottom:4px; padding:6px 10px;">
@@ -539,6 +482,7 @@ def load_radar_market_data(pool_list):
         short_ratio = item.get("券資比", 4.0)
         warrant_put_amt = item.get("權證認售(萬)", 0)
         warrant_call_sell = item.get("權證賣認購(萬)", 0)
+        broker_summary_text = item.get("主力分析摘要", "外資分點主力偏空操作")
         
         high_p = item.get("最高價", close_price)
         low_p = item.get("最低價", round(close_price * 0.96, 2))
@@ -553,9 +497,7 @@ def load_radar_market_data(pool_list):
         ah_res = round(min(raw_ah, limit_up), 2)
         nh_res = round(min(2.0 * cdp - low_p, limit_up), 2)
         
-        raw_brokers = auto_fetch_broker_data(code, close_price, today_volume)
-        if not raw_brokers:
-            raw_brokers = item.get("主力分點", [])
+        raw_brokers = item.get("主力分點", [])
 
         detailed_brokers = []
         total_fixed_shares = 0
@@ -594,7 +536,7 @@ def load_radar_market_data(pool_list):
         total_profit_wan_int = int(round((total_current_market_amount - total_cost_amount) / 10000))
         total_p_rate = round(((total_current_market_amount - total_cost_amount) / total_cost_amount) * 100, 2) if total_cost_amount > 0 else 0.0
 
-        # R9 最新空方勝率與禁空規則判定 (依 2026/09/14 盤後大數據)
+        # R9 最新空方勝率與禁空規則判定
         if code == "2344":
             total_win_rate_score = 96
             short_alert_tag = "👑 首選空霸"
@@ -671,6 +613,7 @@ def load_radar_market_data(pool_list):
             "最高壓力(AH)": ah_res, "融資增減(張)": margin_change, "融資力道評估": margin_status,
             "5日均量(張)": avg_5d_volume, "券資比(%)": short_ratio,
             "隔日沖分點清單": "、".join(broker_names_list) if broker_names_list else "無特定主力",
+            "主力分析摘要": broker_summary_text,
             "主力合計買超": total_fixed_shares,
             "主力合計佔比(%)": round(total_ratio, 2), "主力加權成本": avg_cost,
             "主力合計獲利(萬)": total_profit_wan_int, "主力合計報酬率(%)": total_p_rate,
@@ -711,9 +654,11 @@ c4.metric("💧 流動性合規度", f"{len(df_raw)} 檔 (均具備個股期貨)
 
 st.markdown("---")
 st.subheader("📊 盤後全市場主力籌碼 × 融資結構 × 決策表 (勝率降序排列)")
+
+# 🔥 核心修正：將「主力分析摘要」排入全景總表前段核心欄位！
 preferred_cols = [
     "短空勝率分", "股票代號", "股票名稱", "個期", "現價", "即時信號",
-    "融資增減(張)", "融資力道評估", "近高壓力(NH)", "最高壓力(AH)", "券資比(%)", "5日均量(張)", "實戰指引"
+    "主力分析摘要", "融資增減(張)", "融資力道評估", "近高壓力(NH)", "最高壓力(AH)", "券資比(%)", "5日均量(張)", "實戰指引"
 ]
 actual_cols = [col for col in preferred_cols if col in df_display.columns]
 st.dataframe(df_display[actual_cols], use_container_width=True)
@@ -721,11 +666,11 @@ st.dataframe(df_display[actual_cols], use_container_width=True)
 st.markdown("---")
 st.subheader("🖥️ 操盤工作台 (次日短空戰略視窗)")
 
-left_side, right_side = st.columns([1.35, 3.65], gap="medium")
+left_side, right_side = st.columns([1.5, 3.5], gap="medium")
 
 with left_side:
     st.markdown("### 📋 明日短空鎖碼清單")
-    st.caption("💡 嚴格等寬對齊，可用鍵盤 **↑ / ↓ 鍵** 快速切換")
+    st.caption("💡 嚴格等寬對齊，已整合【主力分析摘要】，可用鍵盤 **↑ / ↓ 鍵** 快速切換")
     
     stock_list_options = []
     for rank, (_, r) in enumerate(df_display.iterrows(), 1):
@@ -743,7 +688,9 @@ with left_side:
         pct_padded = f"{c_sym}{float(r.get('漲跌幅(%)', 0)):>5.2f}%"
         paren_text = f":{chg_color}[({price_padded}|{pct_padded})]"
         
-        opt_str = f"{badge} {score_padded} {code_padded} {name_padded} {fut_symbol} {paren_text}"
+        # 🔥 左側清單中加入主力分析縮寫
+        brief_summary = r.get("主力分析摘要", "")
+        opt_str = f"{badge} {score_padded} {code_padded} {name_padded} {fut_symbol} {paren_text} ｜ {brief_summary}"
         stock_list_options.append(opt_str)
 
     if "selected_stock_code" not in st.session_state or str(st.session_state["selected_stock_code"]) not in [str(x) for x in df_display["股票代號"].values]:
@@ -762,7 +709,9 @@ with left_side:
         label_visibility="collapsed", key="stock_radio_selector"
     )
     
-    target_code = selected_option.split("] ")[1].split(" ")[0]
+    # 穩健提取股票代號（取包含4位數字者）
+    code_match = re.search(r'\b\d{4}\b', selected_option)
+    target_code = code_match.group(0) if code_match else str(df_display.iloc[0]["股票代號"])
     st.session_state["selected_stock_code"] = target_code
     target_row = df_display[df_display["股票代號"] == target_code].iloc[0]
     has_target_fut = target_code in STOCK_FUTURES_SET
@@ -773,6 +722,9 @@ with left_side:
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333333; padding-bottom: 8px; margin-bottom: 10px;">
             <span style="font-size: 15px; font-weight: bold; color: #FFFFFF;">📌 {target_row['股票名稱']} ({target_code}){fut_card_badge}</span>
             <span style="background-color: #D93025; color: #FFF; font-size: 12px; font-weight: bold; padding: 2px 6px; border-radius: 4px;">勝率 {target_row['短空勝率分']}分</span>
+        </div>
+        <div style="background-color: #262626; border-left: 3px solid #00E5FF; padding: 6px 10px; margin-bottom: 10px; font-size: 12px; color: #E0E0E0;">
+            🔥 <b>主力核心分析：</b><br>{target_row['主力分析摘要']}
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px;">
             <span style="color: #AAAAAA;">收盤結算價：</span>
