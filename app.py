@@ -7,33 +7,46 @@ from plotly.subplots import make_subplots
 from datetime import datetime
 
 # ==============================================================================
-# 1. 系統架構與頁面基本配置
+# 1. 系統架構與客製化專業 UI 配置
 # ==============================================================================
 st.set_page_config(
-    page_title="短空雷達量化監控系統 - Round 11 決戰版",
+    page_title="雙 AI 量化短空雷達監控系統 - Round 11",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# 自訂 CSS 保證全螢幕寬表格不跑版、文字緊湊易讀
+# 專業高對比深色戰情室樣式
 st.markdown("""
 <style>
-    .metric-card {
-        background-color: #1E1E1E;
+    .metric-card-gemini {
+        background: linear-gradient(135deg, #1E1E1E 0%, #2A1B1B 100%);
         border-radius: 8px;
-        padding: 12px;
-        border-left: 4px solid #FF4B4B;
-        margin-bottom: 10px;
+        padding: 14px;
+        border-left: 5px solid #FF4444;
+        margin-bottom: 12px;
     }
-    .metric-gpt {
-        border-left: 4px solid #1E88E5 !important;
+    .metric-card-gpt {
+        background: linear-gradient(135deg, #1E1E1E 0%, #1A2634 100%);
+        border-radius: 8px;
+        padding: 14px;
+        border-left: 5px solid #1E88E5;
+        margin-bottom: 12px;
     }
     .stDataFrame {
         border-radius: 6px;
     }
-    .status-badge {
-        padding: 2px 8px;
+    .badge-short {
+        background-color: #D32F2F;
+        color: white;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-weight: bold;
+    }
+    .badge-ban {
+        background-color: #616161;
+        color: #FFD54F;
+        padding: 3px 8px;
         border-radius: 4px;
         font-weight: bold;
     }
@@ -41,16 +54,17 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. 官方公約常數與雙方帳戶狀態 (2026/09/16 結算後凍結生效)
+# 2. 官方公約常數與雙方帳戶狀態 (2026/09/16 R10 結算後正式凍結生效)
 # ==============================================================================
 R11_DATE = "2026/09/17"
-LAST_DATA_DATE = "2026/09/16"
+DATA_BASE_DATE = "2026/09/16"
 
+# 帳戶資本與風控額度
 CAPITAL_GEMINI = 1620595
 CAPITAL_CHATGPT = 1289681
 LIMIT_GEMINI = int(CAPITAL_GEMINI * 0.20)    # NT$ 324,119
 LIMIT_CHATGPT = int(CAPITAL_CHATGPT * 0.20)  # NT$ 257,936
-NET_DIFF = CAPITAL_GEMINI - CAPITAL_CHATGPT  # NT$ 330,914
+NET_SPREAD = CAPITAL_GEMINI - CAPITAL_CHATGPT # NT$ 330,914
 
 # ==============================================================================
 # 3. 官方 12 檔母池大數據庫 (2026/09/16 盤後完整三維籌碼數據)
@@ -155,118 +169,201 @@ WATCHLIST_DB = {
 }
 
 # ==============================================================================
-# 4. 雙方 Round 11 正式封單陣列 (防截斷規格)
+# 4. 雙方 Round 11 正式決戰封單名冊 (官方裁判室存證凍結標準)
 # ==============================================================================
 ORDERS_GEMINI = [
-    {"rank": "🥇 首選 1", "ticker": "2455", "name": "全新(期)", "tool": "期貨", "size": "1口", "margin": 139050, "trigger": 512.0, "stop": 526.0, "t1": 498.0, "t2": 488.0, "reason": "逆勢收黑，外資砍1,700張，融資暴增+627張深套。"},
-    {"rank": "🥈 首選 2", "ticker": "8039", "name": "台虹(期)", "tool": "期貨", "size": "2口", "margin": 110200, "trigger": 273.0, "stop": 280.0, "t1": 264.0, "t2": 258.0, "reason": "小摩單點倒13.9%，散戶融資連四日逆勢接刀。"},
-    {"rank": "🥉 首選 3", "ticker": "6173", "name": "信昌電(期)", "tool": "期貨", "size": "2口", "margin": 170100, "trigger": 312.0, "stop": 322.0, "t1": 302.0, "t2": 295.0, "reason": "隔日沖重鎖2,600張，融資兩天增逾900張。"},
-    {"rank": "4", "ticker": "3189", "name": "景碩(期)", "tool": "期貨", "size": "1口", "margin": 221400, "trigger": 814.0, "stop": 833.0, "t1": 792.0, "t2": 778.0, "reason": "融資暴增+720張居冠，大摩調節，認購大停損。"},
-    {"rank": "5", "ticker": "2327", "name": "國巨*(期)", "tool": "期貨", "size": "1口", "margin": 144720, "trigger": 533.0, "stop": 544.0, "t1": 519.0, "t2": 508.0, "reason": "逆勢收黑，美林重砍2,640張，融資逆勢套牢。"}
+    {"rank": "🥇 首選 1", "ticker": "2455", "name": "全新(期)", "tool": "期貨", "size": "1口", "margin": 139050, "trigger": 512.0, "stop": 526.0, "t1": 498.0, "t2": 488.0, "shares": 2000, "reason": "逆勢收黑，外資砍1,700張，融資暴增+627張深套。"},
+    {"rank": "🥈 首選 2", "ticker": "8039", "name": "台虹(期)", "tool": "期貨", "size": "2口", "margin": 110200, "trigger": 273.0, "stop": 280.0, "t1": 264.0, "t2": 258.0, "shares": 4000, "reason": "小摩單點倒13.9%，散戶融資連四日逆勢接刀。"},
+    {"rank": "🥉 首選 3", "ticker": "6173", "name": "信昌電(期)", "tool": "期貨", "size": "2口", "margin": 170100, "trigger": 312.0, "stop": 322.0, "t1": 302.0, "t2": 295.0, "shares": 4000, "reason": "隔日沖重鎖2,600張，融資兩天增逾900張。"},
+    {"rank": "4", "ticker": "3189", "name": "景碩(期)", "tool": "期貨", "size": "1口", "margin": 221400, "trigger": 814.0, "stop": 833.0, "t1": 792.0, "t2": 778.0, "shares": 2000, "reason": "融資暴增+720張居冠，大摩調節，認購大停損。"},
+    {"rank": "5", "ticker": "2327", "name": "國巨*(期)", "tool": "期貨", "size": "1口", "margin": 144720, "trigger": 533.0, "stop": 544.0, "t1": 519.0, "t2": 508.0, "shares": 2000, "reason": "逆勢收黑，美林重砍2,640張，融資逆勢套牢。"}
 ]
 
 ORDERS_CHATGPT = [
-    {"rank": "🥇 1", "ticker": "2455", "name": "全新(期)", "tool": "期貨", "size": "1口", "margin": 139050, "trigger": 510.0, "stop": 524.0, "t1": 500.0, "t2": 492.0, "reason": "法人重賣＋融資大增，破510進場。"},
-    {"rank": "🥈 2", "ticker": "8039", "name": "台虹(期)", "tool": "期貨", "size": "2口", "margin": 110200, "trigger": 271.0, "stop": 279.0, "t1": 263.0, "t2": 257.0, "reason": "法人連賣＋融資增加，破271進場。"},
-    {"rank": "🥉 3", "ticker": "3189", "name": "景碩(期)", "tool": "期貨", "size": "1口", "margin": 221400, "trigger": 810.0, "stop": 832.0, "t1": 795.0, "t2": 780.0, "reason": "融資暴增＋高檔震盪，破810進場。"},
-    {"rank": "4", "ticker": "2327", "name": "國巨(期)", "tool": "期貨", "size": "1口", "margin": 144720, "trigger": 526.0, "stop": 544.0, "t1": 518.0, "t2": 510.0, "reason": "外資巨量撤退，摜破昨低526才進場。"},
-    {"rank": "5", "ticker": "3037", "name": "欣興(期)", "tool": "期貨", "size": "1口", "margin": 259470, "trigger": 940.0, "stop": 975.0, "t1": 925.0, "t2": 910.0, "reason": "高盛重砍，法人連續轉弱，破940進場。"}
+    {"rank": "🥇 1", "ticker": "2455", "name": "全新(期)", "tool": "期貨", "size": "1口", "margin": 139050, "trigger": 510.0, "stop": 524.0, "t1": 500.0, "t2": 492.0, "shares": 2000, "reason": "法人重賣＋融資大增，破510進場。"},
+    {"rank": "🥈 2", "ticker": "8039", "name": "台虹(期)", "tool": "期貨", "size": "2口", "margin": 110200, "trigger": 271.0, "stop": 279.0, "t1": 263.0, "t2": 257.0, "shares": 4000, "reason": "法人連賣＋融資增加，破271進場。"},
+    {"rank": "🥉 3", "ticker": "3189", "name": "景碩(期)", "tool": "期貨", "size": "1口", "margin": 221400, "trigger": 810.0, "stop": 832.0, "t1": 795.0, "t2": 780.0, "shares": 2000, "reason": "融資暴增＋高檔震盪，破810進場。"},
+    {"rank": "4", "ticker": "2327", "name": "國巨(期)", "tool": "期貨", "size": "1口", "margin": 144720, "trigger": 526.0, "stop": 544.0, "t1": 518.0, "t2": 510.0, "shares": 2000, "reason": "外資巨量撤退，摜破昨低526才進場。"},
+    {"rank": "5", "ticker": "3037", "name": "欣興(期)", "tool": "期貨", "size": "1口", "margin": 259470, "trigger": 940.0, "stop": 975.0, "t1": 925.0, "t2": 910.0, "shares": 2000, "reason": "高盛重砍，法人連續轉弱，破940進場。"}
 ]
 
 # ==============================================================================
-# 5. 核心演算法：不利滑價撮合、方案 A 階梯鎖利與券商分析模組
+# 5. 量化引擎：不利撮合滑價、實體黑棒破線濾網與方案 A 結算器
 # ==============================================================================
-def calculate_execution(trigger_price, trigger_k_close, next_k_open, current_low, stop_loss, t1_price, t2_price):
+def execute_quant_settlement(order, k_open, k_close, k_low, k_high, next_k_open, exit_k_close=None):
     """
-    公約撮合演算法：
-    1. 實體跌破判定：trigger_k_close < trigger_price
-    2. 不利滑價撮合成交價：min(trigger_k_close, next_k_open) (對空方較差者)
-    3. 方案 A 觸發判定：current_low <= t1_price
+    官方執法標準：
+    1. 實體黑棒收破確認：k_close < k_open 且 k_close < trigger_price
+    2. 不利滑價成交價：min(k_close, next_k_open) (取較劣者)
+    3. 方案 A 階梯鎖利：k_low <= t1_price 則全數依 T1 保底平倉
+    4. 停損檢核：k_high >= stop_price 則以 stop_price 停損離場
+    5. 尾盤強平：未達 T1 且未停損，以 exit_k_close (13:25) 強制平倉
     """
-    if trigger_k_close >= trigger_price:
-        return {"status": "未觸發", "entry_price": None, "exit_price": None, "points": 0, "result": "未跌破實體門檻，空手防守"}
+    trigger_p = float(order["trigger"])
+    stop_p = float(order["stop"])
+    t1_p = float(order["t1"])
+    shares = order["shares"]
     
-    # 計算不利滑價撮合價
-    entry_price = min(trigger_k_close, next_k_open)
-    
-    # 方案 A 保底檢驗
-    if current_low <= t1_price:
+    # 1. 實體黑棒與破線檢核
+    if not (k_close < k_open and k_close < trigger_p):
         return {
-            "status": "已平倉 (方案 A 命中)",
-            "entry_price": entry_price,
-            "exit_price": t1_price,
-            "points": entry_price - t1_price,
-            "result": f"盤中低點 {current_low} 穿破 T1 ({t1_price})，依方案 A 全數保底鎖利！"
-        }
-    else:
-        return {
-            "status": "在倉持股中",
-            "entry_price": entry_price,
+            "status": "⚪ 未觸發 (空手觀望)",
+            "entry_price": None,
             "exit_price": None,
-            "points": 0,
-            "result": "部位持倉中，等待跌破 T1 或 13:25 尾盤強平結算。"
+            "pnl_points": 0.0,
+            "pnl_ntd": 0,
+            "note": f"5分K實體未收破門檻 {trigger_p} 或非實體黑棒，風控濾網生效，空手避險。"
         }
-
-def render_broker_table(ticker):
-    """繪製前三大買賣超分點詳細數據"""
-    info = WATCHLIST_DB[ticker]
-    cb, cs = st.columns(2)
-    with cb:
-        st.markdown("**🟢 主力買超前三大分點**")
-        for b_name, b_vol, b_price in info["major_buy"]:
-            st.markdown(f"- **{b_name}**：`+{b_vol:,} 張` (均價: `{b_price:.2f}`)")
-    with cs:
-        st.markdown("**🔴 主力賣超前三大分點**")
-        for s_name, s_vol, s_price in info["major_sell"]:
-            st.markdown(f"- **{s_name}**：`{s_vol:,} 張` (均價: `{s_price:.2f}`)")
+    
+    # 2. 不利滑價撮合
+    entry_p = min(k_close, next_k_open)
+    
+    # 3. 停損判定 (優先於停利若同時發生)
+    if k_high >= stop_p:
+        pts = entry_p - stop_p
+        ntd = int(pts * shares)
+        return {
+            "status": "❌ 停損平倉",
+            "entry_price": entry_p,
+            "exit_price": stop_p,
+            "pnl_points": pts,
+            "pnl_ntd": ntd,
+            "note": f"盤中高點 {k_high} 穿破停損線 {stop_p}，嚴格停損離場。"
+        }
+        
+    # 4. 方案 A 階梯鎖利判定
+    if k_low <= t1_p:
+        pts = entry_p - t1_p
+        ntd = int(pts * shares)
+        return {
+            "status": "🎯 方案 A 停利 (命中 T1)",
+            "entry_price": entry_p,
+            "exit_price": t1_p,
+            "pnl_points": pts,
+            "pnl_ntd": ntd,
+            "note": f"盤中低點 {k_low} 擊穿 T1 ({t1_p})，依方案 A 全數保底平倉落袋！"
+        }
+        
+    # 5. 尾盤 13:25 強制平倉
+    if exit_k_close is not None:
+        pts = entry_p - exit_k_close
+        ntd = int(pts * shares)
+        return {
+            "status": "⏰ 尾盤強制平倉",
+            "entry_price": entry_p,
+            "exit_price": exit_k_close,
+            "pnl_points": pts,
+            "pnl_ntd": ntd,
+            "note": f"未達 T1 且未觸發停損，依公約於 13:25 以市價 {exit_k_close} 強制平倉。"
+        }
+        
+    return {
+        "status": "⏳ 部位持倉中",
+        "entry_price": entry_p,
+        "exit_price": None,
+        "pnl_points": 0.0,
+        "pnl_ntd": 0,
+        "note": f"部位建立於不利滑價 {entry_p}，等待觸發 T1 或 13:25 結算。"
+    }
 
 # ==============================================================================
-# 6. 側邊欄導航與戰績即時看板
+# 6. 側邊欄控制與雙方戰情儀表板
 # ==============================================================================
 st.sidebar.title("⚡ 短空雷達量化控制台")
 st.sidebar.markdown(f"**決戰輪次**：`Round 11` ({R11_DATE})")
-st.sidebar.markdown(f"**母池籌碼基準**：`{LAST_DATA_DATE}` 盤後大數據")
+st.sidebar.markdown(f"**母池數據基準**：`{DATA_BASE_DATE}` 盤後大數據")
 
 # 淨值儀表板
 st.sidebar.markdown("---")
-st.sidebar.subheader("🏆 賽事实時累積淨值")
+st.sidebar.subheader("🏆 賽事即時戰績榜")
 st.sidebar.markdown(f"""
-<div class="metric-card">
-    <div style="font-size: 13px; color: #BBB;">🟥 Gemini 總淨值 (7勝1負2平)</div>
-    <div style="font-size: 22px; font-weight: bold; color: #FFF;">NT$ {CAPITAL_GEMINI:,}</div>
-    <div style="font-size: 12px; color: #AAA;">R10 空手避開強軋 (0損益)</div>
+<div class="metric-card-gemini">
+    <div style="font-size: 13px; color: #BBB;">🟥 Gemini 淨值 (7勝1負2平)</div>
+    <div style="font-size: 24px; font-weight: bold; color: #FFF;">NT$ {CAPITAL_GEMINI:,}</div>
+    <div style="font-size: 12px; color: #81C784;">R10 全數空手避軋 (損益 $0)</div>
 </div>
-<div class="metric-card metric-gpt">
-    <div style="font-size: 13px; color: #BBB;">🟦 ChatGPT 總淨值 (1勝7負2平)</div>
-    <div style="font-size: 22px; font-weight: bold; color: #FFF;">NT$ {CAPITAL_CHATGPT:,}</div>
-    <div style="font-size: 12px; color: #AAA;">R10 空手避開強軋 (0損益)</div>
+<div class="metric-card-gpt">
+    <div style="font-size: 13px; color: #BBB;">🟦 ChatGPT 淨值 (1勝7負2平)</div>
+    <div style="font-size: 24px; font-weight: bold; color: #FFF;">NT$ {CAPITAL_CHATGPT:,}</div>
+    <div style="font-size: 12px; color: #81C784;">R10 全數空手避軋 (損益 $0)</div>
 </div>
 """, unsafe_allow_html=True)
 
-st.sidebar.info(f"🚩 **淨值差距**：Gemini 領先 **NT$ {NET_DIFF:,}**")
+st.sidebar.info(f"🚩 **當前戰況**：Gemini 領先 **NT$ {NET_SPREAD:,}**\n\n**單檔配置上限**：\n• Gemini: NT$ {LIMIT_GEMINI:,}\n• ChatGPT: NT$ {LIMIT_CHATGPT:,}")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 📜 R11 官方執法公約")
-st.sidebar.caption("1. **進場唯一標準**：5分K實體黑棒收盤價 < 觸發價。\n2. **撮合防滑價**：不利撮合價 = min(觸發K收盤, 次K開盤)。\n3. **階梯結算**：方案 A 優先，盤中低點穿破 T1 即刻全數保底鎖利平倉。\n4. **強制清算**：未破停損亦未達 T1 者，一律於 13:25～13:30 強制平倉結算。")
+st.sidebar.markdown("### 📜 官方執法核心規範")
+st.sidebar.caption(
+    """
+    1. **實體確認**：5分K收盤 < 開盤 且 收盤 < 進場價。
+    2. **不利滑價**：成交價 = min(觸發K收, 次K開)。
+    3. **方案 A 優先**：穿破 T1 立即全平保底。
+    4. **尾盤強平**：13:25～13:30 強制平倉清算。
+    """
+)
 
 # ==============================================================================
-# 7. 主頁面：四大功能分頁
+# 7. 主介面分頁架構
 # ==============================================================================
 st.title("🎯 雙 AI 當沖量化 PK 賽事｜Round 11 決戰戰情室")
-st.caption(f"即時連線監控中心｜數據來源：{LAST_DATA_DATE} 臺灣證券交易所/櫃買中心/30+券商分點")
+st.caption(f"實時連線 OFFICIATING TERMINAL｜數據源：{DATA_BASE_DATE} 臺灣證券交易所/櫃買中心/30+主力分點/自營商權證")
 
-tab_radar, tab_orders, tab_matcher, tab_live = st.tabs([
-    "📊 12檔母池籌碼雷達", 
-    "⚔️ R11 雙方正式封單", 
-    "🧮 不利撮合與方案A結算器", 
-    "📈 盤中 5分K 實時監控"
+tab_orders, tab_radar, tab_matcher, tab_live = st.tabs([
+    "⚔️ R11 雙方正式封單陣列", 
+    "📊 12檔母池三維籌碼雷達", 
+    "🧮 官方不利撮合與方案A結算終端", 
+    "📈 盤中 5分K 防線監控圖"
 ])
 
 # ------------------------------------------------------------------------------
-# TAB 1: 12檔母池籌碼雷達 (含主力分析摘要)
+# TAB 1: R11 雙方正式封單陣列 (保證寬版不截斷外顯 T1/T2)
+# ------------------------------------------------------------------------------
+with tab_orders:
+    st.subheader("⚔️ Round 11 官方決戰名冊陣列 (已完成資料庫凍結備查)")
+    col_g, col_c = st.columns(2)
+    
+    with col_g:
+        st.markdown("#### 🟥 Gemini 戰情室封單")
+        st.caption(f"淨值：NT$ {CAPITAL_GEMINI:,}｜單檔上限：NT$ {LIMIT_GEMINI:,}")
+        
+        df_gem_ui = pd.DataFrame([
+            {"順位/標的": f"{x['rank']} {x['name']}", "5分K門檻": f"< {x['trigger']:.1f}", "停損": f"{x['stop']:.1f}", "停利 T1": f"{x['t1']:.1f}", "停利 T2": f"{x['t2']:.1f}", "規格/保證金": f"{x['size']} ({x['margin']//1000}K)"}
+            for x in ORDERS_GEMINI
+        ])
+        st.dataframe(df_gem_ui, use_container_width=True, hide_index=True)
+        
+        with st.expander("🔍 審視 Gemini 籌碼依據與量化細節", expanded=True):
+            for x in ORDERS_GEMINI:
+                st.markdown(f"**{x['rank']} {x['name']}**：門檻 `< {x['trigger']:.1f}` ｜ 停損 `{x['stop']:.1f}` ｜ **T1 `{x['t1']:.1f}`**")
+                st.caption(f"└ 核心籌碼：{x['reason']}")
+                
+    with col_c:
+        st.markdown("#### 🟦 ChatGPT 戰情室封單")
+        st.caption(f"淨值：NT$ {CAPITAL_CHATGPT:,}｜單檔上限：NT$ {LIMIT_CHATGPT:,}")
+        
+        df_gpt_ui = pd.DataFrame([
+            {"順位/標的": f"{x['rank']} {x['name']}", "5分K門檻": f"< {x['trigger']:.1f}", "停損": f"{x['stop']:.1f}", "停利 T1": f"{x['t1']:.1f}", "停利 T2": f"{x['t2']:.1f}", "規格/保證金": f"{x['size']} ({x['margin']//1000}K)"}
+            for x in ORDERS_CHATGPT
+        ])
+        st.dataframe(df_gpt_ui, use_container_width=True, hide_index=True)
+        
+        with st.expander("🔍 審視 ChatGPT 型態邏輯與作戰口令", expanded=True):
+            for x in ORDERS_CHATGPT:
+                st.markdown(f"**{x['rank']} {x['name']}**：門檻 `< {x['trigger']:.1f}` ｜ 停損 `{x['stop']:.1f}` ｜ **T1 `{x['t1']:.1f}`**")
+                st.caption(f"└ 作戰型態：{x['reason']}")
+
+    st.markdown("---")
+    st.subheader("🛑 Round 11 官方共識禁空名單（NO SHORT LIST）")
+    cn1, cn2, cn3 = st.columns(3)
+    cn1.error("🚫 **3406 玉晶光**\n\n強勢漲停鎖死在 1,005 元，多頭籌碼極端擁擠，官方公約維持絕對禁空，嚴防摸頂。")
+    cn2.error("🚫 **2344 華邦電**\n\n外資高盛美林暴買 1.2 萬張，融資狂退 -2,056 張洗淨籌碼，空方肉身縮小，嚴禁追空。")
+    cn3.error("🚫 **2408 南亞科**\n\n元大美林大摩反手狂買，股價飆漲 5.8%，融資大退 -741 張，結構由空翻多不可做空。")
+
+# ------------------------------------------------------------------------------
+# TAB 2: 12檔母池三維籌碼雷達
 # ------------------------------------------------------------------------------
 with tab_radar:
-    st.subheader("📋 12 檔母池大數據總覽 (三維交叉驗證)")
+    st.subheader("📋 12 檔母池三維大數據全景表 (主力分點 × 融資 × 權證)")
     
     radar_rows = []
     for t_code, t_val in WATCHLIST_DB.items():
@@ -277,193 +374,161 @@ with tab_radar:
             "漲跌": f"{t_val['change']:+.2f}",
             "成交量": f"{t_val['volume']:,}",
             "融資增減(張)": f"{t_val['margin_diff']:+d}",
-            "近高壓力(NH)": f"{t_val['nh']:.2f}",
-            "全高壓力(AH)": f"{t_val['ah']:.2f}",
+            "近高(NH)": f"{t_val['nh']:.2f}",
+            "全高(AH)": f"{t_val['ah']:.2f}",
             "認購增減(萬)": f"{t_val['warrant_call']:+d}",
-            "偏空診斷狀態": t_val["status"]
+            "偏空診斷評級": t_val["status"]
         })
     st.dataframe(pd.DataFrame(radar_rows), use_container_width=True, hide_index=True)
     
     st.markdown("---")
-    st.subheader("🔍 標的主力分點進出與避險破綻深度檢驗")
-    target_select = st.selectbox("選擇要檢視籌碼分點的標的：", list(WATCHLIST_DB.keys()), format_func=lambda x: f"{x} {WATCHLIST_DB[x]['name']} - {WATCHLIST_DB[x]['status']}")
+    st.subheader("🔎 主力分點進出與避險破綻深度探針")
+    target_select = st.selectbox("選擇要檢驗籌碼分點的標的：", list(WATCHLIST_DB.keys()), format_func=lambda x: f"{x} {WATCHLIST_DB[x]['name']} ({WATCHLIST_DB[x]['status']})")
     
     col_d1, col_d2 = st.columns([1, 2])
     with col_d1:
         st.markdown(f"### **{target_select} {WATCHLIST_DB[target_select]['name']}**")
-        st.write(f"- **最新收盤**：`{WATCHLIST_DB[target_select]['close']}` ({WATCHLIST_DB[target_select]['change']:+.2f})")
+        st.write(f"- **收盤價**：`{WATCHLIST_DB[target_select]['close']:.2f}` ({WATCHLIST_DB[target_select]['change']:+.2f})")
         st.write(f"- **融資增減**：`{WATCHLIST_DB[target_select]['margin_diff']:+d} 張`")
         st.write(f"- **權證認購增減**：`{WATCHLIST_DB[target_select]['warrant_call']:+d} 萬元`")
-        st.write(f"- **狀態評估**：`{WATCHLIST_DB[target_select]['status']}`")
+        st.write(f"- **系統評級**：`{WATCHLIST_DB[target_select]['status']}`")
     with col_d2:
-        st.markdown(f"**核心破綻摘要**：{WATCHLIST_DB[target_select]['diagnosis']}")
-        render_broker_table(target_select)
+        st.markdown(f"**核心量化診斷**：{WATCHLIST_DB[target_select]['diagnosis']}")
+        info = WATCHLIST_DB[target_select]
+        cb, cs = st.columns(2)
+        with cb:
+            st.markdown("**🟢 主力買超前三**")
+            for b_name, b_vol, b_p in info["major_buy"]:
+                st.markdown(f"- **{b_name}**：`+{b_vol:,} 張` (均價: `{b_p:.2f}`)")
+        with cs:
+            st.markdown("**🔴 主力賣超前三**")
+            for s_name, s_vol, s_p in info["major_sell"]:
+                st.markdown(f"- **{s_name}**：`{s_vol:,} 張` (均價: `{s_p:.2f}`)")
 
 # ------------------------------------------------------------------------------
-# TAB 2: R11 雙方正式封單 (防截斷規格)
-# ------------------------------------------------------------------------------
-with tab_orders:
-    st.subheader("⚔️ Round 11 官方決戰名冊陣列 (已完成資料庫凍結)")
-    col_g, col_c = st.columns(2)
-    
-    with col_g:
-        st.markdown("#### 🟥 Gemini 戰情室封單")
-        st.caption(f"淨值：NT$ {CAPITAL_GEMINI:,}｜單檔上限：NT$ {LIMIT_GEMINI:,}")
-        
-        df_gem_ui = pd.DataFrame([
-            {"順位/標的": f"{x['rank']} {x['name']}", "5分K門檻": f"< {x['trigger']}", "停損": x["stop"], "停利 T1": x["t1"], "停利 T2": x["t2"], "規格": f"{x['size']} ({x['margin']//1000}K)"}
-            for x in ORDERS_GEMINI
-        ])
-        st.dataframe(df_gem_ui, use_container_width=True, hide_index=True)
-        
-        with st.expander("查看 Gemini 籌碼依據與量化細節", expanded=True):
-            for x in ORDERS_GEMINI:
-                st.markdown(f"**{x['rank']} {x['name']}**：門檻 `< {x['trigger']}` ｜ 停損 `{x['stop']}` ｜ **T1 `{x['t1']}`**")
-                st.caption(f"└ 籌碼依據：{x['reason']}")
-                
-    with col_c:
-        st.markdown("#### 🟦 ChatGPT 戰情室封單")
-        st.caption(f"淨值：NT$ {CAPITAL_CHATGPT:,}｜單檔上限：NT$ {LIMIT_CHATGPT:,}")
-        
-        df_gpt_ui = pd.DataFrame([
-            {"順位/標的": f"{x['rank']} {x['name']}", "5分K門檻": f"< {x['trigger']}", "停損": x["stop"], "停利 T1": x["t1"], "停利 T2": x["t2"], "規格": f"{x['size']} ({x['margin']//1000}K)"}
-            for x in ORDERS_CHATGPT
-        ])
-        st.dataframe(df_gpt_ui, use_container_width=True, hide_index=True)
-        
-        with st.expander("查看 ChatGPT 型態邏輯與量化細節", expanded=True):
-            for x in ORDERS_CHATGPT:
-                st.markdown(f"**{x['rank']} {x['name']}**：門檻 `< {x['trigger']}` ｜ 停損 `{x['stop']}` ｜ **T1 `{x['t1']}`**")
-                st.caption(f"└ 作戰型態：{x['reason']}")
-
-    st.markdown("---")
-    st.subheader("🛑 Round 11 官方共識禁空名單（NO SHORT）")
-    cn1, cn2, cn3 = st.columns(3)
-    cn1.error("🚫 **3406 玉晶光**：強勢漲停鎖死 1,005 元，多頭極度強烈，維持絕對禁空。")
-    cn2.error("🚫 **2344 華邦電**：高盛美林暴買 1.2 萬張軋空，融資大退 -2,056 張洗淨，嚴禁追空。")
-    cn3.error("🚫 **2408 南亞科**：元大美林大摩反手大補，單日飆 5.8%，結構翻多不可摸空。")
-
-# ------------------------------------------------------------------------------
-# TAB 3: 撮合與方案 A 階梯結算器 (實務裁判工具)
+# TAB 3: 撮合與方案 A 結算終端
 # ------------------------------------------------------------------------------
 with tab_matcher:
     st.subheader("🧮 裁判室專用：5分K實體跌破撮合與方案 A 結算模擬器")
     st.caption("依據官方公約：取不利撮合價進場，盤中穿破 T1 即刻鎖利，未達條件者於 13:25 強制結算。")
     
-    sim_col1, sim_col2 = st.columns(2)
-    
-    with sim_col1:
-        st.markdown("**步驟 1：選擇審查部位與輸入盤面 5 分 K 數據**")
-        side_selected = st.radio("選擇選手：", ["🟥 Gemini", "🟦 ChatGPT"], horizontal=True)
-        active_list = ORDERS_GEMINI if "Gemini" in side_selected else ORDERS_CHATGPT
+    sim_c1, sim_c2 = st.columns(2)
+    with sim_c1:
+        st.markdown("**步驟 1：選擇審查選手與訂單**")
+        selected_side = st.radio("參賽陣營：", ["🟥 Gemini 戰情室", "🟦 ChatGPT 戰情室"], horizontal=True)
+        order_set = ORDERS_GEMINI if "Gemini" in selected_side else ORDERS_CHATGPT
         
-        selected_order = st.selectbox(
-            "選擇審查訂單：", 
-            active_list, 
-            format_func=lambda x: f"{x['rank']} {x['name']} (門檻 < {x['trigger']}, T1: {x['t1']})"
+        target_order = st.selectbox(
+            "選擇審查標的封單：",
+            order_set,
+            format_func=lambda x: f"{x['rank']} {x['name']} (門檻 < {x['trigger']:.1f}, 停損: {x['stop']:.1f}, T1: {x['t1']:.1f})"
         )
         
-        input_trigger_k = st.number_input("觸發 5 分 K 實體收盤價：", value=float(selected_order["trigger"]) - 0.5, step=0.5)
-        input_next_k = st.number_input("次一 5 分 K 開盤價：", value=float(selected_order["trigger"]) - 1.0, step=0.5)
-        input_low = st.number_input("盤中最低價 (5 分 K 最低點)：", value=float(selected_order["t1"]) - 1.0, step=0.5)
+        st.markdown("**步驟 2：輸入盤面 5 分 K 實體與走勢價位**")
+        k_open_in = st.number_input("觸發 5 分 K 開盤價：", value=float(target_order["trigger"]) + 1.0, step=0.5)
+        k_close_in = st.number_input("觸發 5 分 K 收盤價：", value=float(target_order["trigger"]) - 0.5, step=0.5)
+        next_open_in = st.number_input("次一根 5 分 K 開盤價：", value=float(target_order["trigger"]) - 1.0, step=0.5)
+        k_high_in = st.number_input("盤中最高價 (檢驗停損)：", value=float(target_order["stop"]) - 2.0, step=0.5)
+        k_low_in = st.number_input("盤中最低價 (檢驗方案 A T1)：", value=float(target_order["t1"]) - 1.0, step=0.5)
+        exit_close_in = st.number_input("13:25 尾盤強制平倉價 (備用)：", value=float(target_order["trigger"]) - 3.0, step=0.5)
         
-    with sim_col2:
-        st.markdown("**步驟 2：官方裁判室自動撮合結算結果**")
-        sim_result = calculate_execution(
-            trigger_price=selected_order["trigger"],
-            trigger_k_close=input_trigger_k,
-            next_k_open=input_next_k,
-            current_low=input_low,
-            stop_loss=selected_order["stop"],
-            t1_price=selected_order["t1"],
-            t2_price=selected_order["t2"]
+    with sim_c2:
+        st.markdown("**步驟 3：官方仲裁自動計算結果**")
+        res = execute_quant_settlement(
+            order=target_order,
+            k_open=k_open_in,
+            k_close=k_close_in,
+            k_low=k_low_in,
+            k_high=k_high_in,
+            next_k_open=next_open_in,
+            exit_k_close=exit_close_in
         )
         
-        st.info(f"**部位狀態**：{sim_result['status']}")
-        if sim_result["entry_price"] is not None:
-            st.write(f"- **不利滑價撮合進場價**：`{sim_result['entry_price']:.2f}` (取 {input_trigger_k} 與 {input_next_k} 較劣者)")
-            if sim_result["exit_price"] is not None:
-                st.write(f"- **平倉價格 (T1)**：`{sim_result['exit_price']:.2f}`")
-                st.write(f"- **單股獲利點數**：`+{sim_result['points']:.2f} 點`")
-                # 假設期貨 1 口 2000 股
-                shares = 2000 * (int(selected_order["size"].replace("口", "")) if "口" in selected_order["size"] else 1)
-                total_pnl = sim_result["points"] * shares
-                st.success(f"💰 **結算總損益**：`+NT$ {int(total_pnl):,}`")
-            else:
-                st.warning("部位仍在倉浮動中，未觸發 T1 平倉。")
-        st.caption(f"**詳細執法判定備註**：{sim_result['result']}")
+        st.info(f"**判定狀態**：{res['status']}")
+        if res["entry_price"] is not None:
+            st.write(f"- **不利滑價撮合價**：`{res['entry_price']:.2f}` (取觸發K收盤 {k_close_in} 與次K開盤 {next_open_in} 較劣者)")
+            if res["exit_price"] is not None:
+                st.write(f"- **出場平倉價**：`{res['exit_price']:.2f}`")
+                st.write(f"- **單股價差點數**：`{res['pnl_points']:+.2f} 點`")
+                if res['pnl_ntd'] > 0:
+                    st.success(f"💰 **核定結算總損益**：`+NT$ {res['pnl_ntd']:,}`")
+                else:
+                    st.error(f"📉 **核定結算總損益**：`-NT$ {abs(res['pnl_ntd']):,}`")
+        st.caption(f"**仲裁備註**：{res['note']}")
 
 # ------------------------------------------------------------------------------
-# TAB 4: 盤中走勢即時監控 (yFinance 串接)
+# TAB 4: 盤中走勢即時圖表監控
 # ------------------------------------------------------------------------------
 with tab_live:
-    st.subheader("📈 實時 5 分 K 線走勢圖與雙方防線對照")
+    st.subheader("📈 實時 5 分 K 線走勢圖與雙方作戰防線")
     
-    chart_ticker = st.selectbox("選擇要載入實時圖表的標的：", list(WATCHLIST_DB.keys()), format_func=lambda x: f"{x} {WATCHLIST_DB[x]['name']}")
-    market_ext = ".TWO" if WATCHLIST_DB[chart_ticker]["market"] == "OTC" else ".TW"
-    full_code = f"{chart_ticker}{market_ext}"
+    live_ticker = st.selectbox("選擇要繪製圖表的標的：", list(WATCHLIST_DB.keys()), format_func=lambda x: f"{x} {WATCHLIST_DB[x]['name']}")
+    market_suffix = ".TWO" if WATCHLIST_DB[live_ticker]["market"] == "OTC" else ".TW"
+    full_ticker = f"{live_ticker}{market_suffix}"
     
-    col_k1, col_k2 = st.columns([3, 1])
-    
-    with col_k1:
+    col_chart, col_rules = st.columns([3, 1])
+    with col_chart:
         try:
-            stock_data = yf.Ticker(full_code)
-            k_df = stock_data.history(period="3d", interval="5m")
+            stock = yf.Ticker(full_ticker)
+            k_hist = stock.history(period="3d", interval="5m")
             
-            if not k_df.empty:
+            if not k_hist.empty:
                 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.75, 0.25])
                 fig.add_trace(go.Candlestick(
-                    x=k_df.index, open=k_df['Open'], high=k_df['High'], low=k_df['Low'], close=k_df['Close'],
-                    name="5分K"
+                    x=k_hist.index, open=k_hist['Open'], high=k_hist['High'], low=k_hist['Low'], close=k_hist['Close'],
+                    name="5分K線"
                 ), row=1, col=1)
                 fig.add_trace(go.Bar(
-                    x=k_df.index, y=k_df['Volume'], name="成交量", marker_color='rgba(100, 149, 237, 0.6)'
+                    x=k_hist.index, y=k_hist['Volume'], name="成交量", marker_color='rgba(100, 149, 237, 0.5)'
                 ), row=2, col=1)
                 
-                # 繪製 Gemini 與 GPT 門檻線
-                g_match = next((x for x in ORDERS_GEMINI if x["ticker"] == chart_ticker), None)
-                c_match = next((x for x in ORDERS_CHATGPT if x["ticker"] == chart_ticker), None)
-                
-                if g_match:
-                    fig.add_hline(y=g_match["trigger"], line_dash="dash", line_color="red", annotation_text=f"Gemini 門檻: {g_match['trigger']}", row=1, col=1)
-                    fig.add_hline(y=g_match["t1"], line_dash="dot", line_color="green", annotation_text=f"Gemini T1: {g_match['t1']}", row=1, col=1)
-                if c_match:
-                    fig.add_hline(y=c_match["trigger"], line_dash="dash", line_color="blue", annotation_text=f"GPT 門檻: {c_match['trigger']}", row=1, col=1)
-                    fig.add_hline(y=c_match["t1"], line_dash="dot", line_color="cyan", annotation_text=f"GPT T1: {c_match['t1']}", row=1, col=1)
+                # 疊加 Gemini 標記
+                gm = next((x for x in ORDERS_GEMINI if x["ticker"] == live_ticker), None)
+                if gm:
+                    fig.add_hline(y=gm["trigger"], line_dash="dash", line_color="red", annotation_text=f"Gemini 進場: {gm['trigger']}", row=1, col=1)
+                    fig.add_hline(y=gm["t1"], line_dash="dot", line_color="green", annotation_text=f"Gemini T1: {gm['t1']}", row=1, col=1)
+                    fig.add_hline(y=gm["stop"], line_dash="dashdot", line_color="orange", annotation_text=f"Gemini 停損: {gm['stop']}", row=1, col=1)
                     
-                fig.update_layout(height=480, margin=dict(l=20, r=20, t=30, b=20), xaxis_rangeslider_visible=False)
+                # 疊加 GPT 標記
+                cm = next((x for x in ORDERS_CHATGPT if x["ticker"] == live_ticker), None)
+                if cm:
+                    fig.add_hline(y=cm["trigger"], line_dash="dash", line_color="blue", annotation_text=f"GPT 進場: {cm['trigger']}", row=1, col=1)
+                    fig.add_hline(y=cm["t1"], line_dash="dot", line_color="cyan", annotation_text=f"GPT T1: {cm['t1']}", row=1, col=1)
+                    fig.add_hline(y=cm["stop"], line_dash="dashdot", line_color="purple", annotation_text=f"GPT 停損: {cm['stop']}", row=1, col=1)
+                
+                fig.update_layout(height=500, margin=dict(l=20, r=20, t=30, b=20), xaxis_rangeslider_visible=False)
                 st.plotly_chart(fig, use_container_width=True)
             else:
-                st.warning(f"目前無即時 K 線數據，待盤中連線撮合。")
-        except Exception as err:
-            st.error(f"連線異常：{err}")
+                st.warning("目前非盤中連線時段或尚無資料，請待開盤串接。")
+        except Exception as e:
+            st.error(f"連線載入圖表失敗：{e}")
             
-    with col_k2:
-        st.markdown("#### 🎯 雙方門檻對照")
-        g_rule = next((x for x in ORDERS_GEMINI if x["ticker"] == chart_ticker), None)
-        c_rule = next((x for x in ORDERS_CHATGPT if x["ticker"] == chart_ticker), None)
+    with col_rules:
+        st.markdown("#### 🎯 雙方防線速覽")
+        gm_info = next((x for x in ORDERS_GEMINI if x["ticker"] == live_ticker), None)
+        cm_info = next((x for x in ORDERS_CHATGPT if x["ticker"] == live_ticker), None)
         
-        if g_rule:
-            st.markdown(f"**🟥 Gemini ({g_rule['rank']})**")
-            st.write(f"- 進場：`< {g_rule['trigger']}`")
-            st.write(f"- 停損：`{g_rule['stop']}`")
-            st.write(f"- **T1**：`{g_rule['t1']}`")
-            st.write(f"- **T2**：`{g_rule['t2']}`")
+        if gm_info:
+            st.markdown(f"**🟥 Gemini ({gm_info['rank']})**")
+            st.write(f"- 門檻：`< {gm_info['trigger']:.1f}`")
+            st.write(f"- 停損：`{gm_info['stop']:.1f}`")
+            st.write(f"- **T1**：`{gm_info['t1']:.1f}`")
+            st.write(f"- **T2**：`{gm_info['t2']:.1f}`")
         else:
-            st.caption("🟥 Gemini：未選入 TOP 5 / 空手")
+            st.caption("🟥 Gemini：未入選 TOP 5")
             
         st.markdown("---")
-        if c_rule:
-            st.markdown(f"**🟦 ChatGPT ({c_rule['rank']})**")
-            st.write(f"- 進場：`< {c_rule['trigger']}`")
-            st.write(f"- 停損：`{c_rule['stop']}`")
-            st.write(f"- **T1**：`{c_rule['t1']}`")
-            st.write(f"- **T2**：`{c_rule['t2']}`")
+        if cm_info:
+            st.markdown(f"**🟦 ChatGPT ({cm_info['rank']})**")
+            st.write(f"- 門檻：`< {cm_info['trigger']:.1f}`")
+            st.write(f"- 停損：`{cm_info['stop']:.1f}`")
+            st.write(f"- **T1**：`{cm_info['t1']:.1f}`")
+            st.write(f"- **T2**：`{cm_info['t2']:.1f}`")
         else:
-            st.caption("🟦 ChatGPT：未選入 TOP 5 / 空手")
+            st.caption("🟦 ChatGPT：未入選 TOP 5")
 
 # ==============================================================================
-# 8. 系統頁尾
+# 8. 系統頁尾宣告
 # ==============================================================================
 st.markdown("---")
-st.caption(f"短空雷達量化監控系統 v11.0｜Round 11 決戰專用版｜執法公約：5分K實體跌破 + 不利撮合滑價 + 方案A鎖利 + 13:25強平結算")
+st.caption(f"雙 AI 當沖量化短空雷達系統 v11.0｜裁判室官方核定版｜執法標準：5分K實體破線 + 不利滑價撮合 + 方案A保底鎖利 + 13:25強平清算")
