@@ -58,7 +58,7 @@ LIMIT_GEMINI = int(CAPITAL_GEMINI * 0.20)    # NT$ 324,119
 LIMIT_CHATGPT = int(CAPITAL_CHATGPT * 0.20)  # NT$ 257,936
 NET_SPREAD = CAPITAL_GEMINI - CAPITAL_CHATGPT # NT$ 330,914
 
-# 期交所個股期貨支援名單 (支援 2000 股規格撮合)
+# 期交所個股期貨支援名單
 STOCK_FUTURES_SET = {
     "2408", "3260", "2449", "3231", "2327", "2376", "6488", "2313", "2492",
     "2330", "2317", "2454", "2382", "2603", "2609", "2344", "3037", "2368", "3017",
@@ -75,23 +75,80 @@ STOCK_NAME_DICT = {
 NAME_TO_CODE_DICT = {v: k for k, v in STOCK_NAME_DICT.items()}
 TPEX_STOCKS = {"3260", "6488", "8299", "5289", "3211", "5483", "8112", "6213", "5314", "3105", "3374", "6173"}
 
-# 30 大隔日沖主力名冊
-BROKER_DATA_CATALOG = [
-    [1, "外資量化", "美商美林", "大型權值股、熱門題材股", "演算法高頻點火，尾盤大單市價掃進鎖漲停", "09:00～09:15 不計價市價倒出，常造成早盤垂直殺盤", "破 VWAP 即順勢放空，下殺放量 80% 快速停利"],
-    [2, "外資量化", "摩根大通", "AI伺服器、高價電子股", "程式量化跟風單，偏好拉抬具備國際題材標的", "早盤開高即分批掛內外盤倒貨，持續出貨至 10:00", "衝撞 NH 遇阻即試空，需留意法人反手洗盤"],
-    [3, "外資量化", "新加坡商瑞銀", "權值電子、航運、半導體", "與美林高頻聯動，喜好於高檔爆量時搶進", "09:05～09:20 集中倒出，破均價後不再護盤", "跌破主力加權成本時為標準加碼放空點"],
-    [4, "外資量化", "台灣摩根士丹利", "中大型高價股、IC設計", "早盤拉抬後尾盤鎖單，具備較高部位容忍度", "開盤先拉高營造強勢假象，隨後反手市價灌單", "觀察「假衝高誘多」，5分K 留長上影線果斷摸頂"],
-    [5, "外資量化", "美商高盛", "晶圓代工、蘋果供應鏈", "國際資金與量化混合，點火通常伴隨現貨放量", "早盤直接出清昨日部位，極少留倉隔日", "順勢跟空，注意券資比過高標的避免被軋"],
-    [6, "凱基軍團", "凱基-台北", "全市場強勢飆股、主流龍頭", "號稱隔日沖總舵主，動輒數千張連敲硬鎖漲停", "09:00～09:10 市價大單瘋狂倒貨，破線後絕不回頭", "早盤衝高滯漲第一順位狙擊目標，勝率極高"],
-    [7, "凱基軍團", "凱基-站前", "強勢突破股、集團股", "擅長關鍵點位重鎖，常與外資聯動進出", "早盤迅速宣洩持倉，跌破成本即不再護盤", "開盤見爆量黑K直接順勢短空"],
-    [8, "雙北核心", "元大", "權值股、強勢鎖碼股", "資金規模龐大，通常兼具造市與短線交易", "早盤均勻出脫，若遇大盤偏弱則加速倒貨", "適合穩健型短空，獲利空間約 1.5%～3%"],
-    [9, "雙北核心", "國票-敦北法人", "機構大戶、高價主流股", "大部位集中進出，拉抬時常伴隨極大成交額", "早盤出貨節奏較慢，分批大單掛賣壓制盤面", "觀察 VWAP 均價線下方的大單壓盤，偏空操作"],
-    [10, "雙北核心", "國泰-敦南", "車用電子、重電題材股", "擅長波段與隔日沖混搭，量大時多為隔日沖", "開高後連續出脫，若遇大盤偏弱則加速倒貨", "配合大盤偏弱盤勢時放空，勝率大幅提升"]
+# ==============================================================================
+# 3. 🎯 官方 R1～R10 歷史對決與狙擊標的覆盤大數據庫
+# ==============================================================================
+HISTORICAL_ROUNDS = [
+    {
+        "round": "R0 (初始)", "date": "賽前基準", "winner": "雙方就位",
+        "gem_pnl": 0, "gem_net": 1000000, "gem_targets": "初始資金池",
+        "gpt_pnl": 0, "gpt_net": 1000000, "gpt_targets": "初始資金池",
+        "spread": 0, "review": "賽事實裝啟動，雙方起始資本各 NT$ 1,000,000。"
+    },
+    {
+        "round": "Round 1", "date": "2026/09/02", "winner": "🟥 Gemini 勝",
+        "gem_pnl": 48200, "gem_net": 1048200, "gem_targets": "2327 國巨*(期), 2455 全新(期)",
+        "gpt_pnl": 12500, "gpt_net": 1012500, "gpt_targets": "2344 華邦電(期)",
+        "spread": 35700, "review": "Gemini 鎖定國巨開高走低與全新暴跌，ChatGPT 華邦電微幅獲利。"
+    },
+    {
+        "round": "Round 2", "date": "2026/09/03", "winner": "🟥 Gemini 勝",
+        "gem_pnl": 62400, "gem_net": 1110600, "gem_targets": "2408 南亞科(期), 3189 景碩(期)",
+        "gpt_pnl": -15000, "gpt_net": 997500, "gpt_targets": "2492 華新科(現股停損)",
+        "spread": 113100, "review": "南亞科帶頭重挫觸發 T1；GPT 華新科現股遭遇反彈觸發停損。"
+    },
+    {
+        "round": "Round 3", "date": "2026/09/04", "winner": "🟥 Gemini 勝",
+        "gem_pnl": 51000, "gem_net": 1161600, "gem_targets": "8039 台虹(期), 6173 信昌電(期)",
+        "gpt_pnl": 21000, "gpt_net": 1018500, "gpt_targets": "2313 華通(期)",
+        "spread": 143100, "review": "Gemini 掌握被動元件浮額踩踏，雙中 T1 保底；GPT 華通穩健收尾。"
+    },
+    {
+        "round": "Round 4", "date": "2026/09/08", "winner": "🟥 Gemini 勝",
+        "gem_pnl": 74500, "gem_net": 1236100, "gem_targets": "3037 欣興(期), 2455 全新(期)",
+        "gpt_pnl": 34000, "gpt_net": 1052500, "gpt_targets": "3260 威剛(期)",
+        "spread": 183600, "review": "欣興早盤急殺近 20 點命中 T2；雙方期貨部位大幅提振收益。"
+    },
+    {
+        "round": "Round 5", "date": "2026/09/09", "winner": "🟥 Gemini 勝",
+        "gem_pnl": 89000, "gem_net": 1325100, "gem_targets": "3406 玉晶光(期), 2408 南亞科(期)",
+        "gpt_pnl": 45000, "gpt_net": 1097500, "gpt_targets": "2344 華邦電(期)",
+        "spread": 227600, "review": "玉晶光千元震盪下殺大賺 40 點；雙方建立高額領先優勢。"
+    },
+    {
+        "round": "Round 6", "date": "2026/09/10", "winner": "🟦 ChatGPT 勝",
+        "gem_pnl": -22000, "gem_net": 1303100, "gem_targets": "2313 華通(期停損)",
+        "gpt_pnl": 58000, "gpt_net": 1155500, "gpt_targets": "3189 景碩(期), 2408 南亞科(期)",
+        "spread": 147600, "review": "GPT 首度奪勝！景碩破位大殺命中 T1，Gemini 華通盤中遭反抽停損。"
+    },
+    {
+        "round": "Round 7", "date": "2026/09/11", "winner": "🟥 Gemini 勝",
+        "gem_pnl": 94000, "gem_net": 1397100, "gem_targets": "2455 全新(期), 8039 台虹(期)",
+        "gpt_pnl": 31000, "gpt_net": 1186500, "gpt_targets": "2327 國巨*(期)",
+        "spread": 210600, "review": "全新融資斷頭連環殺盤，Gemini 滿載獲利，差距再度拉開。"
+    },
+    {
+        "round": "Round 8", "date": "2026/09/14", "winner": "🟥 Gemini 勝",
+        "gem_pnl": 157495, "gem_net": 1554595, "gem_targets": "2408 南亞科(期), 3260 威剛(期)",
+        "gpt_pnl": 80181, "gpt_net": 1266681, "gpt_targets": "2344 華邦電(期), 3260 威剛(期)",
+        "spread": 287914, "review": "大盤崩跌 700 點！南亞科與威剛單邊跳水，雙方均刷歷史單期獲利新高。"
+    },
+    {
+        "round": "Round 9", "date": "2026/09/15", "winner": "🟥 Gemini 勝",
+        "gem_pnl": 66000, "gem_net": 1620595, "gem_targets": "3406 玉晶光(期 T1命中 +33點)",
+        "gpt_pnl": 23000, "gpt_net": 1289681, "gpt_targets": "3260 威剛(期 +8點), 2408 南亞科(期 +3.5點)",
+        "spread": 330914, "review": "玉晶光跌破 950 殺至 906 完美達標 T1(915)；GPT 威剛/南亞科期貨獲利收關。"
+    },
+    {
+        "round": "Round 10", "date": "2026/09/16", "winner": "🤝 官方裁定平手",
+        "gem_pnl": 0, "gem_net": 1620595, "gem_targets": "0部位 (嚴格風控 5分K未跌破，空手避軋)",
+        "gpt_pnl": 0, "gpt_net": 1289681, "gpt_targets": "0部位 (門檻未達，空手避開玉晶光千元漲停)",
+        "spread": 330914, "review": "大盤飆漲 500 點、玉晶光漲停！雙方嚴守實體黑棒濾網，一股未進，零虧損守住淨值！"
+    }
 ]
-TARGET_BROKERS = [row[2] for row in BROKER_DATA_CATALOG]
 
 # ==============================================================================
-# 3. 🎯 2026-09-16 盤後 12 檔母池大數據庫 (主力進出 × 融資 × 權證完整版)
+# 4. 🎯 2026-09-16 盤後 12 檔母池大數據庫
 # ==============================================================================
 DEFAULT_WATCHLIST = [
     {
@@ -206,7 +263,7 @@ DEFAULT_WATCHLIST = [
 ]
 
 # ==============================================================================
-# 4. 雙方 Round 11 正式封單陣列 (官方存證凍結版)
+# 5. 雙方 Round 11 正式封單陣列 (官方存證凍結版)
 # ==============================================================================
 ORDERS_GEMINI = [
     {"rank": "🥇 首選 1", "ticker": "2455", "name": "全新(期)", "tool": "期貨", "size": "1口", "margin": 139050, "trigger": 512.0, "stop": 526.0, "t1": 498.0, "t2": 488.0, "shares": 2000, "reason": "逆勢收黑，外資砍1,700張，融資暴增+627張深套。"},
@@ -225,7 +282,7 @@ ORDERS_CHATGPT = [
 ]
 
 # ==============================================================================
-# 5. 抓取引擎與指標計算模組
+# 6. 抓取引擎與指標計算模組
 # ==============================================================================
 def pad_display_text(text, target_display_width):
     current_width = 0
@@ -235,40 +292,6 @@ def pad_display_text(text, target_display_width):
         else:
             current_width += 1
     return str(text) + (" " * max(target_display_width - current_width, 0))
-
-def fetch_from_histock(stock_code, close_price, total_vol):
-    url = f"https://histock.tw/stock/branch.aspx?no={stock_code}"
-    headers = {"User-Agent": "Mozilla/5.0", "Referer": "https://histock.tw/"}
-    try:
-        res = requests.get(url, headers=headers, timeout=3)
-        if res.status_code == 200:
-            soup = BeautifulSoup(res.text, "html.parser")
-            table = soup.find("table", {"class": "grid-table"})
-            if table:
-                cleaned = []
-                for row in table.find_all("tr")[1:6]:
-                    cols = row.find_all("td")
-                    if len(cols) >= 4:
-                        name = cols[0].text.strip()
-                        v_str = cols[1].text.strip().replace(",", "").replace("+", "")
-                        p_str = cols[3].text.strip().replace(",", "")
-                        if v_str.isdigit():
-                            vol = int(v_str)
-                            cost = float(p_str) if p_str.replace(".", "", 1).isdigit() else close_price
-                            cleaned.append({"分點": name, "買超": vol, "均價": cost, "佔比": round((vol / max(total_vol, 1)) * 100, 2)})
-                if cleaned: return cleaned
-    except Exception: pass
-    return None
-
-@st.cache_data(ttl=600)
-def auto_fetch_broker_data(stock_code, close_price, total_vol):
-    code_str = str(stock_code).strip()
-    res = fetch_from_histock(code_str, close_price, total_vol)
-    if res: return res
-    for item in DEFAULT_WATCHLIST:
-        if item.get("代號") == code_str:
-            return item.get("主力分點", [])
-    return []
 
 def calculate_pro_short_indicators(df):
     if df is None or df.empty: return pd.DataFrame()
@@ -318,7 +341,7 @@ def fetch_real_kline(stock_code, interval="5m"):
     return pd.DataFrame()
 
 # ==============================================================================
-# 6. 四層式連動 K 線繪圖引擎 (完全繼承原始 HTML/JS 跨層懸浮同步)
+# 7. 四層式連動 K 線繪圖引擎 (完全繼承原始 HTML/JS 跨層懸浮同步)
 # ==============================================================================
 def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limit_up_price, timeframe_label):
     last = df_k.iloc[-1]
@@ -439,7 +462,7 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
     return custom_component
 
 # ==============================================================================
-# 7. 量化撮合與方案 A 階梯結算引擎
+# 8. 量化撮合與方案 A 階梯結算引擎
 # ==============================================================================
 def execute_quant_settlement(order, k_open, k_close, k_low, k_high, next_k_open, exit_k_close=None):
     trigger_p = float(order["trigger"])
@@ -479,7 +502,7 @@ def execute_quant_settlement(order, k_open, k_close, k_low, k_high, next_k_open,
     }
 
 # ==============================================================================
-# 8. 母池數據預加載與多空勝率演算法
+# 9. 母池數據加載
 # ==============================================================================
 def load_radar_market_data(pool_list):
     enhanced = []
@@ -525,8 +548,6 @@ def load_radar_market_data(pool_list):
             })
 
         avg_cost = round(tot_cost_amount / (tot_buy_shares * 1000), 2) if tot_buy_shares > 0 else close_p
-        
-        # 9/16 官方量化勝率評分
         score_dict = {"2455": 96, "8039": 95, "6173": 92, "3189": 89, "2327": 86, "3037": 84, "2492": 72, "2313": 68, "3260": 50, "2344": 30, "2408": 30, "3406": 10}
         score = score_dict.get(code, 60)
 
@@ -552,7 +573,7 @@ df_display = load_radar_market_data(st.session_state["custom_watchlist"])
 df_display.index = range(1, len(df_display) + 1)
 
 # ==============================================================================
-# 9. 側邊欄與總體戰績儀表板
+# 10. 側邊欄與總體戰績儀表板
 # ==============================================================================
 st.sidebar.title("⚡ 短空雷達量化控制台")
 st.sidebar.markdown(f"**決戰輪次**：`Round 11` ({R11_DATE})")
@@ -587,20 +608,21 @@ st.sidebar.caption(
 )
 
 # ==============================================================================
-# 10. 主頁面四大核心分頁
+# 11. 主頁面五大核心分頁 (新增 Tab 5：R1~R10 淨值覆盤庫)
 # ==============================================================================
 st.title("🎯 雙 AI 量化當沖 PK 賽事｜Round 11 旗艦戰情室")
 st.caption(f"數據庫基準：{DATA_BASE_DATE} 臺灣證券交易所/櫃買中心/30+主力分點/自營商權證三維大數據")
 
-tab_workspace, tab_orders, tab_matcher, tab_radar = st.tabs([
+tab_workspace, tab_orders, tab_matcher, tab_radar, tab_history = st.tabs([
     "🖥️ 專業操盤工作台 (K線與分點)",
     "⚔️ R11 雙方正式決戰封單", 
     "🧮 官方撮合與方案A結算模擬器",
-    "📊 12檔母池籌碼雷達全景表"
+    "📊 12檔母池籌碼雷達全景表",
+    "🏆 R1~R10 淨值覆盤庫"
 ])
 
 # ------------------------------------------------------------------------------
-# TAB 1: 專業操盤工作台 (繼承原始左右分欄、等寬選單、4層式K線)
+# TAB 1: 專業操盤工作台
 # ------------------------------------------------------------------------------
 with tab_workspace:
     left_side, right_side = st.columns([1.35, 3.65], gap="medium")
@@ -694,7 +716,7 @@ with tab_workspace:
             st.dataframe(df_b, use_container_width=True)
 
 # ------------------------------------------------------------------------------
-# TAB 2: R11 雙方正式決戰封單 (防截斷規格)
+# TAB 2: R11 雙方正式決戰封單
 # ------------------------------------------------------------------------------
 with tab_orders:
     st.subheader("⚔️ Round 11 官方決戰名冊陣列 (已完成資料庫凍結備查)")
@@ -794,8 +816,81 @@ with tab_radar:
     ]
     st.dataframe(df_display[[c for c in preferred_cols if c in df_display.columns]], use_container_width=True)
 
+# ------------------------------------------------------------------------------
+# TAB 5: 🏆 R1~R10 淨值覆盤庫 (全新整合模組)
+# ------------------------------------------------------------------------------
+with tab_history:
+    st.subheader("📈 雙 AI 歷輪淨值走勢與狙擊標的覆盤矩陣 (R0～R10)")
+    st.caption("完整記錄每一輪的勝負演變、累積淨值變化與核心狙擊標的，支援量化回測與裁判室複查。")
+    
+    df_hist = pd.DataFrame(HISTORICAL_ROUNDS)
+    
+    # 1. 互動式淨值走勢圖 (Plotly)
+    fig_hist = go.Figure()
+    fig_hist.add_trace(go.Scatter(
+        x=df_hist["round"], y=df_hist["gem_net"],
+        mode="lines+markers+text", name="🟥 Gemini 淨值",
+        line=dict(color="#FF4444", width=3),
+        text=df_hist["gem_net"].apply(lambda x: f"${x//1000}K"),
+        textposition="top center", textfont=dict(color="#FF8888", size=10)
+    ))
+    fig_hist.add_trace(go.Scatter(
+        x=df_hist["round"], y=df_hist["gpt_net"],
+        mode="lines+markers+text", name="🟦 ChatGPT 淨值",
+        line=dict(color="#1E88E5", width=3, dash="dot"),
+        text=df_hist["gpt_net"].apply(lambda x: f"${x//1000}K"),
+        textposition="bottom center", textfont=dict(color="#64B5F6", size=10)
+    ))
+    fig_hist.update_layout(
+        template="plotly_dark", plot_bgcolor="#111", paper_bgcolor="#111",
+        title="雙方累積淨值曲線 (Net Worth Curve)",
+        xaxis_title="對決輪次", yaxis_title="帳戶淨值 (NT$)",
+        height=420, margin=dict(l=40, r=40, t=50, b=30),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    st.plotly_chart(fig_hist, use_container_width=True)
+    
+    st.markdown("---")
+    st.subheader("📋 歷輪戰績逐筆明細表 (含當期損益與核心狙擊標的)")
+    
+    # 呈現覆盤總表
+    table_view = df_hist[[
+        "round", "date", "winner", "gem_pnl", "gem_net", "gem_targets", 
+        "gpt_pnl", "gpt_net", "gpt_targets", "spread"
+    ]].copy()
+    
+    table_view["gem_pnl"] = table_view["gem_pnl"].apply(lambda x: f"{x:+,}")
+    table_view["gem_net"] = table_view["gem_net"].apply(lambda x: f"${x:,}")
+    table_view["gpt_pnl"] = table_view["gpt_pnl"].apply(lambda x: f"{x:+,}")
+    table_view["gpt_net"] = table_view["gpt_net"].apply(lambda x: f"${x:,}")
+    table_view["spread"] = table_view["spread"].apply(lambda x: f"${x:,}")
+    
+    table_view.columns = [
+        "輪次", "日期", "判決結果", "Gemini 損益", "Gemini 淨值", "🟥 Gemini 核心狙擊標的",
+        "ChatGPT 損益", "ChatGPT 淨值", "🟦 ChatGPT 核心狙擊標的", "領先差距"
+    ]
+    st.dataframe(table_view, use_container_width=True, hide_index=True)
+    
+    st.markdown("---")
+    st.subheader("🔍 歷輪戰況深度覆盤與重大仲裁紀錄")
+    
+    for r_item in reversed(HISTORICAL_ROUNDS):
+        with st.expander(f"📌 {r_item['round']} ({r_item['date']}) 判決：{r_item['winner']} ｜ 領先差：NT$ {r_item['spread']:,}", expanded=(r_item["round"] in ["Round 9", "Round 10"])):
+            c_rev1, c_rev2 = st.columns(2)
+            with c_rev1:
+                st.markdown(f"**🟥 Gemini 戰情報告**")
+                st.write(f"- 當期損益：`{r_item['gem_pnl']:+,} NT$`")
+                st.write(f"- 結算淨值：`NT$ {r_item['gem_net']:,}`")
+                st.write(f"- 核心部位：{r_item['gem_targets']}")
+            with c_rev2:
+                st.markdown(f"**🟦 ChatGPT 戰情報告**")
+                st.write(f"- 當期損益：`{r_item['gpt_pnl']:+,} NT$`")
+                st.write(f"- 結算淨值：`NT$ {r_item['gpt_net']:,}`")
+                st.write(f"- 核心部位：{r_item['gpt_targets']}")
+            st.info(f"💡 **戰術覆盤備註**：{r_item['review']}")
+
 # ==============================================================================
-# 11. 系統頁尾
+# 12. 系統頁尾
 # ==============================================================================
 st.markdown("---")
 st.caption(f"雙 AI 量化短空雷達系統 v11.0 旗艦版｜2026/09/16 數據庫凍結備查｜執法標準：5分K實體跌破 + 不利撮合滑價 + 方案A鎖利 + 13:25強平")
