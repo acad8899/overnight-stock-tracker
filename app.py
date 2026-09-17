@@ -65,15 +65,15 @@ STOCK_FUTURES_SET = {
     "2383", "1519", "8210", "2059", "4551", "5289", "8299", "3406",
     "2615", "8039", "5314", "2489", "3006", "2337", "8046", "2426", "2455", "3189",
     "3374", "6239", "6173"
-}[cite: 1]
+}
 
 STOCK_NAME_DICT = {
     "2327": "國巨*", "2455": "全新", "2492": "華新科", "8039": "台虹", "3189": "景碩",
     "3037": "欣興", "2408": "南亞科", "2313": "華通", "3406": "玉晶光", "2344": "華邦電",
     "3260": "威剛", "6173": "信昌電", "2426": "鼎元", "2330": "台積電", "2317": "鴻海"
-}[cite: 1]
-NAME_TO_CODE_DICT = {v: k for k, v in STOCK_NAME_DICT.items()}[cite: 1]
-TPEX_STOCKS = {"3260", "6488", "8299", "5289", "3211", "5483", "8112", "6213", "5314", "3105", "3374", "6173"}[cite: 1]
+}
+NAME_TO_CODE_DICT = {v: k for k, v in STOCK_NAME_DICT.items()}
+TPEX_STOCKS = {"3260", "6488", "8299", "5289", "3211", "5483", "8112", "6213", "5314", "3105", "3374", "6173"}
 
 # ==============================================================================
 # 3. 🎯 官方 R1～R11 歷史對決與狙擊標的覆盤大數據庫 (含最新 R11 裁判紀錄)
@@ -154,7 +154,7 @@ HISTORICAL_ROUNDS = [
 ]
 
 # ==============================================================================
-# 4. 🎯 2026-09-17 盤後 12 檔母池大數據庫 (更新 9/17 收盤走勢)
+# 4. 🎯 2026-09-17 盤後 12 檔母池大數據庫
 # ==============================================================================
 DEFAULT_WATCHLIST = [
     {
@@ -284,70 +284,70 @@ def pad_display_text(text, target_display_width):
     current_width = 0
     for ch in str(text):
         if unicodedata.east_asian_width(ch) in ('F', 'W', 'A'):
-            current_width += 2[cite: 1]
+            current_width += 2
         else:
-            current_width += 1[cite: 1]
-    return str(text) + (" " * max(target_display_width - current_width, 0))[cite: 1]
+            current_width += 1
+    return str(text) + (" " * max(target_display_width - current_width, 0))
 
 def calculate_pro_short_indicators(df):
-    if df is None or df.empty: return pd.DataFrame()[cite: 1]
-    df = df.copy()[cite: 1]
-    closes = [float(x) for x in df["收盤"]][cite: 1]
-    highs = [float(x) for x in df["最高"]][cite: 1]
-    lows = [float(x) for x in df["最低"]][cite: 1]
-    volumes = [float(x) for x in df["成交量"]][cite: 1]
-    opens = [float(x) for x in df["開盤"]][cite: 1]
+    if df is None or df.empty: return pd.DataFrame()
+    df = df.copy()
+    closes = [float(x) for x in df["收盤"]]
+    highs = [float(x) for x in df["最高"]]
+    lows = [float(x) for x in df["最低"]]
+    volumes = [float(x) for x in df["成交量"]]
+    opens = [float(x) for x in df["開盤"]]
     
-    df["5MA"] = df["收盤"].rolling(5, min_periods=1).mean().round(2)[cite: 1]
-    df["12MA"] = df["收盤"].rolling(12, min_periods=1).mean().round(2)[cite: 1]
-    df["20MA"] = df["收盤"].rolling(20, min_periods=1).mean().round(2)[cite: 1]
-    df["VOL_5MA"] = df["成交量"].rolling(5, min_periods=1).mean().round(0)[cite: 1]
+    df["5MA"] = df["收盤"].rolling(5, min_periods=1).mean().round(2)
+    df["12MA"] = df["收盤"].rolling(12, min_periods=1).mean().round(2)
+    df["20MA"] = df["收盤"].rolling(20, min_periods=1).mean().round(2)
+    df["VOL_5MA"] = df["成交量"].rolling(5, min_periods=1).mean().round(0)
 
     tp = (df["最高"] + df["最低"] + df["收盤"]) / 3.0
-    cum_v = df["成交量"].cumsum().replace(0, 1)[cite: 1]
+    cum_v = df["成交量"].cumsum().replace(0, 1)
     df["VWAP"] = ((tp * df["成交量"]).cumsum() / cum_v).round(2)
 
-    df["主力買賣超"] = [int(v * 0.18 * (1 if c >= o else -0.85)) for v, c, o in zip(volumes, closes, opens)][cite: 1]
-    df["大戶淨力道"] = [int(round(v * (((c - l) - (h - c)) / max(h - l, 0.01)) * 0.35)) for h, l, c, o, v in zip(highs, lows, closes, opens, volumes)][cite: 1]
-    df["累積大戶淨差"] = df["大戶淨力道"].cumsum()[cite: 1]
+    df["主力買賣超"] = [int(v * 0.18 * (1 if c >= o else -0.85)) for v, c, o in zip(volumes, closes, opens)]
+    df["大戶淨力道"] = [int(round(v * (((c - l) - (h - c)) / max(h - l, 0.01)) * 0.35)) for h, l, c, o, v in zip(highs, lows, closes, opens, volumes)]
+    df["累積大戶淨差"] = df["大戶淨力道"].cumsum()
     return df
 
 @st.cache_data(ttl=180)
 def fetch_real_kline(stock_code, interval="5m"):
-    code_str = str(stock_code).strip()[cite: 1]
-    syms = [f"{code_str}.TWO", f"{code_str}.TW"][cite: 1]
+    code_str = str(stock_code).strip()
+    syms = [f"{code_str}.TWO", f"{code_str}.TW"]
     for sym in syms:
         try:
-            t = yf.Ticker(sym)[cite: 1]
-            raw = t.history(period="5d", interval=interval)[cite: 1]
-            if raw is not None and not raw.empty and len(raw) >= 3:[cite: 1]
-                raw = raw.reset_index()[cite: 1]
-                tc = "Datetime" if "Datetime" in raw.columns else "Date"[cite: 1]
-                records = [][cite: 1]
-                for _, r in raw.iterrows():[cite: 1]
-                    d_str = r[tc].strftime('%m/%d %H:%M') if interval != "1d" else r[tc].strftime('%Y/%m/%d')[cite: 1]
+            t = yf.Ticker(sym)
+            raw = t.history(period="5d", interval=interval)
+            if raw is not None and not raw.empty and len(raw) >= 3:
+                raw = raw.reset_index()
+                tc = "Datetime" if "Datetime" in raw.columns else "Date"
+                records = []
+                for _, r in raw.iterrows():
+                    d_str = r[tc].strftime('%m/%d %H:%M') if interval != "1d" else r[tc].strftime('%Y/%m/%d')
                     records.append({
                         "日期": d_str, "開盤": round(float(r["Open"]), 2),
                         "最高": round(float(r["High"]), 2), "最低": round(float(r["Low"]), 2),
                         "收盤": round(float(r["Close"]), 2), "成交量": int(r["Volume"]) // 1000
-                    })[cite: 1]
-                df_res = pd.DataFrame(records)[cite: 1]
-                return calculate_pro_short_indicators(df_res)[cite: 1]
-        except Exception: continue[cite: 1]
-    return pd.DataFrame()[cite: 1]
+                    })
+                df_res = pd.DataFrame(records)
+                return calculate_pro_short_indicators(df_res)
+        except Exception: continue
+    return pd.DataFrame()
 
 # ==============================================================================
 # 7. 四層式連動 K 線繪圖引擎 (完全繼承原始 HTML/JS 跨層懸浮同步)
 # ==============================================================================
 def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh_res, limit_up_price, timeframe_label):
-    last = df_k.iloc[-1][cite: 1]
-    prev_close = df_k["收盤"].iloc[-2] if len(df_k) > 1 else last["收盤"][cite: 1]
-    change = round(float(last["收盤"]) - float(prev_close), 2)[cite: 1]
-    change_pct = round((change / float(prev_close)) * 100, 2) if float(prev_close) else 0.0[cite: 1]
+    last = df_k.iloc[-1]
+    prev_close = df_k["收盤"].iloc[-2] if len(df_k) > 1 else last["收盤"]
+    change = round(float(last["收盤"]) - float(prev_close), 2)
+    change_pct = round((change / float(prev_close)) * 100, 2) if float(prev_close) else 0.0
     
-    chg_color = "#FF3333" if change >= 0 else "#00CC00"[cite: 1]
-    chg_symbol = "↑" if change >= 0 else "↓"[cite: 1]
-    fut_badge_html = "<span style='background-color:#1E88E5; color:#FFF; padding:1px 5px; border-radius:4px; font-weight:bold; font-size:12px; margin-left:6px;'>期</span>" if stock_code in STOCK_FUTURES_SET else ""[cite: 1]
+    chg_color = "#FF3333" if change >= 0 else "#00CC00"
+    chg_symbol = "↑" if change >= 0 else "↓"
+    fut_badge_html = "<span style='background-color:#1E88E5; color:#FFF; padding:1px 5px; border-radius:4px; font-weight:bold; font-size:12px; margin-left:6px;'>期</span>" if stock_code in STOCK_FUTURES_SET else ""
     
     default_info_html = (
         f"<span style='color: #FFFF00;'>{timeframe_label} {last['日期']}</span> "
@@ -358,26 +358,26 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
         f"<span style='color: #FFCC00;'>5MA: {last.get('5MA', '-')}</span> "
         f"<span style='color: #33CCFF;'>20MA: {last.get('20MA', '-')}</span> "
         f"<span style='color: #FF00FF; font-weight:bold;'>VWAP: {last.get('VWAP', '-')}</span>"
-    )[cite: 1]
+    )
 
     fig = make_subplots(
-        rows=4, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.48, 0.16, 0.16, 0.20],[cite: 1]
+        rows=4, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.48, 0.16, 0.16, 0.20],
         subplot_titles=(
             "",
-            f"<span style='color:#FF3333; font-size:11px;'>成交量: {int(last.get('成交量', 0))} 張</span>",[cite: 1]
-            f"<span style='color:#00E5FF; font-size:11px;'>主力分點買賣超: {int(last.get('主力買賣超', 0))} 張</span>",[cite: 1]
-            f"<span style='color:#FF9900; font-size:11px;'>主力大戶淨力道: {int(last.get('大戶淨力道', 0)):+} 張</span>"[cite: 1]
+            f"<span style='color:#FF3333; font-size:11px;'>成交量: {int(last.get('成交量', 0))} 張</span>",
+            f"<span style='color:#00E5FF; font-size:11px;'>主力分點買賣超: {int(last.get('主力買賣超', 0))} 張</span>",
+            f"<span style='color:#FF9900; font-size:11px;'>主力大戶淨力道: {int(last.get('大戶淨力道', 0)):+} 張</span>"
         )
     )
     
-    kline_lookup_dict = {}[cite: 1]
-    for i in range(len(df_k)):[cite: 1]
-        r = df_k.iloc[i][cite: 1]
-        d_key = str(r["日期"])[cite: 1]
-        p_val = float(df_k["收盤"].iloc[i-1]) if i > 0 else float(r["收盤"])[cite: 1]
-        c_val = float(r["收盤"])[cite: 1]
-        chg = round(c_val - p_val, 2)[cite: 1]
-        pct = round((chg / p_val) * 100, 2) if p_val else 0.0[cite: 1]
+    kline_lookup_dict = {}
+    for i in range(len(df_k)):
+        r = df_k.iloc[i]
+        d_key = str(r["日期"])
+        p_val = float(df_k["收盤"].iloc[i-1]) if i > 0 else float(r["收盤"])
+        c_val = float(r["收盤"])
+        chg = round(c_val - p_val, 2)
+        pct = round((chg / p_val) * 100, 2) if p_val else 0.0
         kline_lookup_dict[d_key] = (
             f"<span style='color: #FFFF00;'>{timeframe_label} {d_key}</span> "
             f"<span style='color: #00CC00;'>開 <span style='color:#FFF;'>{r['開盤']}</span></span> "
@@ -387,44 +387,44 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
             f"<span style='color: #FFCC00;'>5MA: {r.get('5MA', '-')}</span> "
             f"<span style='color: #33CCFF;'>20MA: {r.get('20MA', '-')}</span> "
             f"<span style='color: #FF00FF; font-weight:bold;'>VWAP: {r.get('VWAP', '-')}</span>"
-        )[cite: 1]
+        )
 
     fig.add_trace(go.Candlestick(
-        x=df_k['日期'], open=df_k['開盤'], high=df_k['最高'], low=df_k['最低'], close=df_k['收盤'],[cite: 1]
-        name='K線', hoverinfo='none', increasing_line_color='#FF3333', decreasing_line_color='#00CC00'[cite: 1]
-    ), row=1, col=1)[cite: 1]
+        x=df_k['日期'], open=df_k['開盤'], high=df_k['最高'], low=df_k['最低'], close=df_k['收盤'],
+        name='K線', hoverinfo='none', increasing_line_color='#FF3333', decreasing_line_color='#00CC00'
+    ), row=1, col=1)
     
-    if '5MA' in df_k.columns: fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFCC00', width=1.2), hoverinfo='none'), row=1, col=1)[cite: 1]
-    if '20MA' in df_k.columns: fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['20MA'], line=dict(color='#33CCFF', width=1.5), hoverinfo='none'), row=1, col=1)[cite: 1]
-    if 'VWAP' in df_k.columns: fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VWAP'], line=dict(color='#FF00FF', width=1.8), hoverinfo='none'), row=1, col=1)[cite: 1]
+    if '5MA' in df_k.columns: fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFCC00', width=1.2), hoverinfo='none'), row=1, col=1)
+    if '20MA' in df_k.columns: fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['20MA'], line=dict(color='#33CCFF', width=1.5), hoverinfo='none'), row=1, col=1)
+    if 'VWAP' in df_k.columns: fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VWAP'], line=dict(color='#FF00FF', width=1.8), hoverinfo='none'), row=1, col=1)
 
     if isinstance(nh_res, (int, float)):
-        fig.add_hline(y=float(nh_res), line=dict(color="#FF8800", width=1.4, dash="dot"), annotation_text=f" 核心壓力(NH): {nh_res} ", row=1, col=1)[cite: 1]
+        fig.add_hline(y=float(nh_res), line=dict(color="#FF8800", width=1.4, dash="dot"), annotation_text=f" 核心壓力(NH): {nh_res} ", row=1, col=1)
     if isinstance(broker_cost, (int, float)):
-        fig.add_hline(y=float(broker_cost), line=dict(color="#00E5FF", width=1.2, dash="dash"), annotation_text=f" 主力均價: {broker_cost} ", row=1, col=1)[cite: 1]
+        fig.add_hline(y=float(broker_cost), line=dict(color="#00E5FF", width=1.2, dash="dash"), annotation_text=f" 主力均價: {broker_cost} ", row=1, col=1)
 
-    vol_colors = ['#FF3333' if float(c) >= float(o) else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])][cite: 1]
-    fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['成交量'], marker_color=vol_colors, hoverinfo='none'), row=2, col=1)[cite: 1]
-    if 'VOL_5MA' in df_k.columns: fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), hoverinfo='none'), row=2, col=1)[cite: 1]
+    vol_colors = ['#FF3333' if float(c) >= float(o) else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
+    fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['成交量'], marker_color=vol_colors, hoverinfo='none'), row=2, col=1)
+    if 'VOL_5MA' in df_k.columns: fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), hoverinfo='none'), row=2, col=1)
 
     if '主力買賣超' in df_k.columns:
-        b_colors = ['#FF3333' if int(v) >= 0 else '#00CC00' for v in df_k['主力買賣超']][cite: 1]
-        fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['主力買賣超'], marker_color=b_colors, hoverinfo='none'), row=3, col=1)[cite: 1]
+        b_colors = ['#FF3333' if int(v) >= 0 else '#00CC00' for v in df_k['主力買賣超']]
+        fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['主力買賣超'], marker_color=b_colors, hoverinfo='none'), row=3, col=1)
 
     if '大戶淨力道' in df_k.columns:
-        f_colors = ['#FF3333' if int(v) >= 0 else '#00CC00' for v in df_k['大戶淨力道']][cite: 1]
-        fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['大戶淨力道'], marker_color=f_colors, hoverinfo='none'), row=4, col=1)[cite: 1]
+        f_colors = ['#FF3333' if int(v) >= 0 else '#00CC00' for v in df_k['大戶淨力道']]
+        fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['大戶淨力道'], marker_color=f_colors, hoverinfo='none'), row=4, col=1)
 
     fig.update_layout(
-        template="plotly_dark", plot_bgcolor="#000000", paper_bgcolor="#000000",[cite: 1]
-        xaxis_rangeslider_visible=False, showlegend=False, height=720,[cite: 1]
-        margin=dict(l=35, r=35, t=10, b=15), hovermode="x"[cite: 1]
+        template="plotly_dark", plot_bgcolor="#000000", paper_bgcolor="#000000",
+        xaxis_rangeslider_visible=False, showlegend=False, height=720,
+        margin=dict(l=35, r=35, t=10, b=15), hovermode="x"
     )
-    fig.update_xaxes(type='category', gridcolor="#222222", showspikes=True, spikemode="across", spikethickness=1, spikedash="dash")[cite: 1]
-    fig.update_yaxes(gridcolor="#222222", side="right", showspikes=True, spikemode="across", spikethickness=1, spikedash="dash")[cite: 1]
+    fig.update_xaxes(type='category', gridcolor="#222222", showspikes=True, spikemode="across", spikethickness=1, spikedash="dash")
+    fig.update_yaxes(gridcolor="#222222", side="right", showspikes=True, spikemode="across", spikethickness=1, spikedash="dash")
 
-    plotly_html = fig.to_html(include_plotlyjs='cdn', full_html=False, config={'displayModeBar': False})[cite: 1]
-    lookup_json = json.dumps(kline_lookup_dict)[cite: 1]
+    plotly_html = fig.to_html(include_plotlyjs='cdn', full_html=False, config={'displayModeBar': False})
+    lookup_json = json.dumps(kline_lookup_dict)
 
     custom_component = f"""
     <div style="background-color:#000; font-family: monospace; border:1px solid #333; padding:6px 10px; margin-bottom:4px;">
@@ -454,8 +454,8 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
         attachHover();
     }})();
     </script>
-    """[cite: 1]
-    return custom_component[cite: 1]
+    """
+    return custom_component
 
 # ==============================================================================
 # 8. 量化撮合與方案 A 階梯結算引擎
@@ -503,34 +503,34 @@ def execute_quant_settlement(order, k_open, k_close, k_low, k_high, next_k_open,
 def load_radar_market_data(pool_list):
     enhanced = []
     for item in pool_list:
-        code = item.get("代號")[cite: 1]
-        name = item.get("名稱", STOCK_NAME_DICT.get(code, f"個股_{code}"))[cite: 1]
-        close_p = float(item.get("昨收", 100.0))[cite: 1]
-        high_p = float(item.get("最高價", close_p))[cite: 1]
-        low_p = float(item.get("最低價", close_p * 0.96))[cite: 1]
-        prev_close = round(close_p * 0.98, 2)[cite: 1]
-        margin_change = item.get("融資增減(張)", 0)[cite: 1]
-        tot_vol = int(item.get("昨日鎖碼量", 10000))[cite: 1]
+        code = item.get("代號")
+        name = item.get("名稱", STOCK_NAME_DICT.get(code, f"個股_{code}"))
+        close_p = float(item.get("昨收", 100.0))
+        high_p = float(item.get("最高價", close_p))
+        low_p = float(item.get("最低價", close_p * 0.96))
+        prev_close = round(close_p * 0.98, 2)
+        margin_change = item.get("融資增減(張)", 0)
+        tot_vol = int(item.get("昨日鎖碼量", 10000))
 
-        limit_up = round(prev_close * 1.10, 2)[cite: 1]
-        cdp = round((high_p + low_p + 2.0 * close_p) / 4.0, 2)[cite: 1]
-        nh_res = round(min(2.0 * cdp - low_p, limit_up), 2)[cite: 1]
-        ah_res = round(min(cdp + (high_p - low_p), limit_up), 2)[cite: 1]
+        limit_up = round(prev_close * 1.10, 2)
+        cdp = round((high_p + low_p + 2.0 * close_p) / 4.0, 2)
+        nh_res = round(min(2.0 * cdp - low_p, limit_up), 2)
+        ah_res = round(min(cdp + (high_p - low_p), limit_up), 2)
 
-        raw_brokers = item.get("主力分點", [])[cite: 1]
+        raw_brokers = item.get("主力分點", [])
         detailed_brokers = []
         tot_buy_shares = 0
         tot_cost_amount = 0.0
         tot_ratio = 0.0
 
         for b in raw_brokers:
-            b_name = b.get("分點")[cite: 1]
-            b_vol = int(b.get("買超", 0))[cite: 1]
-            b_cost = float(b.get("均價", close_p))[cite: 1]
-            b_ratio = float(b.get("佔比", round((b_vol / max(tot_vol, 1)) * 100, 2)))[cite: 1]
+            b_name = b.get("分點")
+            b_vol = int(b.get("買超", 0))
+            b_cost = float(b.get("均價", close_p))
+            b_ratio = float(b.get("佔比", round((b_vol / max(tot_vol, 1)) * 100, 2)))
             
-            p_rate = round(((close_p - b_cost) / b_cost) * 100, 2) if b_cost > 0 else 0.0[cite: 1]
-            profit_wan = int(round(((close_p - b_cost) * b_vol * 1000) / 10000))[cite: 1]
+            p_rate = round(((close_p - b_cost) / b_cost) * 100, 2) if b_cost > 0 else 0.0
+            profit_wan = int(round(((close_p - b_cost) * b_vol * 1000) / 10000))
             
             if b_vol > 0:
                 tot_buy_shares += b_vol
@@ -541,9 +541,9 @@ def load_radar_market_data(pool_list):
                 "分點名稱": b_name, "買超張數": b_vol, "佔比(%)": b_ratio,
                 "收盤價": close_p, "預估成本": b_cost, "預估獲利(萬)": profit_wan,
                 "報酬率(%)": p_rate, "倒貨意願": "🔴 極高" if p_rate >= 1.0 else ("🟡 普通" if p_rate >= -0.5 else "🟢 停損出貨")
-            })[cite: 1]
+            })
 
-        avg_cost = round(tot_cost_amount / (tot_buy_shares * 1000), 2) if tot_buy_shares > 0 else close_p[cite: 1]
+        avg_cost = round(tot_cost_amount / (tot_buy_shares * 1000), 2) if tot_buy_shares > 0 else close_p
         score_dict = {"2455": 96, "8039": 95, "6173": 92, "3189": 89, "2327": 86, "3037": 84, "2492": 72, "2313": 68, "3260": 50, "2344": 30, "2408": 30, "3406": 10}
         score = score_dict.get(code, 60)
 
@@ -686,11 +686,11 @@ with tab_workspace:
         target_name = target_row["股票名稱"]
         c_tf1, c_tf2 = st.columns([1, 1])
         with c_tf1:
-            timeframe_options = {"5分K (主力關鍵)": "5m", "1分K": "1m", "30分K": "30m", "日線": "1d"}[cite: 1]
-            selected_tf_label = st.selectbox("週期切換：", list(timeframe_options.keys()), index=0)[cite: 1]
-            selected_interval = timeframe_options[selected_tf_label][cite: 1]
+            timeframe_options = {"5分K (主力關鍵)": "5m", "1分K": "1m", "30分K": "30m", "日線": "1d"}
+            selected_tf_label = st.selectbox("週期切換：", list(timeframe_options.keys()), index=0)
+            selected_interval = timeframe_options[selected_tf_label]
         with c_tf2:
-            k_count = st.number_input("K 棒根數：", min_value=10, max_value=300, value=60, step=10)[cite: 1]
+            k_count = st.number_input("K 棒根數：", min_value=10, max_value=300, value=60, step=10)
 
         stock_k_df = fetch_real_kline(target_code, interval=selected_interval)
         if stock_k_df is not None and not stock_k_df.empty:
@@ -699,9 +699,9 @@ with tab_workspace:
                 target_code, target_name, target_row["主力加權成本"], target_row["近高壓力(NH)"],
                 round(target_row["昨收"] * 1.1, 2), selected_tf_label
             )
-            components.html(chart_html, height=790, scrolling=False)[cite: 1]
+            components.html(chart_html, height=790, scrolling=False)
         else:
-            st.warning("暫無該標的即時線圖資料。")[cite: 1]
+            st.warning("暫無該標的即時線圖資料。")
 
         # 券商分點列表
         st.markdown(f"#### 🏢 【{target_name}】主力分點鎖碼持倉明細")
