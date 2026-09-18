@@ -267,7 +267,7 @@ DEFAULT_WATCHLIST = [
 ]
 
 # ==============================================================================
-# 5. Gemini Round 13 官方決戰封單陣列 (落實單一部位最大停損 NT$ 10,000)
+# 5. Round 13 雙方官方決戰封單陣列 (落實單一部位最大停損 NT$ 10,000)
 # ==============================================================================
 ORDERS_GEMINI_R13 = [
     {"rank": "🥇 首選 1", "ticker": "8039", "name": "台虹(期)", "tool": "期貨", "size": "1口", "margin": 72765, "trigger": 266.0, "stop": 271.0, "t1": 258.0, "t2": 251.0, "shares": 2000, "reason": "融資狂增+1264張居首，小摩倒10.7%，凱基台北隔日沖鎖單！"},
@@ -275,6 +275,14 @@ ORDERS_GEMINI_R13 = [
     {"rank": "🥉 首選 3", "ticker": "2455", "name": "全新(期)", "tool": "期貨", "size": "1口", "margin": 150120, "trigger": 551.0, "stop": 556.0, "t1": 541.0, "t2": 532.0, "shares": 2000, "reason": "融資連三日狂吞逾2100張，散戶高檔大接刀，破線順勢放空！"},
     {"rank": "4", "ticker": "6173", "name": "信昌電(期)", "tool": "期貨", "size": "1口", "margin": 84780, "trigger": 310.0, "stop": 315.0, "t1": 301.0, "t2": 293.0, "shares": 2000, "reason": "小摩單點爆買2892張(15.5%)，籌碼極度集中，早盤倒貨風險大！"},
     {"rank": "5", "ticker": "2344", "name": "華邦電(期)", "tool": "期貨", "size": "2口", "margin": 48465, "trigger": 177.0, "stop": 179.5, "t1": 172.0, "t2": 168.0, "shares": 4000, "reason": "天量鎖碼逾3萬張，認售權證買超+40萬避險進駐，破177進空！"}
+]
+
+ORDERS_CHATGPT_R13 = [
+    {"rank": "🥇 1", "ticker": "2455", "name": "全新(期)", "tool": "期貨", "size": "1口", "margin": 150120, "trigger": 548.0, "stop": 553.0, "t1": 538.0, "t2": 530.0, "shares": 2000, "reason": "融資追價＋法人轉賣，跌破548才啟動狙擊，限虧1萬。"},
+    {"rank": "🥈 2", "ticker": "3406", "name": "玉晶光(期)", "tool": "期貨", "size": "1口", "margin": 262440, "trigger": 965.0, "stop": 970.0, "t1": 955.0, "t2": 945.0, "shares": 2000, "reason": "主力反向＋高檔套牢，千元關卡外資連賣，破965進空。"},
+    {"rank": "🥉 3", "ticker": "3260", "name": "威剛(期)", "tool": "期貨", "size": "1口", "margin": 107055, "trigger": 393.0, "stop": 398.0, "t1": 383.0, "t2": 376.0, "shares": 2000, "reason": "主力大賣＋高檔橫盤，富邦狂砍14%，破393順勢空。"},
+    {"rank": "4", "ticker": "8039", "name": "台虹(期)", "tool": "期貨", "size": "1口", "margin": 72765, "trigger": 264.0, "stop": 269.0, "t1": 255.0, "t2": 248.0, "shares": 2000, "reason": "融資暴增＋軋空後籌碼堆積，右側跌破264才動手。"},
+    {"rank": "5", "ticker": "6173", "name": "信昌電(期)", "tool": "期貨", "size": "1口", "margin": 84780, "trigger": 308.0, "stop": 313.0, "t1": 298.0, "t2": 290.0, "shares": 2000, "reason": "隔日沖反轉模型，小摩單點鎖碼後早盤出貨防線308。"}
 ]
 
 # ==============================================================================
@@ -477,7 +485,6 @@ def execute_quant_settlement(order, k_open, k_close, k_low, k_high, next_k_open,
     if k_high >= stop_p:
         pts = entry_p - stop_p
         loss_ntd = int(pts * shares)
-        # 強制檢驗停損紀律
         return {
             "status": "❌ 停損平倉 (萬元風控鎖定)", "entry_price": entry_p, "exit_price": stop_p,
             "pnl_points": pts, "pnl_ntd": loss_ntd, "note": f"盤中突破停損價 {stop_p}，依萬元紀律立即停損出場。"
@@ -547,7 +554,6 @@ def load_radar_market_data(pool_list):
 
         avg_cost = round(tot_cost_amount / (tot_buy_shares * 1000), 2) if tot_buy_shares > 0 else close_p
         
-        # 9/18 盤後三維短空勝率分
         score_dict = {"8039": 98, "2327": 96, "2455": 94, "6173": 91, "2344": 88, "3260": 85, "2492": 80, "2313": 75, "3406": 50, "3189": 40, "3037": 30, "2408": 20}
         score = score_dict.get(code, 60)
 
@@ -717,7 +723,7 @@ with tab_workspace:
 # TAB 2: R13 雙方正式決戰封單名冊
 # ------------------------------------------------------------------------------
 with tab_orders:
-    st.subheader("⚔️ Round 13 官方決戰名冊陣列 (實裝萬元停損風控限制)")
+    st.subheader("⚔️ Round 13 官方決戰名冊陣列 (雙方實裝萬元停損風控限制)")
     col_g, col_c = st.columns(2)
     
     with col_g:
@@ -725,20 +731,30 @@ with tab_orders:
         st.caption(f"淨值：NT$ {CAPITAL_GEMINI:,}｜單檔上限：NT$ {LIMIT_GEMINI:,}｜單筆停損 ≤ NT$ 10,000")
         
         df_gem_ui = pd.DataFrame([
-            {"順位/標的": f"{x['rank']} {x['name']}", "5分K門檻": f"< {x['trigger']:.1f}", "停損": f"{x['stop']:.1f}", "停利 T1": f"{x['t1']:.1f}", "停利 T2": f"{x['t2']:.1f}", "規格/保證金": f"{x['size']} ({x['margin']//1000}K)"}
+            {"順位/標的": f"{x['rank']} {x['name']}", "5分K門檻": f"< {x['trigger']:.1f}", "停損": f"{x['stop']:.1f}", "停利 T1": f"{x['t1']:.1f}", "停利 T2": f"{x['t2']:.1f}", "規格": x['size'], "最大停損": "-NT$ 10,000"}
             for x in ORDERS_GEMINI_R13
         ])
         st.dataframe(df_gem_ui, use_container_width=True, hide_index=True)
         
         with st.expander("🔍 查看 Gemini R13 籌碼依據與量化細節", expanded=True):
             for x in ORDERS_GEMINI_R13:
-                st.markdown(f"**{x['rank']} {x['name']}**：門檻 `< {x['trigger']:.1f}` ｜ 停損 `{x['stop']:.1f}` ｜ **T1 `{x['t1']:.1f}`**")
+                st.markdown(f"**{x['rank']} {x['name']}**：門檻 `< {x['trigger']:.1f}` ｜ 停損 `{x['stop']:.1f}` ｜ **T1 `{x['t1']:.1f}`** ｜ 最大停損 `-NT$ 10,000`")
                 st.caption(f"└ 核心籌碼：{x['reason']}")
                 
     with col_c:
-        st.markdown("#### 🟦 ChatGPT 戰情室 R13 待命陣列")
-        st.caption(f"淨值：NT$ {CAPITAL_CHATGPT:,}｜單檔上限：NT$ {LIMIT_CHATGPT:,}")
-        st.info("靜候 ChatGPT 戰情室提交 Round 13 封單（將同步落實萬元停損新公約）！")
+        st.markdown("#### 🟦 ChatGPT 戰情室 R13 正式封單")
+        st.caption(f"淨值：NT$ {CAPITAL_CHATGPT:,}｜單檔上限：NT$ {LIMIT_CHATGPT:,}｜單筆停損 ≤ NT$ 10,000")
+        
+        df_gpt_ui = pd.DataFrame([
+            {"順位/標的": f"{x['rank']} {x['name']}", "5分K門檻": f"< {x['trigger']:.1f}", "停損": f"{x['stop']:.1f}", "停利 T1": f"{x['t1']:.1f}", "停利 T2": f"{x['t2']:.1f}", "規格": x['size'], "最大停損": "-NT$ 10,000"}
+            for x in ORDERS_CHATGPT_R13
+        ])
+        st.dataframe(df_gpt_ui, use_container_width=True, hide_index=True)
+        
+        with st.expander("🔍 查看 ChatGPT R13 策略邏輯與作戰口令", expanded=True):
+            for x in ORDERS_CHATGPT_R13:
+                st.markdown(f"**{x['rank']} {x['name']}**：門檻 `< {x['trigger']:.1f}` ｜ 停損 `{x['stop']:.1f}` ｜ **T1 `{x['t1']:.1f}`** ｜ 最大停損 `-NT$ 10,000`")
+                st.caption(f"└ 作戰定位：{x['reason']}")
 
     st.markdown("---")
     st.subheader("🛑 Round 13 官方共識禁空名單（NO SHORT LIST）")
@@ -755,9 +771,12 @@ with tab_matcher:
     
     sim_c1, sim_c2 = st.columns(2)
     with sim_c1:
-        st.markdown("**步驟 1：選擇審查訂單**")
+        st.markdown("**步驟 1：選擇審查陣營與封單**")
+        selected_side = st.radio("參賽陣營：", ["🟥 Gemini 戰情室", "🟦 ChatGPT 戰情室"], horizontal=True)
+        order_set = ORDERS_GEMINI_R13 if "Gemini" in selected_side else ORDERS_CHATGPT_R13
+        
         target_order = st.selectbox(
-            "選擇審查封單：", ORDERS_GEMINI_R13,
+            "選擇審查封單：", order_set,
             format_func=lambda x: f"{x['rank']} {x['name']} (門檻 < {x['trigger']:.1f}, 停損: {x['stop']:.1f}, T1: {x['t1']:.1f})"
         )
         
@@ -875,4 +894,4 @@ with tab_history:
 # 12. 系統頁尾
 # ==============================================================================
 st.markdown("---")
-st.caption(f"雙 AI 量化短空雷達系統 v13.0 旗艦版｜2026/09/18 盤後數據庫凍結備查｜執法標準：5分K實體跌破 + 不利撮合滑價 + 萬元停損鎖定 + 方案A鎖利 + 13:25強平")
+st.caption(f"雙 AI 量化短空雷達系統 v13.1 旗艦版｜2026/09/21 Round 13 雙方封單正式鎖定｜執法標準：5分K實體跌破 + 不利撮合滑價 + 單筆萬元停損鎖定 + 方案A鎖利 + 13:25強平")
