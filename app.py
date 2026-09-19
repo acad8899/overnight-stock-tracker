@@ -1157,7 +1157,7 @@ with tab_margin:
     st.subheader("⚡ 母池個股快速切換 (一鍵單擊快速檢視 10 日走勢)")
     st.caption("直接單擊下方按鈕即可秒切換標的，無須反覆拉動下拉選單：")
 
-    # 橫向一鍵快速點選列 (使用高相容性水平 radio)
+    # 橫向一鍵快速點選列 (使用相容性最高的水平 radio)
     pills_options = [f"{r['代號']} {r['股票名稱']} ({r['9/18融資增減(張)']:+,d})" for _, r in df_all_m.iterrows()]
     
     if "selected_margin_ticker" not in st.session_state:
@@ -1193,7 +1193,7 @@ with tab_margin:
         fig_margin = make_subplots(specs=[[{"secondary_y": True}]])
         bar_colors = ['#FF4444' if c >= 0 else '#00CC00' for c in df_margin_single["change"]]
         
-        # 右軸：單日增減 (Bar)
+        # 右軸：單日增減 (Bar，維持時間軸正序 09/07 -> 09/18)
         fig_margin.add_trace(
             go.Bar(
                 x=df_margin_single["date"], 
@@ -1205,7 +1205,7 @@ with tab_margin:
             secondary_y=False
         )
         
-        # 左軸：融資餘額 (Scatter Line)
+        # 左軸：融資餘額 (Scatter Line，維持時間軸正序 09/07 -> 09/18)
         fig_margin.add_trace(
             go.Scatter(
                 x=df_margin_single["date"], 
@@ -1233,8 +1233,9 @@ with tab_margin:
         st.plotly_chart(fig_margin, use_container_width=True)
 
     with m_col2:
-        st.markdown(f"#### 📋 逐日融資增減明細")
-        df_margin_display = df_margin_single.copy()
+        st.markdown(f"#### 📋 逐日融資增減明細 (最新日期置頂)")
+        # 將資料庫正序（09/07 -> 09/18）倒序排列（09/18 在第一筆）
+        df_margin_display = df_margin_single.iloc[::-1].copy().reset_index(drop=True)
         df_margin_display.columns = ["日期", "融資買進", "融資賣出", "單日增減(張)", "融資餘額(張)"]
         df_margin_display.index = range(1, len(df_margin_display) + 1)
         
