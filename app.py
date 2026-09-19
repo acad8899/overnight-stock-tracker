@@ -209,7 +209,7 @@ DEFAULT_WATCHLIST = [
 "主力分點": [
 {"分點": "合庫", "買超": 317, "均價": 397.66, "佔比": 4.51},
 {"分點": "富邦", "買超": -990, "均價": 396.32, "佔比": -14.09},
-{"分點": "凱基-台北", "買超": -459, "均價": 397.01, "佔比": -6.53}
+{"分点": "凱基-台北", "買超": -459, "均價": 397.01, "佔比": -6.53}
 ]
 },
 {
@@ -276,6 +276,8 @@ ORDERS_GEMINI_R13 = [
 {"rank": "5", "ticker": "2344", "name": "華邦電(期)", "tool": "期貨", "size": "2口", "margin": 96930, "trigger": 177.0, "stop": 181.5, "t1": 172.0, "t2": 168.0, "shares": 4000, "max_loss": 18000, "reason": "天量鎖碼逾3萬張，認售權證買超+40萬避險進駐，破177進空！"}
 ]
 
+ChatGPT 戰情室重新提交之正式 TOP 5 (實裝 2 萬金盾標準)
+
 ORDERS_CHATGPT_R13 = [
 {"rank": "🥇 1", "ticker": "2455", "name": "全新(期)", "tool": "期貨", "size": "1口", "margin": 150120, "trigger": 548.0, "stop": 558.0, "t1": 538.0, "t2": 528.0, "shares": 2000, "max_loss": 20000, "reason": "融資連三日狂吞逾2100張，停損放寬至558(10點)抗震，破548空。"},
 {"rank": "🥈 2", "ticker": "3406", "name": "玉晶光(期)", "tool": "期貨", "size": "1口", "margin": 262440, "trigger": 965.0, "stop": 975.0, "t1": 950.0, "t2": 940.0, "shares": 2000, "max_loss": 20000, "reason": "主力反向＋千元高檔套牢，外資大摩小摩齊倒，破965進空。"},
@@ -300,7 +302,8 @@ current_width += 1
 return str(text) + (" " * max(target_display_width - current_width, 0))
 
 def calculate_pro_short_indicators(df):
-if df is None or df.empty: return pd.DataFrame()
+if df is None or df.empty:
+return pd.DataFrame()
 df = df.copy()
 closes = [float(x) for x in df["收盤"]]
 highs = [float(x) for x in df["最高"]]
@@ -344,7 +347,8 @@ records.append({
 })
 df_res = pd.DataFrame(records)
 return calculate_pro_short_indicators(df_res)
-except Exception: continue
+except Exception:
+continue
 return pd.DataFrame()
 
 ==============================================================================
@@ -502,9 +506,12 @@ fig.add_trace(go.Candlestick(
     name='K線', hoverinfo='none', increasing_line_color='#FF3333', decreasing_line_color='#00CC00'
 ), row=1, col=1)
 
-if '5MA' in df_k.columns: fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFCC00', width=1.2), hoverinfo='none'), row=1, col=1)
-if '20MA' in df_k.columns: fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['20MA'], line=dict(color='#33CCFF', width=1.5), hoverinfo='none'), row=1, col=1)
-if 'VWAP' in df_k.columns: fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VWAP'], line=dict(color='#FF00FF', width=1.8), hoverinfo='none'), row=1, col=1)
+if '5MA' in df_k.columns:
+    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['5MA'], line=dict(color='#FFCC00', width=1.2), hoverinfo='none'), row=1, col=1)
+if '20MA' in df_k.columns:
+    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['20MA'], line=dict(color='#33CCFF', width=1.5), hoverinfo='none'), row=1, col=1)
+if 'VWAP' in df_k.columns:
+    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VWAP'], line=dict(color='#FF00FF', width=1.8), hoverinfo='none'), row=1, col=1)
 
 if isinstance(nh_res, (int, float)):
     fig.add_hline(y=float(nh_res), line=dict(color="#FF8800", width=1.4, dash="dot"), annotation_text=f" 核心壓力(NH): {nh_res} ", row=1, col=1)
@@ -513,7 +520,8 @@ if isinstance(broker_cost, (int, float)):
 
 vol_colors = ['#FF3333' if float(c) >= float(o) else '#00CC00' for c, o in zip(df_k['收盤'], df_k['開盤'])]
 fig.add_trace(go.Bar(x=df_k['日期'], y=df_k['成交量'], marker_color=vol_colors, hoverinfo='none'), row=2, col=1)
-if 'VOL_5MA' in df_k.columns: fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), hoverinfo='none'), row=2, col=1)
+if 'VOL_5MA' in df_k.columns:
+    fig.add_trace(go.Scatter(x=df_k['日期'], y=df_k['VOL_5MA'], line=dict(color='#FFFF00', width=1), hoverinfo='none'), row=2, col=1)
 
 if '主力買賣超' in df_k.columns:
     b_colors = ['#FF3333' if int(v) >= 0 else '#00CC00' for v in df_k['主力買賣超']]
