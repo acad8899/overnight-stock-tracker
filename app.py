@@ -42,6 +42,12 @@ st.markdown("""
     .stDataFrame {
         border-radius: 6px;
     }
+    /* 美化橫向單選按鈕組為 Pills 外觀 */
+    div[role="radiogroup"] {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -511,7 +517,6 @@ def execute_quant_settlement(order, k_open, k_close, k_low, k_high, next_k_open,
 # ==============================================================================
 # 9. 融資大數據抓取模組 (FinMind API + 玩股網/本地雙重備援)
 # ==============================================================================
-# 10 日歷史基準融資矩陣備援庫 (2026/09/07 ~ 2026/09/18)
 LOCAL_MARGIN_HISTORY_10D = {
     "8039": [
         {"date": "09/07", "buy": 1120, "sell": 890, "change": 230, "balance": 18450},
@@ -661,9 +666,6 @@ LOCAL_MARGIN_HISTORY_10D = {
 
 @st.cache_data(ttl=300)
 def fetch_stock_margin_10d(stock_code):
-    """
-    雙重備援架構：優先呼叫 FinMind 開放 API，失敗則無縫降級至本地精確校準資料庫
-    """
     code_str = str(stock_code).strip()
     try:
         url = "https://api.finmindtrade.com/api/v4/data"
@@ -696,7 +698,6 @@ def fetch_stock_margin_10d(stock_code):
     except Exception:
         pass
     
-    # 備援回退機制
     fallback_data = LOCAL_MARGIN_HISTORY_10D.get(code_str, LOCAL_MARGIN_HISTORY_10D["8039"])
     return pd.DataFrame(fallback_data)
 
@@ -808,7 +809,7 @@ st.sidebar.caption(
 )
 
 # ==============================================================================
-# 12. 主頁面六大核心分頁 (含全新「融資增減」)
+# 12. 主頁面六大核心分頁
 # ==============================================================================
 st.title("🎯 雙 AI 量化當沖 PK 賽事｜Round 13 旗艦戰情室")
 st.caption(f"數據庫基準：{DATA_BASE_DATE} 臺灣證券交易所/櫃買中心/30+主力分點/自營商權證三維大數據")
@@ -1104,7 +1105,6 @@ with tab_margin:
         last_bal = int(df_10d.iloc[-1]["balance"]) if not df_10d.empty else 10000
         cum_10d_chg = int(df_10d["change"].sum()) if not df_10d.empty else last_chg
         
-        # 多空籌碼評語
         if last_chg > 1000:
             status_desc = "🔴 融資暴增 (散戶瘋狂接刀，下週一早盤極度危險)"
         elif last_chg > 400:
@@ -1131,7 +1131,7 @@ with tab_margin:
     df_all_m = pd.DataFrame(summary_margin_list).sort_values(by="9/18融資增減(張)", ascending=False).reset_index(drop=True)
     df_all_m.index = range(1, len(df_all_m) + 1)
 
-    # 樣式著色：台股紅增綠減 (增加=紅, 減少=綠)
+    # 樣式著色：台股紅增綠減
     def style_margin_changes(val):
         if isinstance(val, (int, float)):
             if val > 0:
@@ -1140,7 +1140,6 @@ with tab_margin:
                 return "color: #00CC00; font-weight: bold;"
         return ""
 
-    # 使用版本相容性安全著色函式
     def apply_color_styler(styler, func, subset):
         if hasattr(styler, "map"):
             return styler.map(func, subset=subset)
@@ -1158,31 +1157,29 @@ with tab_margin:
     st.subheader("⚡ 母池個股快速切換 (一鍵單擊快速檢視 10 日走勢)")
     st.caption("直接單擊下方按鈕即可秒切換標的，無須反覆拉動下拉選單：")
 
-    # 橫向一鍵快速點選列
+    # 橫向一鍵快速點選列 (使用高相容性水平 radio)
     pills_options = [f"{r['代號']} {r['股票名稱']} ({r['9/18融資增減(張)']:+,d})" for _, r in df_all_m.iterrows()]
     
     if "selected_margin_ticker" not in st.session_state:
         st.session_state["selected_margin_ticker"] = df_all_m.iloc[0]["代號"]
 
-    # 找出當前選取的 index
     default_pill_idx = 0
     for idx, opt in enumerate(pills_options):
         if opt.startswith(str(st.session_state["selected_margin_ticker"])):
             default_pill_idx = idx
             break
 
-    # 若 streamlit 版本支援 pills 則使用 pills，否則平滑降級為 horizontal radio
-    if hasattr(st, "pills"):
-        sel_pill = st.pills("選擇個股：", pills_options, index=default_pill_idx, key="margin_pills_selector", label_visibility="collapsed")
-        if sel_pill:
-            cur_margin_code = sel_pill.split(" ")[0]
-            st.session_state["selected_margin_ticker"] = cur_margin_code
-    else:
-        sel_radio = st.radio("選擇個股：", pills_options, index=default_pill_idx, horizontal=True, key="margin_radio_selector", label_visibility="collapsed")
-        cur_margin_code = sel_radio.split(" ")[0]
-        st.session_state["selected_margin_ticker"] = cur_margin_code
+    sel_radio = st.radio(
+        "選擇個股：",
+        options=pills_options,
+        index=default_pill_idx,
+        horizontal=True,
+        key="margin_horizontal_selector",
+        label_visibility="collapsed"
+    )
+    cur_margin_code = sel_radio.split(" ")[0]
+    st.session_state["selected_margin_ticker"] = cur_margin_code
 
-    cur_margin_code = st.session_state["selected_margin_ticker"]
     cur_stock_name = STOCK_NAME_DICT.get(cur_margin_code, cur_margin_code)
     
     # 2. 獲取並呈現該標的 10 日融資走勢圖
@@ -1193,10 +1190,7 @@ with tab_margin:
     with m_col1:
         st.markdown(f"#### 📈 【{cur_margin_code} {cur_stock_name}】近 10 日融資餘額與單日增減走勢")
         
-        # 繪製 Plotly 雙軸互動圖表 (折線為餘額，長條圖為單日增減)
         fig_margin = make_subplots(specs=[[{"secondary_y": True}]])
-        
-        # 柱狀圖顏色：紅增綠減
         bar_colors = ['#FF4444' if c >= 0 else '#00CC00' for c in df_margin_single["change"]]
         
         # 右軸：單日增減 (Bar)
