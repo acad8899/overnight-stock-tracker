@@ -301,15 +301,9 @@ COMMON_HEADERS = {
 
 @st.cache_data(ttl=600)
 def fetch_top_brokers_live(stock_code, target_date="2026-09-18", token=""):
-    """
-    全自動抓取主力分點買賣超：
-    1. 優先呼叫 FinMind 官方原始分點報表 (TaiwanStockTradingDailyReport)，並以 Pandas 自動聚合出 Top 分點
-    2. 若未配置 Token 或逾時，則自動啟用公開 JSON 代理聚合端點
-    3. 若遇週末或休市，回退返回精確校準之 DEFAULT_WATCHLIST 主力分點
-    """
     code_str = str(stock_code).strip()
     
-    # 策略 A: FinMind 原始日報自動聚合運算
+    # 策略 A: FinMind 原始日報聚合
     if token and len(token) > 10:
         try:
             url = "https://api.finmindtrade.com/api/v4/data"
@@ -325,7 +319,6 @@ def fetch_top_brokers_live(stock_code, target_date="2026-09-18", token=""):
                 js = res.json()
                 if js.get("data") and len(js["data"]) > 0:
                     raw_df = pd.DataFrame(js["data"])
-                    # 聚合計算買賣超張數與加權均價
                     grouped = raw_df.groupby("broker").agg(
                         total_buy=("buy_volume", "sum"),
                         total_sell=("sell_volume", "sum"),
@@ -340,7 +333,6 @@ def fetch_top_brokers_live(stock_code, target_date="2026-09-18", token=""):
                         (grouped["sell_val"] / grouped["total_sell"]).round(2)
                     )
                     
-                    # 抓取前 3 大買超與前 3 大賣超
                     top_buy = grouped.sort_values(by="net_volume", ascending=False).head(3)
                     top_sell = grouped.sort_values(by="net_volume", ascending=True).head(3)
                     combined = pd.concat([top_buy, top_sell]).drop_duplicates(subset=["broker"])
@@ -359,7 +351,7 @@ def fetch_top_brokers_live(stock_code, target_date="2026-09-18", token=""):
         except Exception:
             pass
 
-    # 策略 B: 公開免 Token 聚合代理端點 (Wantgoo/HiStock 鏡像備援)
+    # 策略 B: 公開免 Token 聚合備援
     try:
         url_public = f"https://www.wantgoo.com/stock/{code_str}/major-investors/branch-rank-data"
         res_pub = requests.get(url_public, headers=COMMON_HEADERS, timeout=2.5)
@@ -386,7 +378,7 @@ def fetch_top_brokers_live(stock_code, target_date="2026-09-18", token=""):
     except Exception:
         pass
 
-    # 策略 C: 穩定回退至 9/18 盤後完整覆盤快照庫
+    # 策略 C: 穩定回退至預設母池快照
     for it in DEFAULT_WATCHLIST:
         if it["代號"] == code_str:
             return it["主力分點"]
@@ -394,12 +386,10 @@ def fetch_top_brokers_live(stock_code, target_date="2026-09-18", token=""):
     return DEFAULT_WATCHLIST[0]["主力分點"]
 
 def auto_fetch_all_brokers_flow(target_date="2026-09-18", token=""):
-    """
-    批次自動抓取 12 檔母池分點並寫入 session_state
-    """
     new_watchlist = []
     tot = len(DEFAULT_WATCHLIST)
-    prog_bar = st.sidebar.progress(0)
+    prog_container = st.empty()
+    prog_bar = prog_container.progress(0)
     
     for idx, item in enumerate(DEFAULT_WATCHLIST):
         code = item["代號"]
@@ -409,8 +399,9 @@ def auto_fetch_all_brokers_flow(target_date="2026-09-18", token=""):
         new_watchlist.append(fresh_item)
         prog_bar.progress((idx + 1) / tot)
         
+    prog_container.empty()
     st.session_state["custom_watchlist"] = new_watchlist
-    st.sidebar.success(f"✅ 12 檔主力分點進出已全自動更新！基準日：{target_date}")
+    st.session_state["broker_last_updated"] = f"{target_date} (更新成功)"
 
 # ==============================================================================
 # 7. 量化指標與技術分析模組
@@ -894,20 +885,9 @@ df_display = load_radar_market_data(st.session_state["custom_watchlist"])
 df_display.index = range(1, len(df_display) + 1)
 
 # ==============================================================================
-# 12. 側邊欄控制台 (含全自動主力分點一鍵爬取功能)
+# 12. 側邊欄控制台 (清爽專業版：僅保留累積淨值與風控執法)
 # ==============================================================================
 st.sidebar.title("⚡ 短空雷達量化控制台")
-
-with st.sidebar.expander("🤖 盤後一鍵自動抓取 12 檔主力分點", expanded=True):
-    st.caption("支援 FinMind API 分點日報自動聚合運算與免 Token 聚合備援端點：")
-    input_date = st.text_input("目標日期 (YYYY-MM-DD)：", value="2026-09-18")
-    input_token = st.text_input("FinMind Token (選填，無則走免Token備援)：", value="", type="password")
-    
-    if st.button("🚀 一鍵自動更新 12 檔主力分點", use_container_width=True):
-        with st.spinner("正在呼叫分點端點並聚合 12 檔主力買賣超中..."):
-            auto_fetch_all_brokers_flow(target_date=input_date, token=input_token)
-            st.rerun()
-
 st.sidebar.markdown(f"**決戰輪次**：`Round 13` ({R13_DATE})")
 st.sidebar.markdown(f"**母池籌碼基準**：`{DATA_BASE_DATE}` 盤後大數據")
 
@@ -940,18 +920,19 @@ st.sidebar.caption(
 )
 
 # ==============================================================================
-# 13. 主頁面六大核心分頁
+# 13. 主頁面七大核心分頁 (含全新「主力分點」獨立專屬頁籤)
 # ==============================================================================
 st.title("🎯 雙 AI 量化當沖 PK 賽事｜Round 13 旗艦戰情室")
 st.caption(f"數據庫基準：{DATA_BASE_DATE} 臺灣證券交易所/櫃買中心/30+主力分點/自營商權證三維大數據")
 
-tab_workspace, tab_orders, tab_matcher, tab_radar, tab_history, tab_margin = st.tabs([
+tab_workspace, tab_orders, tab_matcher, tab_radar, tab_history, tab_margin, tab_broker = st.tabs([
     "🖥️ 專業操盤工作台 (K線與分點)",
     "⚔️ R13 官方決戰封單名冊", 
     "🧮 官方撮合與方案A結算模擬器",
     "📊 12檔母池籌碼雷達全景表",
     "🏆 R1~R12 淨值覆盤庫",
-    "📈 融資增減 (近10日多空趨勢)"
+    "📈 融資增減 (近10日多空趨勢)",
+    "🏢 主力分點 (進出一鍵更新)"
 ])
 
 # ------------------------------------------------------------------------------
@@ -1178,44 +1159,6 @@ with tab_history:
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
     st.plotly_chart(fig_hist, use_container_width=True)
-    
-    st.markdown("---")
-    st.subheader("📋 歷輪戰績逐筆明細表 (含當期損益與核心狙擊標的)")
-    
-    table_view = df_hist[[
-        "round", "date", "winner", "gem_pnl", "gem_net", "gem_targets", 
-        "gpt_pnl", "gpt_net", "gpt_targets", "spread"
-    ]].copy()
-    
-    table_view["gem_pnl"] = table_view["gem_pnl"].apply(lambda x: f"{x:+,}")
-    table_view["gem_net"] = table_view["gem_net"].apply(lambda x: f"${x:,}")
-    table_view["gpt_pnl"] = table_view["gpt_pnl"].apply(lambda x: f"{x:+,}")
-    table_view["gpt_net"] = table_view["gpt_net"].apply(lambda x: f"${x:,}")
-    table_view["spread"] = table_view["spread"].apply(lambda x: f"${x:,}")
-    
-    table_view.columns = [
-        "輪次", "日期", "判決結果", "Gemini 損益", "Gemini 淨值", "🟥 Gemini 核心狙擊標的",
-        "ChatGPT 損益", "ChatGPT 決戰淨值", "🟦 ChatGPT 核心狙擊標的", "領先差距"
-    ]
-    st.dataframe(table_view, use_container_width=True, hide_index=True)
-    
-    st.markdown("---")
-    st.subheader("🔍 歷輪戰況深度覆盤與重大仲裁紀錄")
-    
-    for r_item in reversed(HISTORICAL_ROUNDS):
-        with st.expander(f"📌 {r_item['round']} ({r_item['date']}) 判決：{r_item['winner']} ｜ 領先差：NT$ {r_item['spread']:,}", expanded=(r_item["round"] in ["Round 11", "Round 12"])):
-            c_rev1, c_rev2 = st.columns(2)
-            with c_rev1:
-                st.markdown(f"**🟥 Gemini 戰情報告**")
-                st.write(f"- 當期損益：`{r_item['gem_pnl']:+,} NT$`")
-                st.write(f"- 結算淨值：`NT$ {r_item['gem_net']:,}`")
-                st.write(f"- 核心部位：{r_item['gem_targets']}")
-            with c_rev2:
-                st.markdown(f"**🟦 ChatGPT 戰情報告**")
-                st.write(f"- 當期損益：`{r_item['gpt_pnl']:+,} NT$`")
-                st.write(f"- 結算淨值：`NT$ {r_item['gpt_net']:,}`")
-                st.write(f"- 核心部位：{r_item['gpt_targets']}")
-            st.info(f"💡 **戰術覆盤備註**：{r_item['review']}")
 
 # ------------------------------------------------------------------------------
 # TAB 6: 📈 融資增減 (近10日多空趨勢)
@@ -1224,7 +1167,6 @@ with tab_margin:
     st.subheader("📊 12 檔母池 9/18 最新融資增減熱力排行榜 (按增減張數降序)")
     st.caption("資料來源：FinMind API (TaiwanStockMarginPurchaseShortSale) / 玩股網備援架構。🔴 紅色代表融資增加（散戶接刀/追多浮額累積），🟢 綠色代表融資減少（斷頭停損/軋空離場）。")
 
-    # 1. 整理 12 檔標的之 9/18 最新融資數據與 10 日累計
     summary_margin_list = []
     for item in st.session_state["custom_watchlist"]:
         c_code = item["代號"]
@@ -1262,7 +1204,6 @@ with tab_margin:
     df_all_m = pd.DataFrame(summary_margin_list).sort_values(by="9/18融資增減(張)", ascending=False).reset_index(drop=True)
     df_all_m.index = range(1, len(df_all_m) + 1)
 
-    # 樣式著色：台股紅增綠減
     def style_margin_changes(val):
         if isinstance(val, (int, float)):
             if val > 0:
@@ -1283,14 +1224,12 @@ with tab_margin:
         "近10日累計增減(張)": "{:+,d}"
     })
     
-    # 設定 height=490，讓 12 檔標的全數直接呈現，免滾動
     st.dataframe(styled_df_all_m, use_container_width=True, height=490)
 
     st.markdown("---")
     st.subheader("⚡ 母池個股快速切換 (一鍵單擊快速檢視 10 日走勢)")
     st.caption("直接單擊下方按鈕即可秒切換標的，無須反覆拉動下拉選單：")
 
-    # 橫向一鍵快速點選列 (相容性最高的水平 radio)
     pills_options = [f"{r['代號']} {r['股票名稱']} ({r['9/18融資增減(張)']:+,d})" for _, r in df_all_m.iterrows()]
     
     if "selected_margin_ticker" not in st.session_state:
@@ -1312,21 +1251,16 @@ with tab_margin:
     )
     cur_margin_code = sel_radio.split(" ")[0]
     st.session_state["selected_margin_ticker"] = cur_margin_code
-
     cur_stock_name = STOCK_NAME_DICT.get(cur_margin_code, cur_margin_code)
     
-    # 2. 獲取並呈現該標的 10 日融資走勢圖
     df_margin_single = fetch_stock_margin_10d(cur_margin_code)
-    
     m_col1, m_col2 = st.columns([2.5, 1.5])
     
     with m_col1:
         st.markdown(f"#### 📈 【{cur_margin_code} {cur_stock_name}】近 10 日融資餘額與單日增減走勢")
-        
         fig_margin = make_subplots(specs=[[{"secondary_y": True}]])
         bar_colors = ['#FF4444' if c >= 0 else '#00CC00' for c in df_margin_single["change"]]
         
-        # 右軸：單日增減 (Bar，維持時間軸正序 09/07 -> 09/18)
         fig_margin.add_trace(
             go.Bar(
                 x=df_margin_single["date"], 
@@ -1338,7 +1272,6 @@ with tab_margin:
             secondary_y=False
         )
         
-        # 左軸：融資餘額 (Scatter Line，維持時間軸正序 09/07 -> 09/18)
         fig_margin.add_trace(
             go.Scatter(
                 x=df_margin_single["date"], 
@@ -1351,18 +1284,14 @@ with tab_margin:
         )
         
         fig_margin.update_layout(
-            template="plotly_dark",
-            plot_bgcolor="#111",
-            paper_bgcolor="#111",
-            height=380,
-            margin=dict(l=20, r=20, t=30, b=20),
+            template="plotly_dark", plot_bgcolor="#111", paper_bgcolor="#111",
+            height=380, margin=dict(l=20, r=20, t=30, b=20),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             hovermode="x unified"
         )
         fig_margin.update_yaxes(title_text="單日增減 (張)", secondary_y=False, gridcolor="#222")
         fig_margin.update_yaxes(title_text="融資餘額 (張)", secondary_y=True, gridcolor="#222")
         fig_margin.update_xaxes(gridcolor="#222")
-        
         st.plotly_chart(fig_margin, use_container_width=True)
 
     with m_col2:
@@ -1378,6 +1307,101 @@ with tab_margin:
             "融資餘額(張)": "{:,d}"
         })
         st.dataframe(styled_single, use_container_width=True, height=360)
+
+# ------------------------------------------------------------------------------
+# TAB 7: 🏢 主力分點 (進出一鍵更新 - 全新獨立分頁)
+# ------------------------------------------------------------------------------
+with tab_broker:
+    st.subheader("🏢 12 檔母池主力分點進出與持倉成本分析")
+    st.caption("支援 FinMind 券商分點日報 API 全自動聚合計算與公開 JSON 代理備援端點。")
+
+    # 1. 頂部一鍵更新操作區塊
+    with st.container():
+        st.markdown("#### ⚡ 盤後一鍵自動抓取與聚合設定")
+        b_c1, b_c2, b_c3 = st.columns([1.5, 2.5, 1.2])
+        with b_c1:
+            in_b_date = st.text_input("目標交易日期 (YYYY-MM-DD)：", value="2026-09-18", key="tab_broker_date_in")
+        with b_c2:
+            in_b_token = st.text_input("FinMind Token (選填，無則走免Token備援)：", value="", type="password", key="tab_broker_token_in")
+        with b_c3:
+            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+            run_btn = st.button("🚀 一鍵自動更新 12 檔分點", use_container_width=True)
+
+        if run_btn:
+            with st.spinner(f"正在連線抓取 {in_b_date} 全台主力分點日報並聚合中..."):
+                auto_fetch_all_brokers_flow(target_date=in_b_date, token=in_b_token)
+                st.success(f"✅ 12 檔主力分點資料已全數更新完成！(基準日：{in_b_date})")
+                st.rerun()
+
+        last_up_txt = st.session_state.get("broker_last_updated", f"{DATA_BASE_DATE} (官方校準基準盤後)")
+        st.info(f"🕒 **當前主力分點數據狀態**：`{last_up_txt}`")
+
+    st.markdown("---")
+
+    # 2. 橫向一鍵快速選股 (與融資增減相同體驗)
+    st.markdown("#### ⚡ 母池個股主力鎖碼切換")
+    st.caption("單擊下方按鈕即可秒切換檢視該檔個股的主力分點買賣超明細與獲利預估：")
+
+    broker_pill_options = [
+        f"{r['股票代號']} {r['股票名稱']} (主力買超 {r['主力合計買超']:,}張)" 
+        for _, r in df_display.iterrows()
+    ]
+
+    if "selected_broker_ticker" not in st.session_state:
+        st.session_state["selected_broker_ticker"] = str(df_display.iloc[0]["股票代號"])
+
+    default_b_idx = 0
+    for idx, opt in enumerate(broker_pill_options):
+        if opt.startswith(str(st.session_state["selected_broker_ticker"])):
+            default_b_idx = idx
+            break
+
+    sel_broker_radio = st.radio(
+        "選擇標的：",
+        options=broker_pill_options,
+        index=default_b_idx,
+        horizontal=True,
+        key="broker_horizontal_selector",
+        label_visibility="collapsed"
+    )
+    cur_b_code = sel_broker_radio.split(" ")[0]
+    st.session_state["selected_broker_ticker"] = cur_b_code
+    cur_b_row = df_display[df_display["股票代號"] == cur_b_code].iloc[0]
+
+    # 3. 該標的之主力分點持倉與獲利全景
+    bc_top1, bc_top2, bc_top3, bc_top4 = st.columns(4)
+    bc_top1.metric("標的與收盤價", f"{cur_b_row['股票名稱']} ({cur_b_code})", f"{cur_b_row['現價']} 元")
+    bc_top2.metric("主力加權均價", f"{cur_b_row['主力加權成本']} 元")
+    bc_top3.metric("主力合計買超", f"{cur_b_row['主力合計買超']:,} 張", f"佔比 {cur_b_row['主力合計佔比(%)']}%")
+    bc_top4.metric("核心防守壓力 (NH)", f"{cur_b_row['近高壓力(NH)']} 元")
+
+    st.markdown(f"##### 📋 【{cur_b_row['股票名稱']} ({cur_b_code})】主力關鍵分點名冊與倒貨意願評級")
+    b_detail_list = cur_b_row.get("各分點清單", [])
+    if b_detail_list:
+        df_b_detail = pd.DataFrame(b_detail_list)
+        df_b_detail.index = range(1, len(df_b_detail) + 1)
+        
+        def style_broker_trades(val):
+            if isinstance(val, (int, float)):
+                if val > 0:
+                    return "color: #FF4444; font-weight: bold;"
+                elif val < 0:
+                    return "color: #00CC00; font-weight: bold;"
+            return ""
+
+        styled_b_table = apply_color_styler(
+            df_b_detail.style, style_broker_trades, subset=["買超張數", "預估獲利(萬)", "報酬率(%)"]
+        ).format({
+            "買超張數": "{:+,d}",
+            "佔比(%)": "{:.2f}%",
+            "收盤價": "{:.2f}",
+            "預估成本": "{:.2f}",
+            "預估獲利(萬)": "{:+,d}",
+            "報酬率(%)": "{:+.2f}%"
+        })
+        st.dataframe(styled_b_table, use_container_width=True)
+    else:
+        st.info("暫無此標的分點交易資料。")
 
 # ==============================================================================
 # 14. 系統頁尾
