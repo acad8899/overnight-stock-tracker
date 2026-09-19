@@ -1151,13 +1151,15 @@ with tab_margin:
         "最新融資餘額(張)": "{:,d}",
         "近10日累計增減(張)": "{:+,d}"
     })
-    st.dataframe(styled_df_all_m, use_container_width=True)
+    
+    # 設定 height=490，讓 12 檔標的全數直接呈現，免滾動
+    st.dataframe(styled_df_all_m, use_container_width=True, height=490)
 
     st.markdown("---")
     st.subheader("⚡ 母池個股快速切換 (一鍵單擊快速檢視 10 日走勢)")
     st.caption("直接單擊下方按鈕即可秒切換標的，無須反覆拉動下拉選單：")
 
-    # 橫向一鍵快速點選列 (使用相容性最高的水平 radio)
+    # 橫向一鍵快速點選列 (相容性最高的水平 radio)
     pills_options = [f"{r['代號']} {r['股票名稱']} ({r['9/18融資增減(張)']:+,d})" for _, r in df_all_m.iterrows()]
     
     if "selected_margin_ticker" not in st.session_state:
