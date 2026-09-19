@@ -165,11 +165,27 @@ HISTORICAL_ROUNDS = [
 ]
 
 # ==============================================================================
-# 4. 2026-09-18 盤後 12 檔母池三維大數據庫 (完整包含前五大買超與賣超)
+# 4. 2026-09-18 盤後 12 檔母池三維大數據庫 (校準元大點精靈真實數據)
 # ==============================================================================
 DEFAULT_WATCHLIST = [
     {
-        "代號": "8039", "名稱": "台虹", "昨收": 269.50, "昨日鎖碼量": 18887, "融資增減(張)": 1264, "券資比": 4.5, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
+        "代號": "2313", "名稱": "華通", "昨收": 228.50, "昨日鎖碼量": 29688, "融資增減(張)": -772, "券資比": 3.7, "權證認售(萬)": -97, "權證賣認購(萬)": 0,
+        "最高價": 228.50, "最低價": 221.50,
+        "主力分點": [
+            {"分點": "新加坡商瑞銀", "買超": 3175, "均價": 227.61, "佔比": 10.69},
+            {"分點": "摩根大通", "買超": 1173, "均價": 228.03, "佔比": 3.95},
+            {"分點": "花旗環球", "買超": 1012, "均價": 227.90, "佔比": 3.41},
+            {"分點": "港商野村", "買超": 681, "均價": 227.71, "佔比": 2.29},
+            {"分點": "港商麥格理", "買超": 589, "均價": 228.44, "佔比": 1.98},
+            {"分點": "美商高盛", "買超": -2915, "均價": 227.59, "佔比": -9.82},
+            {"分點": "凱基-台北", "買超": -891, "均價": 227.18, "佔比": -3.00},
+            {"分點": "統一", "買超": -269, "均價": 223.94, "佔比": -0.91},
+            {"分點": "國泰-敦南", "買超": -192, "均價": 225.13, "佔比": -0.65},
+            {"分點": "華南永昌-長虹", "買超": -151, "均價": 224.30, "佔比": -0.51}
+        ]
+    },
+    {
+        "代號": "8039", "名稱": "台虹", "昨收": 269.50, "昨日鎖碼量": 18887, "融資增減(張)": 1269, "券資比": 4.5, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
         "最高價": 271.00, "最低價": 257.00,
         "主力分點": [
             {"分點": "凱基-台北", "買超": 859, "均價": 265.47, "佔比": 4.53},
@@ -185,7 +201,7 @@ DEFAULT_WATCHLIST = [
         ]
     },
     {
-        "代號": "2327", "名稱": "國巨*", "昨收": 550.00, "昨日鎖碼量": 26232, "融資增減(張)": 1020, "券資比": 3.1, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
+        "代號": "2327", "名稱": "國巨*", "昨收": 550.00, "昨日鎖碼量": 26232, "融資增減(張)": 1045, "券資比": 3.1, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
         "最高價": 550.00, "最低價": 533.00,
         "主力分點": [
             {"分點": "凱基-台北", "買超": 1320, "均價": 543.49, "佔比": 4.90},
@@ -201,7 +217,7 @@ DEFAULT_WATCHLIST = [
         ]
     },
     {
-        "代號": "2455", "名稱": "全新", "昨收": 556.00, "昨日鎖碼量": 20022, "融資增減(張)": 623, "券資比": 5.9, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
+        "代號": "2455", "名稱": "全新", "昨收": 556.00, "昨日鎖碼量": 20022, "融資增減(張)": 624, "券資比": 5.9, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
         "最高價": 563.00, "最低價": 520.00,
         "主力分點": [
             {"分點": "台新", "買超": 344, "均價": 542.97, "佔比": 1.72},
@@ -249,7 +265,7 @@ DEFAULT_WATCHLIST = [
         ]
     },
     {
-        "代號": "3260", "名稱": "威剛", "昨收": 396.50, "昨日鎖碼量": 6928, "融資增減(張)": -192, "券資比": 4.1, "權證認售(萬)": -32, "權證賣認購(萬)": 0,
+        "代號": "3260", "名稱": "威剛", "昨收": 396.50, "昨日鎖碼量": 6928, "融資增減(張)": -136, "券資比": 4.1, "權證認售(萬)": -32, "權證賣認購(萬)": 0,
         "最高價": 401.50, "最低價": 395.00,
         "主力分點": [
             {"分點": "合庫", "買超": 317, "均價": 397.66, "佔比": 4.51},
@@ -265,7 +281,7 @@ DEFAULT_WATCHLIST = [
         ]
     },
     {
-        "代號": "2492", "名稱": "華新科", "昨收": 309.50, "昨日鎖碼量": 15482, "融資增減(張)": -360, "券資比": 2.9, "權證認售(萬)": -21, "權證賣認購(萬)": 0,
+        "代號": "2492", "名稱": "華新科", "昨收": 309.50, "昨日鎖碼量": 15482, "融資增減(張)": -341, "券資比": 2.9, "權證認售(萬)": -21, "權證賣認購(萬)": 0,
         "最高價": 311.00, "最低價": 300.00,
         "主力分點": [
             {"分點": "凱基-台北", "買超": 1204, "均價": 307.56, "佔比": 7.76},
@@ -281,23 +297,7 @@ DEFAULT_WATCHLIST = [
         ]
     },
     {
-        "代號": "2313", "名稱": "華通", "昨收": 228.50, "昨日鎖碼量": 25875, "融資增減(張)": -776, "券資比": 3.7, "權證認售(萬)": -97, "權證賣認購(萬)": 0,
-        "最高價": 228.50, "最低價": 221.50,
-        "主力分點": [
-            {"分點": "新加坡商瑞銀", "買超": 3175, "均價": 227.61, "佔比": 10.69},
-            {"分點": "元大", "買超": 850, "均價": 226.80, "佔比": 2.86},
-            {"分點": "統一", "買超": 620, "均價": 227.10, "佔比": 2.09},
-            {"分點": "凱基-台北", "買超": 540, "均價": 228.00, "佔比": 1.82},
-            {"分點": "國泰", "買超": 410, "均價": 226.50, "佔比": 1.38},
-            {"分點": "美商高盛", "買超": -2915, "均價": 227.59, "佔比": -9.82},
-            {"分點": "摩根大通", "買超": -1240, "均價": 226.90, "佔比": -4.18},
-            {"分點": "台灣摩根士丹利", "買超": -980, "均價": 227.40, "佔比": -3.30},
-            {"分點": "富邦", "買超": -650, "均價": 228.20, "佔比": -2.19},
-            {"分點": "群益金鼎", "買超": -480, "均價": 226.00, "佔比": -1.62}
-        ]
-    },
-    {
-        "代號": "3189", "名稱": "景碩", "昨收": 832.00, "昨日鎖碼量": 16702, "融資增減(張)": -899, "券資比": 3.9, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
+        "代號": "3189", "名稱": "景碩", "昨收": 832.00, "昨日鎖碼量": 16702, "融資增減(張)": -897, "券資比": 3.9, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
         "最高價": 850.00, "最低價": 815.00,
         "主力分點": [
             {"分點": "新加坡商瑞銀", "買超": 911, "均價": 833.55, "佔比": 4.97},
@@ -382,7 +382,7 @@ ORDERS_CHATGPT_R13 = [
 ]
 
 # ==============================================================================
-# 6. 主力分點進出自動抓取與聚合計算模組 (Top 5 買超 & Top 5 賣超分離)
+# 6. 主力分點進出自動抓取與聚合計算模組 (優化聚合邏輯)
 # ==============================================================================
 COMMON_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -416,9 +416,9 @@ def fetch_top_brokers_live(stock_code, target_date="2026-09-18", token=""):
                     
                     grouped["net_volume"] = (grouped["total_buy"] - grouped["total_sell"]) // 1000
                     grouped["avg_price"] = np.where(
-                        grouped["total_buy"] > 0,
-                        (grouped["buy_val"] / grouped["total_buy"]).round(2),
-                        (grouped["sell_val"] / grouped["total_sell"]).round(2)
+                        grouped["net_volume"] > 0,
+                        (grouped["buy_val"] / np.maximum(grouped["total_buy"], 1)).round(2),
+                        (grouped["sell_val"] / np.maximum(grouped["total_sell"], 1)).round(2)
                     )
                     
                     top_buy = grouped.sort_values(by="net_volume", ascending=False).head(5)
@@ -438,32 +438,6 @@ def fetch_top_brokers_live(stock_code, target_date="2026-09-18", token=""):
                         return res_brokers
         except Exception:
             pass
-
-    try:
-        url_public = f"https://www.wantgoo.com/stock/{code_str}/major-investors/branch-rank-data"
-        res_pub = requests.get(url_public, headers=COMMON_HEADERS, timeout=2.5)
-        if res_pub.status_code == 200:
-            p_data = res_pub.json()
-            if p_data.get("buy") or p_data.get("sell"):
-                res_brokers = []
-                for b in p_data.get("buy", [])[:5]:
-                    res_brokers.append({
-                        "分點": b.get("name", "外資分點"),
-                        "買超": int(b.get("netVolume", 0)),
-                        "均價": float(b.get("avgPrice", 0.0)),
-                        "佔比": float(b.get("ratio", 0.0))
-                    })
-                for s in p_data.get("sell", [])[:5]:
-                    res_brokers.append({
-                        "分點": s.get("name", "自營分點"),
-                        "買超": -abs(int(s.get("netVolume", 0))),
-                        "均價": float(s.get("avgPrice", 0.0)),
-                        "佔比": -float(s.get("ratio", 0.0))
-                    })
-                if res_brokers:
-                    return res_brokers
-    except Exception:
-        pass
 
     for it in DEFAULT_WATCHLIST:
         if it["代號"] == code_str:
@@ -487,7 +461,7 @@ def auto_fetch_all_brokers_flow(target_date="2026-09-18", token=""):
         
     prog_container.empty()
     st.session_state["custom_watchlist"] = new_watchlist
-    st.session_state["broker_last_updated"] = f"{target_date} (更新成功)"
+    st.session_state["broker_last_updated"] = f"{target_date} (已校準更新)"
 
 # ==============================================================================
 # 7. 量化指標與技術分析模組
@@ -725,79 +699,7 @@ LOCAL_MARGIN_HISTORY_10D = {
         {"date": "09/15", "buy": 1980, "sell": 1420, "change": 560, "balance": 21660},
         {"date": "09/16", "buy": 2340, "sell": 1780, "change": 560, "balance": 22220},
         {"date": "09/17", "buy": 2890, "sell": 1980, "change": 910, "balance": 23130},
-        {"date": "09/18", "buy": 3480, "sell": 2216, "change": 1264, "balance": 24394}
-    ],
-    "2327": [
-        {"date": "09/07", "buy": 850, "sell": 910, "change": -60, "balance": 14200},
-        {"date": "09/08", "buy": 920, "sell": 880, "change": 40, "balance": 14240},
-        {"date": "09/09", "buy": 1150, "sell": 780, "change": 370, "balance": 14610},
-        {"date": "09/10", "buy": 1080, "sell": 990, "change": 90, "balance": 14700},
-        {"date": "09/11", "buy": 1340, "sell": 1100, "change": 240, "balance": 14940},
-        {"date": "09/14", "buy": 1560, "sell": 1250, "change": 310, "balance": 15250},
-        {"date": "09/15", "buy": 1420, "sell": 1380, "change": 40, "balance": 15290},
-        {"date": "09/16", "buy": 1680, "sell": 1190, "change": 490, "balance": 15780},
-        {"date": "09/17", "buy": 1820, "sell": 1210, "change": 610, "balance": 16390},
-        {"date": "09/18", "buy": 2580, "sell": 1560, "change": 1020, "balance": 17410}
-    ],
-    "2455": [
-        {"date": "09/07", "buy": 780, "sell": 820, "change": -40, "balance": 12100},
-        {"date": "09/08", "buy": 890, "sell": 950, "change": -60, "balance": 12040},
-        {"date": "09/09", "buy": 920, "sell": 810, "change": 110, "balance": 12150},
-        {"date": "09/10", "buy": 1100, "sell": 890, "change": 210, "balance": 12360},
-        {"date": "09/11", "buy": 1350, "sell": 980, "change": 370, "balance": 12730},
-        {"date": "09/14", "buy": 1480, "sell": 1120, "change": 360, "balance": 13090},
-        {"date": "09/15", "buy": 1620, "sell": 1180, "change": 440, "balance": 13530},
-        {"date": "09/16", "buy": 1980, "sell": 1353, "change": 627, "balance": 14157},
-        {"date": "09/17", "buy": 2450, "sell": 1544, "change": 906, "balance": 15063},
-        {"date": "09/18", "buy": 2150, "sell": 1527, "change": 623, "balance": 15686}
-    ],
-    "6173": [
-        {"date": "09/07", "buy": 450, "sell": 520, "change": -70, "balance": 8950},
-        {"date": "09/08", "buy": 510, "sell": 480, "change": 30, "balance": 8980},
-        {"date": "09/09", "buy": 620, "sell": 490, "change": 130, "balance": 9110},
-        {"date": "09/10", "buy": 580, "sell": 640, "change": -60, "balance": 9050},
-        {"date": "09/11", "buy": 710, "sell": 590, "change": 120, "balance": 9170},
-        {"date": "09/14", "buy": 820, "sell": 740, "change": 80, "balance": 9250},
-        {"date": "09/15", "buy": 790, "sell": 810, "change": -20, "balance": 9230},
-        {"date": "09/16", "buy": 950, "sell": 830, "change": 120, "balance": 9350},
-        {"date": "09/17", "buy": 840, "sell": 1380, "change": -540, "balance": 8810},
-        {"date": "09/18", "buy": 920, "sell": 1589, "change": -669, "balance": 8141}
-    ],
-    "2344": [
-        {"date": "09/07", "buy": 3200, "sell": 2980, "change": 220, "balance": 68500},
-        {"date": "09/08", "buy": 3450, "sell": 3120, "change": 330, "balance": 68830},
-        {"date": "09/09", "buy": 4100, "sell": 3560, "change": 540, "balance": 69370},
-        {"date": "09/10", "buy": 3890, "sell": 4200, "change": -310, "balance": 69060},
-        {"date": "09/11", "buy": 4500, "sell": 3980, "change": 520, "balance": 69580},
-        {"date": "09/14", "buy": 4890, "sell": 4120, "change": 770, "balance": 70350},
-        {"date": "09/15", "buy": 4320, "sell": 4650, "change": -330, "balance": 70020},
-        {"date": "09/16", "buy": 5120, "sell": 4890, "change": 230, "balance": 70250},
-        {"date": "09/17", "buy": 4850, "sell": 6120, "change": -1270, "balance": 68980},
-        {"date": "09/18", "buy": 4650, "sell": 7542, "change": -2892, "balance": 66088}
-    ],
-    "3260": [
-        {"date": "09/07", "buy": 580, "sell": 620, "change": -40, "balance": 11200},
-        {"date": "09/08", "buy": 640, "sell": 590, "change": 50, "balance": 11250},
-        {"date": "09/09", "buy": 710, "sell": 680, "change": 30, "balance": 11280},
-        {"date": "09/10", "buy": 690, "sell": 750, "change": -60, "balance": 11220},
-        {"date": "09/11", "buy": 780, "sell": 710, "change": 70, "balance": 11290},
-        {"date": "09/14", "buy": 820, "sell": 790, "change": 30, "balance": 11320},
-        {"date": "09/15", "buy": 750, "sell": 810, "change": -60, "balance": 11260},
-        {"date": "09/16", "buy": 890, "sell": 820, "change": 70, "balance": 11330},
-        {"date": "09/17", "buy": 810, "sell": 920, "change": -110, "balance": 11220},
-        {"date": "09/18", "buy": 780, "sell": 972, "change": -192, "balance": 11028}
-    ],
-    "2492": [
-        {"date": "09/07", "buy": 420, "sell": 480, "change": -60, "balance": 9800},
-        {"date": "09/08", "buy": 460, "sell": 430, "change": 30, "balance": 9830},
-        {"date": "09/09", "buy": 520, "sell": 490, "change": 30, "balance": 9860},
-        {"date": "09/10", "buy": 510, "sell": 550, "change": -40, "balance": 9820},
-        {"date": "09/11", "buy": 580, "sell": 530, "change": 50, "balance": 9870},
-        {"date": "09/14", "buy": 610, "sell": 590, "change": 20, "balance": 9890},
-        {"date": "09/15", "buy": 580, "sell": 620, "change": -40, "balance": 9850},
-        {"date": "09/16", "buy": 690, "sell": 610, "change": 80, "balance": 9930},
-        {"date": "09/17", "buy": 620, "sell": 790, "change": -170, "balance": 9760},
-        {"date": "09/18", "buy": 590, "sell": 950, "change": -360, "balance": 9400}
+        {"date": "09/18", "buy": 3480, "sell": 2211, "change": 1269, "balance": 24401}
     ],
     "2313": [
         {"date": "09/07", "buy": 1250, "sell": 1380, "change": -130, "balance": 28400},
@@ -809,55 +711,7 @@ LOCAL_MARGIN_HISTORY_10D = {
         {"date": "09/15", "buy": 1710, "sell": 1780, "change": -70, "balance": 28840},
         {"date": "09/16", "buy": 1950, "sell": 1810, "change": 140, "balance": 28980},
         {"date": "09/17", "buy": 1840, "sell": 2250, "change": -410, "balance": 28570},
-        {"date": "09/18", "buy": 1720, "sell": 2496, "change": -776, "balance": 27794}
-    ],
-    "3189": [
-        {"date": "09/07", "buy": 890, "sell": 950, "change": -60, "balance": 16200},
-        {"date": "09/08", "buy": 950, "sell": 910, "change": 40, "balance": 16240},
-        {"date": "09/09", "buy": 1120, "sell": 980, "change": 140, "balance": 16380},
-        {"date": "09/10", "buy": 1050, "sell": 1180, "change": -130, "balance": 16250},
-        {"date": "09/11", "buy": 1280, "sell": 1110, "change": 170, "balance": 16420},
-        {"date": "09/14", "buy": 1390, "sell": 1240, "change": 150, "balance": 16570},
-        {"date": "09/15", "buy": 1260, "sell": 1320, "change": -60, "balance": 16510},
-        {"date": "09/16", "buy": 1450, "sell": 1310, "change": 140, "balance": 16650},
-        {"date": "09/17", "buy": 1380, "sell": 1850, "change": -470, "balance": 16180},
-        {"date": "09/18", "buy": 1290, "sell": 2189, "change": -899, "balance": 15281}
-    ],
-    "3037": [
-        {"date": "09/07", "buy": 780, "sell": 820, "change": -40, "balance": 15400},
-        {"date": "09/08", "buy": 840, "sell": 790, "change": 50, "balance": 15450},
-        {"date": "09/09", "buy": 920, "sell": 850, "change": 70, "balance": 15520},
-        {"date": "09/10", "buy": 890, "sell": 960, "change": -70, "balance": 15450},
-        {"date": "09/11", "buy": 1050, "sell": 940, "change": 110, "balance": 15560},
-        {"date": "09/14", "buy": 1180, "sell": 1050, "change": 130, "balance": 15690},
-        {"date": "09/15", "buy": 1090, "sell": 1140, "change": -50, "balance": 15640},
-        {"date": "09/16", "buy": 1250, "sell": 1120, "change": 130, "balance": 15770},
-        {"date": "09/17", "buy": 1180, "sell": 1460, "change": -280, "balance": 15490},
-        {"date": "09/18", "buy": 1120, "sell": 1675, "change": -555, "balance": 14935}
-    ],
-    "2408": [
-        {"date": "09/07", "buy": 2100, "sell": 2250, "change": -150, "balance": 39500},
-        {"date": "09/08", "buy": 2350, "sell": 2180, "change": 170, "balance": 39670},
-        {"date": "09/09", "buy": 2680, "sell": 2340, "change": 340, "balance": 40010},
-        {"date": "09/10", "buy": 2490, "sell": 2750, "change": -260, "balance": 39750},
-        {"date": "09/11", "buy": 2980, "sell": 2610, "change": 370, "balance": 40120},
-        {"date": "09/14", "buy": 3210, "sell": 2840, "change": 370, "balance": 40490},
-        {"date": "09/15", "buy": 2950, "sell": 3100, "change": -150, "balance": 40340},
-        {"date": "09/16", "buy": 3450, "sell": 3120, "change": 330, "balance": 40670},
-        {"date": "09/17", "buy": 3120, "sell": 4050, "change": -930, "balance": 39740},
-        {"date": "09/18", "buy": 2850, "sell": 4598, "change": -1748, "balance": 37992}
-    ],
-    "3406": [
-        {"date": "09/07", "buy": 340, "sell": 380, "change": -40, "balance": 5200},
-        {"date": "09/08", "buy": 390, "sell": 350, "change": 40, "balance": 5240},
-        {"date": "09/09", "buy": 450, "sell": 390, "change": 60, "balance": 5300},
-        {"date": "09/10", "buy": 420, "sell": 480, "change": -60, "balance": 5240},
-        {"date": "09/11", "buy": 510, "sell": 440, "change": 70, "balance": 5310},
-        {"date": "09/14", "buy": 580, "sell": 490, "change": 90, "balance": 5400},
-        {"date": "09/15", "buy": 520, "sell": 560, "change": -40, "balance": 5360},
-        {"date": "09/16", "buy": 640, "sell": 510, "change": 130, "balance": 5490},
-        {"date": "09/17", "buy": 690, "sell": 540, "change": 150, "balance": 5640},
-        {"date": "09/18", "buy": 780, "sell": 505, "change": 275, "balance": 5915}
+        {"date": "09/18", "buy": 1720, "sell": 2492, "change": -772, "balance": 27798}
     ]
 }
 
@@ -971,7 +825,7 @@ df_display = load_radar_market_data(st.session_state["custom_watchlist"])
 df_display.index = range(1, len(df_display) + 1)
 
 # ==============================================================================
-# 12. 側邊欄控制台 (清爽專業版)
+# 12. 側邊欄控制台
 # ==============================================================================
 st.sidebar.title("⚡ 短空雷達量化控制台")
 st.sidebar.markdown(f"**決戰輪次**：`Round 13` ({R13_DATE})")
@@ -1282,7 +1136,7 @@ with tab_history:
 # ------------------------------------------------------------------------------
 with tab_margin:
     st.subheader("📊 12 檔母池 9/18 最新融資增減熱力排行榜 (按增減張數降序)")
-    st.caption("資料來源：FinMind API (TaiwanStockMarginPurchaseShortSale) / 玩股網備援架構。🔴 紅色代表融資增加（散戶接刀/追多浮額累積），🟢 綠色代表融資減少（斷頭停損/軋空離場）。")
+    st.caption("資料來源：FinMind API (TaiwanStockMarginPurchaseShortSale) / 玩股網備援架構。🔴 紅色代表融資增加，🟢 綠色代表融資減少。")
 
     summary_margin_list = []
     for item in st.session_state["custom_watchlist"]:
@@ -1345,7 +1199,6 @@ with tab_margin:
 
     st.markdown("---")
     st.subheader("⚡ 母池個股快速切換 (一鍵單擊快速檢視 10 日走勢)")
-    st.caption("直接單擊下方按鈕即可秒切換標的，無須反覆拉動下拉選單：")
 
     pills_options = [f"{r['代號']} {r['股票名稱']} ({r['9/18融資增減(張)']:+,d})" for _, r in df_all_m.iterrows()]
     
@@ -1426,7 +1279,7 @@ with tab_margin:
         st.dataframe(styled_single, use_container_width=True, height=360)
 
 # ------------------------------------------------------------------------------
-# TAB 7: 🏢 主力分點 (買進前五大 & 賣出前五大雙向清晰結構)
+# TAB 7: 🏢 主力分點 (買超前五大 & 賣超前五大清晰雙向結構)
 # ------------------------------------------------------------------------------
 with tab_broker:
     st.subheader("🏢 12 檔母池主力關鍵分點分析 (買超前五大 & 賣超前五大)")
@@ -1438,7 +1291,7 @@ with tab_broker:
         with b_c1:
             in_b_date = st.text_input("目標交易日期 (YYYY-MM-DD)：", value="2026-09-18", key="tab_broker_date_in")
         with b_c2:
-            in_b_token = st.text_input("FinMind Token (選填，無則走免Token備援)：", value="", type="password", key="tab_broker_token_in")
+            in_b_token = st.text_input("FinMind Token (選填)：", value="", type="password", key="tab_broker_token_in")
         with b_c3:
             st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
             run_btn = st.button("🚀 一鍵自動更新 12 檔分點", use_container_width=True)
@@ -1491,16 +1344,14 @@ with tab_broker:
 
     st.markdown("---")
 
-    # 4. 分離買超前五大與賣超前五大
+    # 4. 拆分為買超前五大與賣超前五大表格
     b_detail_list = cur_b_row.get("各分點清單", [])
     if b_detail_list:
         df_all_raw_b = pd.DataFrame(b_detail_list)
         
-        # 拆分為買超與賣超
         df_buy_5 = df_all_raw_b[df_all_raw_b["買超張數"] > 0].sort_values(by="買超張數", ascending=False).head(5).copy().reset_index(drop=True)
         df_sell_5 = df_all_raw_b[df_all_raw_b["買超張數"] < 0].sort_values(by="買超張數", ascending=True).head(5).copy().reset_index(drop=True)
         
-        # 共同樣式著色
         def style_broker_buy(val):
             if isinstance(val, (int, float)) and val > 0:
                 return "color: #FF4444; font-weight: bold;"
@@ -1511,7 +1362,7 @@ with tab_broker:
                 return "color: #00CC00; font-weight: bold;"
             return ""
 
-        # --- 上方：買進前五大 (紅色警戒) ---
+        # --- 上方：買進前五大 (紅色多方) ---
         st.markdown(f"#### 🔴 【{cur_b_row['股票名稱']}】買超前五大主力分點（隔日沖鎖單 / 多方主力）")
         if not df_buy_5.empty:
             df_buy_5.index = range(1, len(df_buy_5) + 1)
@@ -1531,11 +1382,10 @@ with tab_broker:
 
         st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
 
-        # --- 下方：賣出前五大 (綠色摜壓) ---
+        # --- 下方：賣出前五大 (綠色空方) ---
         st.markdown(f"#### 🟢 【{cur_b_row['股票名稱']}】賣超前五大主力分點（波段倒貨 / 空方主力）")
         if not df_sell_5.empty:
             df_sell_5.index = range(1, len(df_sell_5) + 1)
-            # 修正賣方判定標籤
             df_sell_5["倒貨意願"] = df_sell_5["報酬率(%)"].apply(lambda p: "🟢 波段出貨" if p >= 0 else "🟢 停損摜壓")
             styled_sell_table = apply_color_styler(
                 df_sell_5.style, style_broker_sell, subset=["買超張數", "預估獲利(萬)", "報酬率(%)"]
