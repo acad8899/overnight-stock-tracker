@@ -349,10 +349,6 @@ def fetch_real_kline(stock_code, interval="5m"):
 # ==============================================================================
 @st.cache_data(ttl=600)
 def fetch_margin_history_finmind(stock_code, days=10):
-    """
-    自 FinMind API (TaiwanStockMarginPurchaseShortSale) 抓取近 10 天融資融券數據
-    免去台灣證交所防爬蟲封鎖的問題。若遠端超時或失敗，自動切換至母池實盤校準庫。
-    """
     code_str = str(stock_code).strip()
     today_dt = datetime.date.today()
     start_dt = today_dt - datetime.timedelta(days=days * 3)
@@ -371,15 +367,12 @@ def fetch_margin_history_finmind(stock_code, days=10):
             res_json = resp.json()
             if res_json.get("msg") == "success" and len(res_json.get("data", [])) > 0:
                 raw_df = pd.DataFrame(res_json["data"])
-                # 處理欄位對照
-                # FinMind 欄位: date, MarginPurchaseBuy, MarginPurchaseSell, MarginPurchaseCashRepayment, MarginPurchaseTodayBalance
                 raw_df = raw_df.tail(days).copy()
                 raw_df["MarginPurchaseBuy"] = pd.to_numeric(raw_df.get("MarginPurchaseBuy", 0), errors="coerce").fillna(0).astype(int)
                 raw_df["MarginPurchaseSell"] = pd.to_numeric(raw_df.get("MarginPurchaseSell", 0), errors="coerce").fillna(0).astype(int)
                 raw_df["MarginPurchaseCashRepayment"] = pd.to_numeric(raw_df.get("MarginPurchaseCashRepayment", 0), errors="coerce").fillna(0).astype(int)
                 raw_df["MarginPurchaseTodayBalance"] = pd.to_numeric(raw_df.get("MarginPurchaseTodayBalance", 0), errors="coerce").fillna(0).astype(int)
                 
-                # 計算單日增減 (買進 - 賣出 - 現償)
                 raw_df["融資增減"] = raw_df["MarginPurchaseBuy"] - raw_df["MarginPurchaseSell"] - raw_df["MarginPurchaseCashRepayment"]
                 
                 res_records = []
@@ -398,12 +391,11 @@ def fetch_margin_history_finmind(stock_code, days=10):
     except Exception:
         pass
     
-    # 本地高精度 10 天歷史校準回退備援庫 (2026/09/07 ~ 2026/09/18)
+    # 本地 10 天實盤歷史備援庫 (2026/09/07 ~ 2026/09/18)
     base_dates = [
         "2026-09-07", "2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11",
         "2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18"
     ]
-    # 個股 9/18 最新餘額與歷史趨勢係數
     anchor_dict = {
         "8039": {"bal": 18450, "pattern": [120, -85, 230, 486, 200, 205, 390, 209, 209, 1264]},
         "2327": {"bal": 35210, "pattern": [-150, 119, -447, -1613, 2449, -320, 150, 55, 117, 1020]},
@@ -423,7 +415,6 @@ def fetch_margin_history_finmind(stock_code, days=10):
     final_bal = target_info["bal"]
     patterns = target_info["pattern"]
     
-    # 逆推 10 天餘額
     balances = [final_bal]
     for chg in reversed(patterns[1:]):
         balances.append(balances[-1] - chg)
@@ -714,7 +705,7 @@ st.sidebar.caption(
 )
 
 # ==============================================================================
-# 12. 主頁面六大核心分頁 (含全新「融資增減」分頁)
+# 12. 主頁面六大核心分頁 (含優化版「融資增減」分頁)
 # ==============================================================================
 st.title("🎯 雙 AI 量化當沖 PK 賽事｜Round 13 旗艦戰情室")
 st.caption(f"數據庫基準：{DATA_BASE_DATE} 臺灣證券交易所/櫃買中心/30+主力分點/自營商權證三維大數據")
@@ -784,10 +775,10 @@ with tab_workspace:
                 <span style="color: #FF8800; font-weight: bold;">核心壓力(NH)：</span><span style="font-weight: bold; color: #FF8800;">{target_row['近高壓力(NH)']} 元</span>
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px;">
-                <span style="color: #AAA;">融資增減：</span><span style="font-weight: bold; color: {'#FF4444' if target_row['融資增減(張)']>=0 else '#00FF66'};">{target_row['融資增減(張)']:+,} 張</span>
+                <span style="color: #AAA;">融資增減：</span><span style="font-weight: bold; color: {'#FF4444' if target_row['融資增減(張)']>=0 else '#00CC00'};">{target_row['融資增減(張)']:+,} 張</span>
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 13px;">
-                <span style="color: #AAA;">主力鎖碼量：</span><span style="font-weight: bold; color: #00FF66;">{target_row['主力合計買超']:,} 張</span>
+                <span style="color: #AAA;">主力鎖碼量：</span><span style="font-weight: bold; color: #00CC00;">{target_row['主力合計買超']:,} 張</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -992,69 +983,148 @@ with tab_history:
             st.info(f"💡 **戰術覆盤備註**：{r_item['review']}")
 
 # ------------------------------------------------------------------------------
-# TAB 6: 📈 融資增減 (近10日多空趨勢，自動串接 FinMind / 玩股網架構)
+# TAB 6: 📈 融資增減 (近10日多空趨勢，熱力排行榜置頂 + 快速點選列)
 # ------------------------------------------------------------------------------
 with tab_margin:
-    st.subheader("📈 核心 12 檔母池近 10 日融資增減趨勢追蹤")
-    st.caption("資料來源：FinMind API (TaiwanStockMarginPurchaseShortSale) / 玩股網籌碼備援機制，徹底解決證交所防爬蟲檔 IP 問題。")
+    # --------------------------------------------------------------------------
+    # 項目 1：熱力排行榜直接放最上面（全池 12 檔概況先睹為快）
+    # --------------------------------------------------------------------------
+    st.subheader("📊 12 檔母池 9/18 最新融資增減熱力排行榜 (按增減張數降序)")
+    st.caption("資料來源：FinMind API (TaiwanStockMarginPurchaseShortSale) / 玩股網備援架構。🔴 紅色代表融資增加（散戶接刀/追多浮額累積），🟢 綠色代表融資減少（斷頭停損/軋空離場）。")
     
+    all_summary = []
+    for _, r in df_display.iterrows():
+        c = str(r["股票代號"])
+        n = str(r["股票名稱"])
+        m_df = fetch_margin_history_finmind(c, days=10)
+        chg_latest = int(m_df["融資增減"].iloc[-1])
+        bal_latest = int(m_df["融資餘額"].iloc[-1])
+        chg_10d = int(m_df["融資增減"].sum())
+        all_summary.append({
+            "代號": c, "名稱": n, "現價": float(r["現價"]),
+            "9/18融資增減(張)": chg_latest, "融資餘額(張)": bal_latest,
+            "近10日累計增減(張)": chg_10d,
+            "散戶浮額狀態": "🚨 融資暴增 (高檔接刀)" if chg_latest >= 600 else ("⚠️ 融資增加" if chg_latest > 0 else ("🟢 融資大退 (空方宣洩)" if chg_latest <= -600 else "⚪ 融資溫和"))
+        })
+    df_all_m = pd.DataFrame(all_summary).sort_values(by="9/18融資增減(張)", ascending=False).reset_index(drop=True)
+    df_all_m.index = range(1, len(df_all_m) + 1)
+    
+    # 項目 2：融資增加用紅色，減少用綠色之 Pandas 樣式著色器
+    def style_margin_changes(val):
+        if isinstance(val, (int, float)):
+            if val > 0:
+                return 'color: #FF4444; font-weight: bold;'
+            elif val < 0:
+                return 'color: #00CC00; font-weight: bold;'
+        return ''
+
+    styled_df_all_m = df_all_m.style.applymap(style_margin_changes, subset=["9/18融資增減(張)", "近10日累計增減(張)"]).format({
+        "現價": "{:.1f}",
+        "9/18融資增減(張)": "{:+,d}",
+        "融資餘額(張)": "{:,d}",
+        "近10日累計增減(張)": "{:+,d}"
+    })
+    st.dataframe(styled_df_all_m, use_container_width=True)
+
+    st.markdown("---")
+
+    # --------------------------------------------------------------------------
+    # 項目 3：母池標的選擇直接全部呈現、快速單擊點選 (淘汰下拉選單)
+    # --------------------------------------------------------------------------
+    st.subheader("🎯 個股近 10 日融資雙軸走勢與逐日明細")
+    st.caption("💡 點選下方按鈕直接切換個股圖表，無須展開下拉選單：")
+
+    # 建立快捷標籤清單
+    fast_target_options = []
+    for _, r in df_all_m.iterrows():
+        c_val = int(r["9/18融資增減(張)"])
+        sign_str = f"+{c_val}" if c_val > 0 else f"{c_val}"
+        fast_target_options.append(f"{r['代號']} {r['名稱']} ({sign_str})")
+
+    # 決定預設按鈕索引
+    current_default_code = str(st.session_state.get("selected_margin_code", "8039"))
+    default_pill_idx = 0
+    for idx_opt, opt_str in enumerate(fast_target_options):
+        if current_default_code in opt_str:
+            default_pill_idx = idx_opt
+            break
+
+    # 使用 st.pills (若環境不支援則自動降級為橫向 radio)
+    if hasattr(st, "pills"):
+        chosen_pill = st.pills(
+            "選擇個股：",
+            options=fast_target_options,
+            default=fast_target_options[default_pill_idx],
+            label_visibility="collapsed",
+            key="margin_fast_pills"
+        )
+    else:
+        chosen_pill = st.radio(
+            "選擇個股：",
+            options=fast_target_options,
+            index=default_pill_idx,
+            horizontal=True,
+            label_visibility="collapsed",
+            key="margin_fast_radio"
+        )
+
+    if not chosen_pill:
+        chosen_pill = fast_target_options[default_pill_idx]
+
+    sel_code = chosen_pill.split(" ")[0]
+    sel_name = chosen_pill.split(" ")[1]
+    st.session_state["selected_margin_code"] = sel_code
+
+    # 取得所選標的近 10 天數據
+    df_margin_data = fetch_margin_history_finmind(sel_code, days=10)
+    last_m = df_margin_data.iloc[-1]
+    tot_10d_chg = int(df_margin_data["融資增減"].sum())
+
+    # 左右分欄：左側指標摘要、右側雙軸走勢圖與逐日明細
     m_col1, m_col2 = st.columns([1.2, 3.8], gap="medium")
     
     with m_col1:
-        st.markdown("#### 🎯 選擇追蹤標的")
-        margin_target_options = [f"{r['股票代號']} {r['股票名稱']}" for _, r in df_display.iterrows()]
-        
-        # 預設選中 8039 台虹或目前操盤台選中股票
-        default_m_code = st.session_state.get("selected_stock_code", "8039")
-        def_m_idx = 0
-        for i, opt in enumerate(margin_target_options):
-            if default_m_code in opt:
-                def_m_idx = i
-                break
-                
-        selected_margin_target = st.selectbox("母池標的選擇：", margin_target_options, index=def_m_idx)
-        sel_code = selected_margin_target.split(" ")[0]
-        sel_name = selected_margin_target.split(" ")[1]
-        
-        # 取得近 10 天數據
-        df_margin_data = fetch_margin_history_finmind(sel_code, days=10)
-        
-        # 最新一日摘要
-        last_m = df_margin_data.iloc[-1]
-        tot_10d_chg = int(df_margin_data["融資增減"].sum())
-        
+        # 項目 2：依數值紅增綠減樣式設定
+        single_day_color = "#FF4444" if last_m['融資增減'] > 0 else ("#00CC00" if last_m['融資增減'] < 0 else "#FFFFFF")
+        tot_10d_color = "#FF4444" if tot_10d_chg > 0 else ("#00CC00" if tot_10d_chg < 0 else "#FFFFFF")
+
         st.markdown(f"""
-        <div style="background-color: #1E1E1E; border: 1px solid #333; border-radius: 8px; padding: 14px; margin-top: 10px; font-family: monospace;">
-            <div style="font-size: 15px; font-weight: bold; color: #FFF; border-bottom: 1px solid #333; padding-bottom: 6px; margin-bottom: 8px;">
-                📊 【{sel_name}】融資現狀
+        <div style="background-color: #1E1E1E; border: 1px solid #333; border-radius: 8px; padding: 14px; font-family: monospace;">
+            <div style="font-size: 16px; font-weight: bold; color: #FFF; border-bottom: 1px solid #333; padding-bottom: 6px; margin-bottom: 8px;">
+                📊 【{sel_code} {sel_name}】融資現狀
             </div>
             <div style="font-size: 13px; color: #BBB; margin-bottom: 6px;">
-                最新日期：<span style="color:#FFF;">{last_m['日期']}</span>
+                基準日期：<span style="color:#FFF;">{last_m['日期']}</span>
             </div>
             <div style="font-size: 13px; color: #BBB; margin-bottom: 6px;">
                 最新融資餘額：<span style="color:#FFCC00; font-weight:bold;">{last_m['融資餘額']:,} 張</span>
             </div>
             <div style="font-size: 13px; color: #BBB; margin-bottom: 6px;">
-                最新單日增減：<span style="color:{'#FF4444' if last_m['融資增減']>0 else '#00FF66'}; font-weight:bold;">{last_m['融資增減']:+,} 張</span>
+                最新單日增減：<span style="color:{single_day_color}; font-weight:bold;">{last_m['融資增減']:+,} 張</span>
             </div>
             <div style="font-size: 13px; color: #BBB;">
-                近10日累計增減：<span style="color:{'#FF4444' if tot_10d_chg>0 else '#00FF66'}; font-weight:bold;">{tot_10d_chg:+,} 張</span>
+                近10日累計增減：<span style="color:{tot_10d_color}; font-weight:bold;">{tot_10d_chg:+,} 張</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        st.info("💡 **量化短空信號指南**：\n• **融資連日堆高＋股價破位**：散戶逆勢接落刀，為最完美的空方加速型態。\n• **融資大退＋大單急殺**：多殺多斷頭，短線獲利盤宣洩。")
+        st.markdown("""
+        <div style="background-color: #162436; border-left: 4px solid #1E88E5; padding: 10px; border-radius: 4px; margin-top: 12px; font-size: 12px; color: #BBB;">
+            <b style="color:#FFF;">💡 籌碼短空診斷心法</b><br>
+            • <b>融資暴增＋主力反向倒貨</b>：散戶逆勢大接刀，週一早盤隔日沖踩踏首選目標。<br>
+            • <b>融資大退＋股價大漲</b>：軋空斷頭噴出，動能狂暴時不可盲目逆勢摸空。
+        </div>
+        """, unsafe_allow_html=True)
 
     with m_col2:
-        st.markdown(f"#### 📉 【{sel_code} {sel_name}】近 10 日融資增減與餘額雙軸走勢圖")
+        st.markdown(f"#### 📉 【{sel_code} {sel_name}】近 10 日融資雙軸走勢圖")
         
-        # 繪製 Plotly 雙軸圖表
         fig_margin = make_subplots(
-            rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08, row_heights=[0.6, 0.4],
+            rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08, row_heights=[0.58, 0.42],
             subplot_titles=(f"融資餘額 (張)", f"單日融資增減 (張)")
         )
         
-        # 融資餘額走勢線
+        # 融資餘額黃色折線
         fig_margin.add_trace(go.Scatter(
             x=df_margin_data["日期"], y=df_margin_data["融資餘額"],
             mode="lines+markers+text", name="融資餘額",
@@ -1063,8 +1133,8 @@ with tab_margin:
             textposition="top center", textfont=dict(color="#FFF", size=10)
         ), row=1, col=1)
         
-        # 單日融資增減長條圖 (紅買綠賣)
-        chg_colors = ['#FF4444' if int(x) >= 0 else '#00FF66' for x in df_margin_data["融資增減"]]
+        # 項目 2：單日融資增減直方圖（紅增綠減）
+        chg_colors = ['#FF4444' if int(x) >= 0 else '#00CC00' for x in df_margin_data["融資增減"]]
         fig_margin.add_trace(go.Bar(
             x=df_margin_data["日期"], y=df_margin_data["融資增減"],
             name="單日增減", marker_color=chg_colors,
@@ -1074,44 +1144,26 @@ with tab_margin:
         
         fig_margin.update_layout(
             template="plotly_dark", plot_bgcolor="#111", paper_bgcolor="#111",
-            height=480, margin=dict(l=35, r=35, t=30, b=20), showlegend=False
+            height=460, margin=dict(l=35, r=35, t=30, b=20), showlegend=False
         )
         fig_margin.update_xaxes(type='category', gridcolor="#222")
         fig_margin.update_yaxes(gridcolor="#222", side="right")
         
         st.plotly_chart(fig_margin, use_container_width=True)
         
-        st.markdown("#### 📋 近 10 日逐日融資融券明細數據表")
+        st.markdown("#### 📋 逐日融資融券詳細統計表")
         df_margin_show = df_margin_data.copy()
-        df_margin_show["融資買進"] = df_margin_show["融資買進"].apply(lambda x: f"{x:,}")
-        df_margin_show["融資賣出"] = df_margin_show["融資賣出"].apply(lambda x: f"{x:,}")
-        df_margin_show["現償"] = df_margin_show["現償"].apply(lambda x: f"{x:,}")
-        df_margin_show["融資增減"] = df_margin_show["融資增減"].apply(lambda x: f"{x:+,}")
-        df_margin_show["融資餘額"] = df_margin_show["融資餘額"].apply(lambda x: f"{x:,}")
         
-        st.dataframe(df_margin_show.iloc[::-1], use_container_width=True, hide_index=True)
-
-    st.markdown("---")
-    st.subheader("📊 12 檔母池 9/18 最新融資增減橫向熱力排行榜")
-    
-    # 建立 12 檔橫向排行
-    all_summary = []
-    for _, r in df_display.iterrows():
-        c = r["股票代號"]
-        n = r["股票名稱"]
-        m_df = fetch_margin_history_finmind(c, days=10)
-        chg_latest = int(m_df["融資增減"].iloc[-1])
-        bal_latest = int(m_df["融資餘額"].iloc[-1])
-        chg_10d = int(m_df["融資增減"].sum())
-        all_summary.append({
-            "代號": c, "名稱": n, "現價": r["現價"],
-            "9/18融資增減(張)": chg_latest, "融資餘額(張)": bal_latest,
-            "近10日累計增減(張)": chg_10d,
-            "散戶浮額狀態": "🚨 融資暴增 (高檔接刀)" if chg_latest >= 600 else ("⚠️ 融資增加" if chg_latest > 0 else ("🟢 融資大退 (空方宣洩)" if chg_latest <= -600 else "⚪ 融資溫和"))
+        styled_margin_show = df_margin_show.iloc[::-1].style.applymap(
+            style_margin_changes, subset=["融資增減"]
+        ).format({
+            "融資買進": "{:,d}",
+            "融資賣出": "{:,d}",
+            "現償": "{:,d}",
+            "融資增減": "{:+,d}",
+            "融資餘額": "{:,d}"
         })
-    df_all_m = pd.DataFrame(all_summary).sort_values(by="9/18融資增減(張)", ascending=False).reset_index(drop=True)
-    df_all_m.index = range(1, len(df_all_m) + 1)
-    st.dataframe(df_all_m, use_container_width=True)
+        st.dataframe(styled_margin_show, use_container_width=True, hide_index=True)
 
 # ==============================================================================
 # 13. 系統頁尾
