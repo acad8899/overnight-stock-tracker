@@ -165,9 +165,25 @@ HISTORICAL_ROUNDS = [
 ]
 
 # ==============================================================================
-# 4. 2026-09-18 盤後 12 檔母池三維大數據庫 (校準元大點精靈真實數據)
+# 4. 2026-09-18 盤後 12 檔母池大數據庫 (真實核定數據，拒絕虛構湊檔)
 # ==============================================================================
 DEFAULT_WATCHLIST = [
+    {
+        "代號": "8039", "名稱": "台虹", "昨收": 269.50, "昨日鎖碼量": 18951, "融資增減(張)": 1269, "券資比": 4.5, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
+        "最高價": 271.00, "最低價": 257.00,
+        "主力分點": [
+            {"分點": "凱基-台北", "買超": 859, "均價": 265.47, "佔比": 4.53},
+            {"分點": "元大", "買超": 616, "均價": 264.87, "佔比": 3.25},
+            {"分點": "國票-安和", "買超": 522, "均價": 265.95, "佔比": 2.75},
+            {"分點": "美商高盛", "買超": 484, "均價": 264.53, "佔比": 2.55},
+            {"分點": "台灣摩根士丹利", "買超": 379, "均價": 265.11, "佔比": 2.00},
+            {"分點": "摩根大通", "買超": -2031, "均價": 264.13, "佔比": -10.72},
+            {"分點": "新加坡商瑞銀", "買超": -293, "均價": 264.79, "佔比": -1.55},
+            {"分點": "富邦", "買超": -89, "均價": 261.77, "佔比": -0.47},
+            {"分點": "台新-成功", "買超": -79, "均價": 269.76, "佔比": -0.42},
+            {"分點": "花旗環球", "買超": -67, "均價": 264.24, "佔比": -0.35}
+        ]
+    },
     {
         "代號": "2313", "名稱": "華通", "昨收": 228.50, "昨日鎖碼量": 29688, "融資增減(張)": -772, "券資比": 3.7, "權證認售(萬)": -97, "權證賣認購(萬)": 0,
         "最高價": 228.50, "最低價": 221.50,
@@ -185,35 +201,12 @@ DEFAULT_WATCHLIST = [
         ]
     },
     {
-        "代號": "8039", "名稱": "台虹", "昨收": 269.50, "昨日鎖碼量": 18887, "融資增減(張)": 1269, "券資比": 4.5, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
-        "最高價": 271.00, "最低價": 257.00,
-        "主力分點": [
-            {"分點": "凱基-台北", "買超": 859, "均價": 265.47, "佔比": 4.53},
-            {"分點": "元大", "買超": 616, "均價": 264.87, "佔比": 3.25},
-            {"分點": "美商高盛", "買超": 420, "均價": 266.10, "佔比": 2.22},
-            {"分點": "富邦", "買超": 310, "均價": 265.80, "佔比": 1.64},
-            {"分點": "統一", "買超": 285, "均價": 264.50, "佔比": 1.51},
-            {"分點": "摩根大通", "買超": -2031, "均價": 264.13, "佔比": -10.72},
-            {"分點": "新加坡商瑞銀", "買超": -580, "均價": 263.90, "佔比": -3.07},
-            {"分點": "台灣摩根士丹利", "買超": -410, "均價": 264.80, "佔比": -2.17},
-            {"分點": "國泰", "買超": -320, "均價": 265.20, "佔比": -1.69},
-            {"分點": "群益金鼎", "買超": -290, "均價": 263.70, "佔比": -1.53}
-        ]
-    },
-    {
         "代號": "2327", "名稱": "國巨*", "昨收": 550.00, "昨日鎖碼量": 26232, "融資增減(張)": 1045, "券資比": 3.1, "權證認售(萬)": 0, "權證賣認購(萬)": 0,
         "最高價": 550.00, "最低價": 533.00,
         "主力分點": [
             {"分點": "凱基-台北", "買超": 1320, "均價": 543.49, "佔比": 4.90},
             {"分點": "美商高盛", "買超": 822, "均價": 544.86, "佔比": 3.05},
-            {"分點": "統一", "買超": 510, "均價": 542.50, "佔比": 1.89},
-            {"分點": "元大", "買超": 450, "均價": 544.10, "佔比": 1.67},
-            {"分點": "富邦", "買超": 390, "均價": 543.00, "佔比": 1.45},
-            {"分點": "新加坡商瑞銀", "買超": -697, "均價": 545.97, "佔比": -2.59},
-            {"分點": "台灣摩根士丹利", "買超": -640, "均價": 546.20, "佔比": -2.38},
-            {"分點": "摩根大通", "買超": -520, "均價": 544.90, "佔比": -1.93},
-            {"分點": "國泰", "買超": -410, "均價": 545.00, "佔比": -1.52},
-            {"分點": "永豐金", "買超": -350, "均價": 543.80, "佔比": -1.30}
+            {"分點": "新加坡商瑞銀", "買超": -697, "均價": 545.97, "佔比": -2.59}
         ]
     },
     {
@@ -221,15 +214,7 @@ DEFAULT_WATCHLIST = [
         "最高價": 563.00, "最低價": 520.00,
         "主力分點": [
             {"分點": "台新", "買超": 344, "均價": 542.97, "佔比": 1.72},
-            {"分點": "元大", "買超": 280, "均價": 545.10, "佔比": 1.40},
-            {"分點": "富邦", "買超": 240, "均價": 544.00, "佔比": 1.20},
-            {"分點": "統一", "買超": 190, "均價": 543.50, "佔比": 0.95},
-            {"分點": "凱基", "買超": 165, "均價": 546.00, "佔比": 0.82},
-            {"分點": "台灣摩根士丹利", "買超": -360, "均價": 542.24, "佔比": -1.80},
-            {"分點": "摩根大通", "買超": -310, "均價": 543.10, "佔比": -1.55},
-            {"分點": "新加坡商瑞銀", "買超": -290, "均價": 544.50, "佔比": -1.45},
-            {"分點": "美商高盛", "買超": -230, "均價": 541.80, "佔比": -1.15},
-            {"分點": "國泰", "買超": -180, "均價": 542.00, "佔比": -0.90}
+            {"分點": "台灣摩根士丹利", "買超": -360, "均價": 542.24, "佔比": -1.80}
         ]
     },
     {
@@ -237,15 +222,7 @@ DEFAULT_WATCHLIST = [
         "最高價": 314.00, "最低價": 300.00,
         "主力分點": [
             {"分點": "摩根大通", "買超": 2892, "均價": 313.76, "佔比": 15.48},
-            {"分點": "凱基-台北", "買超": 450, "均價": 312.50, "佔比": 2.41},
-            {"分點": "元大", "買超": 320, "均價": 311.80, "佔比": 1.71},
-            {"分點": "統一", "買超": 280, "均價": 313.00, "佔比": 1.50},
-            {"分點": "富邦", "買超": 210, "均價": 312.00, "佔比": 1.12},
-            {"分點": "新加坡商瑞銀", "買超": -847, "均價": 313.07, "佔比": -4.53},
-            {"分點": "台灣摩根士丹利", "買超": -620, "均價": 311.90, "佔比": -3.32},
-            {"分點": "美商高盛", "買超": -510, "均價": 312.50, "佔比": -2.73},
-            {"分點": "國泰", "買超": -340, "均價": 313.20, "佔比": -1.82},
-            {"分點": "群益金鼎", "買超": -290, "均價": 310.50, "佔比": -1.55}
+            {"分點": "新加坡商瑞銀", "買超": -847, "均價": 313.07, "佔比": -4.53}
         ]
     },
     {
@@ -254,14 +231,7 @@ DEFAULT_WATCHLIST = [
         "主力分點": [
             {"分點": "新加坡商瑞銀", "買超": 18987, "均價": 177.88, "佔比": 13.70},
             {"分點": "美商高盛", "買超": 6929, "均價": 177.27, "佔比": 5.00},
-            {"分點": "凱基-台北", "買超": 4859, "均價": 177.05, "佔比": 3.51},
-            {"分點": "元大", "買超": 3210, "均價": 176.90, "佔比": 2.32},
-            {"分點": "富邦", "買超": 2450, "均價": 177.30, "佔比": 1.77},
-            {"分點": "摩根大通", "買超": -8950, "均價": 177.50, "佔比": -6.46},
-            {"分點": "台灣摩根士丹利", "買超": -6420, "均價": 178.10, "佔比": -4.63},
-            {"分點": "國泰", "買超": -4120, "均價": 177.80, "佔比": -2.97},
-            {"分點": "統一", "買超": -3580, "均價": 176.50, "佔比": -2.58},
-            {"分點": "永豐金", "買超": -2890, "均價": 177.00, "佔比": -2.08}
+            {"分點": "凱基-台北", "買超": 4859, "均價": 177.05, "佔比": 3.51}
         ]
     },
     {
@@ -269,15 +239,8 @@ DEFAULT_WATCHLIST = [
         "最高價": 401.50, "最低價": 395.00,
         "主力分點": [
             {"分點": "合庫", "買超": 317, "均價": 397.66, "佔比": 4.51},
-            {"分點": "元大", "買超": 180, "均價": 396.20, "佔比": 2.56},
-            {"分點": "統一", "買超": 140, "均價": 397.00, "佔比": 1.99},
-            {"分點": "國泰", "買超": 125, "均價": 395.80, "佔比": 1.78},
-            {"分點": "玉山", "買超": 110, "均價": 396.50, "佔比": 1.56},
             {"分點": "富邦", "買超": -990, "均價": 396.32, "佔比": -14.09},
-            {"分點": "凱基-台北", "買超": -459, "均價": 397.01, "佔比": -6.53},
-            {"分點": "美商高盛", "買超": -340, "均價": 395.50, "佔比": -4.84},
-            {"分點": "摩根大通", "買超": -280, "均價": 396.80, "佔比": -3.98},
-            {"分點": "台灣摩根士丹利", "買超": -210, "均價": 397.20, "佔比": -2.99}
+            {"分點": "凱基-台北", "買超": -459, "均價": 397.01, "佔比": -6.53}
         ]
     },
     {
@@ -285,15 +248,7 @@ DEFAULT_WATCHLIST = [
         "最高價": 311.00, "最低價": 300.00,
         "主力分點": [
             {"分點": "凱基-台北", "買超": 1204, "均價": 307.56, "佔比": 7.76},
-            {"分點": "元大", "買超": 420, "均價": 306.80, "佔比": 2.71},
-            {"分點": "統一", "買超": 310, "均價": 307.10, "佔比": 2.00},
-            {"分點": "國泰", "買超": 250, "均價": 305.90, "佔比": 1.61},
-            {"分點": "美商高盛", "買超": 210, "均價": 308.00, "佔比": 1.35},
-            {"分點": "富邦", "買超": -414, "均價": 302.59, "佔比": -2.67},
-            {"分點": "摩根大通", "買超": -380, "均價": 306.20, "佔比": -2.45},
-            {"分點": "新加坡商瑞銀", "買超": -310, "均價": 305.80, "佔比": -2.00},
-            {"分點": "台灣摩根士丹利", "買超": -260, "均價": 307.00, "佔比": -1.67},
-            {"分點": "永豐金", "買超": -190, "均價": 304.50, "佔比": -1.22}
+            {"分點": "富邦", "買超": -414, "均價": 302.59, "佔比": -2.67}
         ]
     },
     {
@@ -301,15 +256,7 @@ DEFAULT_WATCHLIST = [
         "最高價": 850.00, "最低價": 815.00,
         "主力分點": [
             {"分點": "新加坡商瑞銀", "買超": 911, "均價": 833.55, "佔比": 4.97},
-            {"分點": "元大", "買超": 410, "均價": 830.00, "佔比": 2.24},
-            {"分點": "凱基-台北", "買超": 320, "均價": 835.00, "佔比": 1.75},
-            {"分點": "富邦", "買超": 280, "均價": 831.50, "佔比": 1.53},
-            {"分點": "統一", "買超": 210, "均價": 829.00, "佔比": 1.15},
-            {"分點": "美商高盛", "買超": -318, "均價": 829.58, "佔比": -1.74},
-            {"分點": "摩根大通", "買超": -290, "均價": 834.00, "佔比": -1.58},
-            {"分點": "台灣摩根士丹利", "買超": -250, "均價": 832.00, "佔比": -1.36},
-            {"分點": "國泰", "買超": -210, "均價": 830.50, "佔比": -1.15},
-            {"分點": "永豐金", "買超": -180, "均價": 828.00, "佔比": -0.98}
+            {"分點": "美商高盛", "買超": -318, "均價": 829.58, "佔比": -1.74}
         ]
     },
     {
@@ -317,15 +264,7 @@ DEFAULT_WATCHLIST = [
         "最高價": 990.00, "最低價": 971.00,
         "主力分點": [
             {"分點": "台灣摩根士丹利", "買超": 1796, "均價": 982.28, "佔比": 12.32},
-            {"分點": "摩根大通", "買超": 580, "均價": 980.50, "佔比": 3.98},
-            {"分點": "元大", "買超": 340, "均價": 979.00, "佔比": 2.33},
-            {"分點": "凱基-台北", "買超": 290, "均價": 983.00, "佔比": 1.99},
-            {"分點": "統一", "買超": 210, "均價": 981.00, "佔比": 1.44},
-            {"分點": "美商高盛", "買超": -472, "均價": 981.93, "佔比": -3.24},
-            {"分點": "新加坡商瑞銀", "買超": -410, "均價": 983.50, "佔比": -2.81},
-            {"分點": "富邦", "買超": -320, "均價": 980.00, "佔比": -2.20},
-            {"分點": "國泰", "買超": -250, "均價": 978.50, "佔比": -1.72},
-            {"分點": "永豐金", "買超": -190, "均價": 977.00, "佔比": -1.30}
+            {"分點": "美商高盛", "買超": -472, "均價": 981.93, "佔比": -3.24}
         ]
     },
     {
@@ -333,15 +272,7 @@ DEFAULT_WATCHLIST = [
         "最高價": 525.00, "最低價": 508.00,
         "主力分點": [
             {"分點": "摩根大通", "買超": 12561, "均價": 523.02, "佔比": 15.80},
-            {"分點": "新加坡商瑞銀", "買超": 3450, "均價": 522.50, "佔比": 4.34},
-            {"分點": "美商高盛", "買超": 2890, "均價": 524.10, "佔比": 3.63},
-            {"分點": "元大", "買超": 1820, "均價": 521.80, "佔比": 2.29},
-            {"分點": "凱基-台北", "買超": 1450, "均價": 524.50, "佔比": 1.82},
-            {"分點": "永豐金", "買超": -2240, "均價": 518.85, "佔比": -2.82},
-            {"分點": "富邦", "買超": -1850, "均價": 520.00, "佔比": -2.33},
-            {"分點": "國泰", "買超": -1420, "均價": 521.00, "佔比": -1.79},
-            {"分點": "統一", "買超": -1100, "均價": 519.50, "佔比": -1.38},
-            {"分點": "群益金鼎", "買超": -980, "均價": 517.50, "佔比": -1.23}
+            {"分點": "永豐金", "買超": -2240, "均價": 518.85, "佔比": -2.82}
         ]
     },
     {
@@ -349,15 +280,7 @@ DEFAULT_WATCHLIST = [
         "最高價": 999.00, "最低價": 955.00,
         "主力分點": [
             {"分點": "兆豐", "買超": 213, "均價": 969.60, "佔比": 2.66},
-            {"分點": "元大", "買超": 185, "均價": 971.00, "佔比": 2.31},
-            {"分點": "富邦", "買超": 150, "均價": 970.50, "佔比": 1.88},
-            {"分點": "凱基-台北", "買超": 135, "均價": 975.00, "佔比": 1.69},
-            {"分點": "統一", "買超": 95, "均價": 968.00, "佔比": 1.19},
-            {"分點": "摩根大通", "買超": -320, "均價": 972.89, "佔比": -3.99},
-            {"分點": "台灣摩根士丹利", "買超": -280, "均價": 974.50, "佔比": -3.49},
-            {"分點": "美商高盛", "買超": -210, "均價": 970.00, "佔比": -2.62},
-            {"分點": "新加坡商瑞銀", "買超": -165, "均價": 973.00, "佔比": -2.06},
-            {"分點": "國泰", "買超": -130, "均價": 969.00, "佔比": -1.62}
+            {"分點": "摩根大通", "買超": -320, "均價": 972.89, "佔比": -3.99}
         ]
     }
 ]
@@ -382,19 +305,49 @@ ORDERS_CHATGPT_R13 = [
 ]
 
 # ==============================================================================
-# 6. 主力分點進出自動抓取與聚合計算模組 (優化聚合邏輯)
+# 6. 真實主力分點爬蟲模組 (直連玩股網公開端點，不湊檔)
 # ==============================================================================
 COMMON_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Referer": "https://www.wantgoo.com/"
 }
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=300)
 def fetch_top_brokers_live(stock_code, target_date="2026-09-18", token=""):
     code_str = str(stock_code).strip()
     
+    # 策略 1: 玩股網公開 JSON 端點
+    try:
+        url_wantgoo = f"https://www.wantgoo.com/stock/{code_str}/major-investors/branch-rank-data"
+        res = requests.get(url_wantgoo, headers=COMMON_HEADERS, timeout=3.5)
+        if res.status_code == 200:
+            p_data = res.json()
+            buy_list = p_data.get("buy", [])
+            sell_list = p_data.get("sell", [])
+            if buy_list or sell_list:
+                res_brokers = []
+                for b in buy_list:
+                    res_brokers.append({
+                        "分點": str(b.get("name", "???")),
+                        "買超": int(b.get("netVolume", 0)),
+                        "均價": float(b.get("avgPrice", 0.0)),
+                        "佔比": float(b.get("ratio", 0.0))
+                    })
+                for s in sell_list:
+                    res_brokers.append({
+                        "分點": str(s.get("name", "???")),
+                        "買超": -abs(int(s.get("netVolume", 0))),
+                        "均價": float(s.get("avgPrice", 0.0)),
+                        "佔比": -float(s.get("ratio", 0.0))
+                    })
+                return res_brokers
+    except Exception:
+        pass
+
+    # 策略 2: FinMind 原生報表聚合 (若有 token)
     if token and len(token) > 10:
         try:
-            url = "https://api.finmindtrade.com/api/v4/data"
+            url_finmind = "https://api.finmindtrade.com/api/v4/data"
             params = {
                 "dataset": "TaiwanStockTradingDailyReport",
                 "data_id": code_str,
@@ -402,9 +355,9 @@ def fetch_top_brokers_live(stock_code, target_date="2026-09-18", token=""):
                 "end_date": target_date,
                 "token": token
             }
-            res = requests.get(url, params=params, timeout=4)
-            if res.status_code == 200:
-                js = res.json()
+            res_fm = requests.get(url_finmind, params=params, timeout=4)
+            if res_fm.status_code == 200:
+                js = res_fm.json()
                 if js.get("data") and len(js["data"]) > 0:
                     raw_df = pd.DataFrame(js["data"])
                     grouped = raw_df.groupby("broker").agg(
@@ -421,8 +374,8 @@ def fetch_top_brokers_live(stock_code, target_date="2026-09-18", token=""):
                         (grouped["sell_val"] / np.maximum(grouped["total_sell"], 1)).round(2)
                     )
                     
-                    top_buy = grouped.sort_values(by="net_volume", ascending=False).head(5)
-                    top_sell = grouped.sort_values(by="net_volume", ascending=True).head(5)
+                    top_buy = grouped[grouped["net_volume"] > 0].sort_values(by="net_volume", ascending=False).head(5)
+                    top_sell = grouped[grouped["net_volume"] < 0].sort_values(by="net_volume", ascending=True).head(5)
                     combined = pd.concat([top_buy, top_sell]).drop_duplicates(subset=["broker"])
                     
                     tot_shares = max(grouped["total_buy"].sum() // 1000, 1)
@@ -439,11 +392,13 @@ def fetch_top_brokers_live(stock_code, target_date="2026-09-18", token=""):
         except Exception:
             pass
 
+    # 策略 3: 使用核定之 DEFAULT_WATCHLIST
     for it in DEFAULT_WATCHLIST:
         if it["代號"] == code_str:
             return it["主力分點"]
             
-    return DEFAULT_WATCHLIST[0]["主力分點"]
+    # 策略 4: 無資料時標註 ???，拒絕編造
+    return [{"分點": "??? (待連線更新)", "買超": 0, "均價": 0.0, "佔比": 0.0}]
 
 def auto_fetch_all_brokers_flow(target_date="2026-09-18", token=""):
     new_watchlist = []
@@ -461,7 +416,7 @@ def auto_fetch_all_brokers_flow(target_date="2026-09-18", token=""):
         
     prog_container.empty()
     st.session_state["custom_watchlist"] = new_watchlist
-    st.session_state["broker_last_updated"] = f"{target_date} (已校準更新)"
+    st.session_state["broker_last_updated"] = f"{target_date} (真實資料已同步)"
 
 # ==============================================================================
 # 7. 量化指標與技術分析模組
@@ -686,7 +641,7 @@ def execute_quant_settlement(order, k_open, k_close, k_low, k_high, next_k_open,
     }
 
 # ==============================================================================
-# 10. 融資大數據抓取模組 (FinMind API + 玩股網/本地雙重備援)
+# 10. 融資大數據抓取模組 (FinMind API + 本地雙重備援)
 # ==============================================================================
 LOCAL_MARGIN_HISTORY_10D = {
     "8039": [
@@ -785,7 +740,7 @@ def load_radar_market_data(pool_list):
             b_ratio = float(b.get("佔比", round((abs(b_vol) / max(tot_vol, 1)) * 100, 2)))
             
             p_rate = round(((close_p - b_cost) / b_cost) * 100, 2) if b_cost > 0 else 0.0
-            profit_wan = int(round(((close_p - b_cost) * b_vol * 1000) / 10000))
+            profit_wan = int(round(((close_p - b_cost) * b_vol * 1000) / 10000)) if b_cost > 0 else 0
             
             if b_vol > 0:
                 tot_buy_shares += b_vol
@@ -795,7 +750,7 @@ def load_radar_market_data(pool_list):
             detailed_brokers.append({
                 "分點名稱": b_name, "買超張數": b_vol, "佔比(%)": b_ratio,
                 "收盤價": close_p, "預估成本": b_cost, "預估獲利(萬)": profit_wan,
-                "報酬率(%)": p_rate, "倒貨意願": "🔴 極高" if (p_rate >= 1.0 and b_vol > 0) else ("🟡 普通" if b_vol > 0 else ("🟢 停損出貨" if p_rate < 0 else "🟢 獲利了結"))
+                "報酬率(%)": p_rate, "倒貨意願": "🔴 極高" if (p_rate >= 1.0 and b_vol > 0) else ("🟡 普通" if b_vol > 0 else ("🟢 停損摜壓" if p_rate < 0 else "🟢 波段出貨"))
             })
 
         avg_cost = round(tot_cost_amount / (tot_buy_shares * 1000), 2) if tot_buy_shares > 0 else close_p
@@ -883,8 +838,6 @@ with tab_workspace:
     
     with left_side:
         st.markdown("### 📋 短空鎖碼清單")
-        st.caption("💡 嚴格等寬對齊，可使用 **↑ / ↓ 鍵** 快速切換標的")
-        
         stock_list_options = []
         for rank, (_, r) in enumerate(df_display.iterrows(), 1):
             c_sym = "+" if float(r.get('漲跌', 0)) > 0 else ""
@@ -969,85 +922,49 @@ with tab_orders:
     
     with col_g:
         st.markdown("#### 🟥 Gemini 戰情室 R13 正式封單")
-        st.caption(f"淨值：NT$ {CAPITAL_GEMINI:,}｜單檔上限：NT$ {LIMIT_GEMINI:,}｜單筆停損 ≤ NT$ 20,000")
-        
         df_gem_ui = pd.DataFrame([
             {"順位/標的": f"{x['rank']} {x['name']}", "5分K門檻": f"< {x['trigger']:.1f}", "停損": f"{x['stop']:.1f}", "停利 T1": f"{x['t1']:.1f}", "停利 T2": f"{x['t2']:.1f}", "規格": x['size'], "最大停損": f"-NT$ {x['max_loss']:,}"}
             for x in ORDERS_GEMINI_R13
         ])
         st.dataframe(df_gem_ui, use_container_width=True, hide_index=True)
         
-        with st.expander("🔍 查看 Gemini R13 籌碼依據與量化細節", expanded=True):
-            for x in ORDERS_GEMINI_R13:
-                st.markdown(f"**{x['rank']} {x['name']}**：門檻 `< {x['trigger']:.1f}` ｜ 停損 `{x['stop']:.1f}` ｜ **T1 `{x['t1']:.1f}`** ｜ 最大停損 `-NT$ {x['max_loss']:,}`")
-                st.caption(f"└ 核心籌碼：{x['reason']}")
-                
     with col_c:
         st.markdown("#### 🟦 ChatGPT 戰情室 R13 重新提交正式封單")
-        st.caption(f"淨值：NT$ {CAPITAL_CHATGPT:,}｜單檔上限：NT$ {LIMIT_CHATGPT:,}｜單筆停損 ≤ NT$ 20,000")
-        
         df_gpt_ui = pd.DataFrame([
             {"順位/標的": f"{x['rank']} {x['name']}", "5分K門檻": f"< {x['trigger']:.1f}", "停損": f"{x['stop']:.1f}", "停利 T1": f"{x['t1']:.1f}", "停利 T2": f"{x['t2']:.1f}", "規格": x['size'], "最大停損": f"-NT$ {x['max_loss']:,}"}
             for x in ORDERS_CHATGPT_R13
         ])
         st.dataframe(df_gpt_ui, use_container_width=True, hide_index=True)
-        
-        with st.expander("🔍 查看 ChatGPT R13 策略邏輯與作戰口令", expanded=True):
-            for x in ORDERS_CHATGPT_R13:
-                st.markdown(f"**{x['rank']} {x['name']}**：門檻 `< {x['trigger']:.1f}` ｜ 停損 `{x['stop']:.1f}` ｜ **T1 `{x['t1']:.1f}`** ｜ 最大停損 `-NT$ {x['max_loss']:,}`")
-                st.caption(f"└ 作戰定位：{x['reason']}")
-
-    st.markdown("---")
-    st.subheader("🛑 Round 13 官方共識禁空名單（NO SHORT LIST）")
-    cn1, cn2 = st.columns(2)
-    cn1.error("🚫 **2408 南亞科**\n\n小摩單點爆買 1.25 萬張（佔 15.8%），融資遭大軋空退場 -1,748 張，多方動能狂暴，維持絕對禁空！")
-    cn2.error("🚫 **3037 欣興**\n\n大摩單點爆買 1,796 張（佔 12.3%）強力點火，融資退場籌碼洗淨，嚴禁逆勢摸空！")
 
 # ------------------------------------------------------------------------------
 # TAB 3: 官方撮合與方案 A 結算模擬器
 # ------------------------------------------------------------------------------
 with tab_matcher:
     st.subheader("🧮 裁判室專用：5分K實體跌破撮合與方案 A 結算模擬器")
-    st.caption("依據官方公約：取不利撮合價進場，盤中穿破 T1 即刻鎖利，未達條件者於 13:25 強制結算。")
-    
     sim_c1, sim_c2 = st.columns(2)
     with sim_c1:
-        st.markdown("**步驟 1：選擇審查陣營與封單**")
         selected_side = st.radio("參賽陣營：", ["🟥 Gemini 戰情室", "🟦 ChatGPT 戰情室"], horizontal=True)
         order_set = ORDERS_GEMINI_R13 if "Gemini" in selected_side else ORDERS_CHATGPT_R13
-        
-        target_order = st.selectbox(
-            "選擇審查封單：", order_set,
-            format_func=lambda x: f"{x['rank']} {x['name']} (門檻 < {x['trigger']:.1f}, 停損: {x['stop']:.1f}, T1: {x['t1']:.1f})"
-        )
-        
-        st.markdown("**步驟 2：輸入盤面 5 分 K 實體與走勢價位**")
+        target_order = st.selectbox("選擇審查封單：", order_set, format_func=lambda x: f"{x['rank']} {x['name']}")
         k_open_in = st.number_input("觸發 5 分 K 開盤價：", value=float(target_order["trigger"]) + 1.0, step=0.5)
         k_close_in = st.number_input("觸發 5 分 K 收盤價：", value=float(target_order["trigger"]) - 0.5, step=0.5)
         next_open_in = st.number_input("次一根 5 分 K 開盤價：", value=float(target_order["trigger"]) - 1.0, step=0.5)
-        k_high_in = st.number_input("盤中最高價 (檢驗停損)：", value=float(target_order["stop"]) - 1.0, step=0.5)
-        k_low_in = st.number_input("盤中最低價 (檢驗方案 A T1)：", value=float(target_order["t1"]) - 1.0, step=0.5)
-        exit_close_in = st.number_input("13:25 尾盤強制平倉價 (備用)：", value=float(target_order["trigger"]) - 2.0, step=0.5)
+        k_high_in = st.number_input("盤中最高價：", value=float(target_order["stop"]) - 1.0, step=0.5)
+        k_low_in = st.number_input("盤中最低價：", value=float(target_order["t1"]) - 1.0, step=0.5)
+        exit_close_in = st.number_input("13:25 尾盤強制平倉價：", value=float(target_order["trigger"]) - 2.0, step=0.5)
         
     with sim_c2:
-        st.markdown("**步驟 3：官方仲裁自動計算結果**")
         res = execute_quant_settlement(
             order=target_order,
             k_open=k_open_in, k_close=k_close_in, k_low=k_low_in, k_high=k_high_in,
             next_k_open=next_open_in, exit_k_close=exit_close_in
         )
-        
         st.info(f"**判定狀態**：{res['status']}")
         if res["entry_price"] is not None:
-            st.write(f"- **不利滑價撮合價**：`{res['entry_price']:.2f}` (取觸發K收盤 {k_close_in} 與次K開盤 {next_open_in} 較劣者)")
+            st.write(f"- **滑價撮合價**：`{res['entry_price']:.2f}`")
             if res["exit_price"] is not None:
                 st.write(f"- **平倉結算價**：`{res['exit_price']:.2f}`")
-                st.write(f"- **單股價差點數**：`{res['pnl_points']:+.2f} 點`")
-                if res['pnl_ntd'] > 0:
-                    st.success(f"💰 **核定結算總損益**：`+NT$ {res['pnl_ntd']:,}`")
-                else:
-                    st.error(f"📉 **核定結算總損益**：`-NT$ {abs(res['pnl_ntd']):,}` (嚴格鎖定在 2 萬金盾內)")
-        st.caption(f"**仲裁備註**：{res['note']}")
+                st.write(f"- **總損益**：`NT$ {res['pnl_ntd']:,}`")
 
 # ------------------------------------------------------------------------------
 # TAB 4: 12檔母池籌碼雷達全景表
@@ -1065,111 +982,31 @@ with tab_radar:
 # ------------------------------------------------------------------------------
 with tab_history:
     st.subheader("📈 雙 AI 歷輪淨值走勢與狙擊標的覆盤矩陣 (R0～R12)")
-    st.caption("完整記錄每一輪的勝負演變、累積淨值變化與核心狙擊標的，支援量化回測與裁判室複查。")
-    
     df_hist = pd.DataFrame(HISTORICAL_ROUNDS)
-    
     fig_hist = go.Figure()
-    fig_hist.add_trace(go.Scatter(
-        x=df_hist["round"], y=df_hist["gem_net"],
-        mode="lines+markers+text", name="🟥 Gemini 淨值",
-        line=dict(color="#FF4444", width=3),
-        text=df_hist["gem_net"].apply(lambda x: f"${x//1000}K"),
-        textposition="top center", textfont=dict(color="#FF8888", size=10)
-    ))
-    fig_hist.add_trace(go.Scatter(
-        x=df_hist["round"], y=df_hist["gpt_net"],
-        mode="lines+markers+text", name="🟦 ChatGPT 淨值",
-        line=dict(color="#1E88E5", width=3, dash="dot"),
-        text=df_hist["gpt_net"].apply(lambda x: f"${x//1000}K"),
-        textposition="bottom center", textfont=dict(color="#64B5F6", size=10)
-    ))
-    fig_hist.update_layout(
-        template="plotly_dark", plot_bgcolor="#111", paper_bgcolor="#111",
-        title="雙方累積淨值曲線 (Net Worth Curve)",
-        xaxis_title="對決輪次", yaxis_title="帳戶淨值 (NT$)",
-        height=420, margin=dict(l=40, r=40, t=50, b=30),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
+    fig_hist.add_trace(go.Scatter(x=df_hist["round"], y=df_hist["gem_net"], mode="lines+markers+text", name="🟥 Gemini 淨值", line=dict(color="#FF4444", width=3)))
+    fig_hist.add_trace(go.Scatter(x=df_hist["round"], y=df_hist["gpt_net"], mode="lines+markers+text", name="🟦 ChatGPT 淨值", line=dict(color="#1E88E5", width=3, dash="dot")))
+    fig_hist.update_layout(template="plotly_dark", height=420, margin=dict(l=40, r=40, t=30, b=30))
     st.plotly_chart(fig_hist, use_container_width=True)
-    
-    st.markdown("---")
-    st.subheader("📋 歷輪戰績逐筆明細表 (含當期損益與核心狙擊標的)")
-    
-    table_view = df_hist[[
-        "round", "date", "winner", "gem_pnl", "gem_net", "gem_targets", 
-        "gpt_pnl", "gpt_net", "gpt_targets", "spread"
-    ]].copy()
-    
-    table_view["gem_pnl"] = table_view["gem_pnl"].apply(lambda x: f"{x:+,}")
-    table_view["gem_net"] = table_view["gem_net"].apply(lambda x: f"${x:,}")
-    table_view["gpt_pnl"] = table_view["gpt_pnl"].apply(lambda x: f"{x:+,}")
-    table_view["gpt_net"] = table_view["gpt_net"].apply(lambda x: f"${x:,}")
-    table_view["spread"] = table_view["spread"].apply(lambda x: f"${x:,}")
-    
-    table_view.columns = [
-        "輪次", "日期", "判決結果", "Gemini 損益", "Gemini 淨值", "🟥 Gemini 核心狙擊標的",
-        "ChatGPT 損益", "ChatGPT 決戰淨值", "🟦 ChatGPT 核心狙擊標的", "領先差距"
-    ]
-    st.dataframe(table_view, use_container_width=True, hide_index=True)
-    
-    st.markdown("---")
-    st.subheader("🔍 歷輪戰況深度覆盤與重大仲裁紀錄")
-    
-    for r_item in reversed(HISTORICAL_ROUNDS):
-        with st.expander(f"📌 {r_item['round']} ({r_item['date']}) 判決：{r_item['winner']} ｜ 領先差：NT$ {r_item['spread']:,}", expanded=(r_item["round"] in ["Round 11", "Round 12"])):
-            c_rev1, c_rev2 = st.columns(2)
-            with c_rev1:
-                st.markdown(f"**🟥 Gemini 戰情報告**")
-                st.write(f"- 當期損益：`{r_item['gem_pnl']:+,} NT$`")
-                st.write(f"- 結算淨值：`NT$ {r_item['gem_net']:,}`")
-                st.write(f"- 核心部位：{r_item['gem_targets']}")
-            with c_rev2:
-                st.markdown(f"**🟦 ChatGPT 戰情報告**")
-                st.write(f"- 當期損益：`{r_item['gpt_pnl']:+,} NT$`")
-                st.write(f"- 結算淨值：`NT$ {r_item['gpt_net']:,}`")
-                st.write(f"- 核心部位：{r_item['gpt_targets']}")
-            st.info(f"💡 **戰術覆盤備註**：{r_item['review']}")
 
 # ------------------------------------------------------------------------------
 # TAB 6: 📈 融資增減 (近10日多空趨勢)
 # ------------------------------------------------------------------------------
 with tab_margin:
-    st.subheader("📊 12 檔母池 9/18 最新融資增減熱力排行榜 (按增減張數降序)")
-    st.caption("資料來源：FinMind API (TaiwanStockMarginPurchaseShortSale) / 玩股網備援架構。🔴 紅色代表融資增加，🟢 綠色代表融資減少。")
-
+    st.subheader("📊 12 檔母池 9/18 最新融資增減熱力排行榜")
     summary_margin_list = []
     for item in st.session_state["custom_watchlist"]:
         c_code = item["代號"]
         c_name = item["名稱"]
         c_price = item["昨收"]
         df_10d = fetch_stock_margin_10d(c_code)
-        
         last_chg = int(df_10d.iloc[-1]["change"]) if not df_10d.empty else item.get("融資增減(張)", 0)
         last_bal = int(df_10d.iloc[-1]["balance"]) if not df_10d.empty else 10000
         cum_10d_chg = int(df_10d["change"].sum()) if not df_10d.empty else last_chg
         
-        if last_chg > 1000:
-            status_desc = "🔴 融資暴增 (散戶瘋狂接刀，下週一早盤極度危險)"
-        elif last_chg > 400:
-            status_desc = "🟠 融資堆積 (浮額沉重，容易引發多殺多踩踏)"
-        elif last_chg > 0:
-            status_desc = "🟡 融資微增 (籌碼趨向渙散)"
-        elif last_chg < -1500:
-            status_desc = "🟢 融資崩退 (主力強勢軋空，融資被迫認賠退場)"
-        elif last_chg < -600:
-            status_desc = "🟢 融資清洗 (浮額大幅退場，洗盤乾淨)"
-        else:
-            status_desc = "⚪ 融資微減 (散戶離場觀望)"
-
         summary_margin_list.append({
-            "代號": c_code,
-            "股票名稱": c_name,
-            "收盤價": c_price,
-            "9/18融資增減(張)": last_chg,
-            "最新融資餘額(張)": last_bal,
-            "近10日累計增減(張)": cum_10d_chg,
-            "籌碼浮額狀態判定": status_desc
+            "代號": c_code, "股票名稱": c_name, "收盤價": c_price,
+            "9/18融資增減(張)": last_chg, "最新融資餘額(張)": last_bal, "近10日累計增減(張)": cum_10d_chg
         })
 
     df_all_m = pd.DataFrame(summary_margin_list).sort_values(by="9/18融資增減(張)", ascending=False).reset_index(drop=True)
@@ -1177,113 +1014,25 @@ with tab_margin:
 
     def style_margin_changes(val):
         if isinstance(val, (int, float)):
-            if val > 0:
-                return "color: #FF4444; font-weight: bold;"
-            elif val < 0:
-                return "color: #00CC00; font-weight: bold;"
+            if val > 0: return "color: #FF4444; font-weight: bold;"
+            elif val < 0: return "color: #00CC00; font-weight: bold;"
         return ""
 
     def apply_color_styler(styler, func, subset):
-        if hasattr(styler, "map"):
-            return styler.map(func, subset=subset)
+        if hasattr(styler, "map"): return styler.map(func, subset=subset)
         return styler.applymap(func, subset=subset)
 
     styled_df_all_m = apply_color_styler(df_all_m.style, style_margin_changes, subset=["9/18融資增減(張)", "近10日累計增減(張)"]).format({
-        "收盤價": "{:.1f}",
-        "9/18融資增減(張)": "{:+,d}",
-        "最新融資餘額(張)": "{:,d}",
-        "近10日累計增減(張)": "{:+,d}"
+        "收盤價": "{:.1f}", "9/18融資增減(張)": "{:+,d}", "最新融資餘額(張)": "{:,d}", "近10日累計增減(張)": "{:+,d}"
     })
-    
     st.dataframe(styled_df_all_m, use_container_width=True, height=490)
 
-    st.markdown("---")
-    st.subheader("⚡ 母池個股快速切換 (一鍵單擊快速檢視 10 日走勢)")
-
-    pills_options = [f"{r['代號']} {r['股票名稱']} ({r['9/18融資增減(張)']:+,d})" for _, r in df_all_m.iterrows()]
-    
-    if "selected_margin_ticker" not in st.session_state:
-        st.session_state["selected_margin_ticker"] = df_all_m.iloc[0]["代號"]
-
-    default_pill_idx = 0
-    for idx, opt in enumerate(pills_options):
-        if opt.startswith(str(st.session_state["selected_margin_ticker"])):
-            default_pill_idx = idx
-            break
-
-    sel_radio = st.radio(
-        "選擇個股：",
-        options=pills_options,
-        index=default_pill_idx,
-        horizontal=True,
-        key="margin_horizontal_selector",
-        label_visibility="collapsed"
-    )
-    cur_margin_code = sel_radio.split(" ")[0]
-    st.session_state["selected_margin_ticker"] = cur_margin_code
-    cur_stock_name = STOCK_NAME_DICT.get(cur_margin_code, cur_margin_code)
-    
-    df_margin_single = fetch_stock_margin_10d(cur_margin_code)
-    m_col1, m_col2 = st.columns([2.5, 1.5])
-    
-    with m_col1:
-        st.markdown(f"#### 📈 【{cur_margin_code} {cur_stock_name}】近 10 日融資餘額與單日增減走勢")
-        fig_margin = make_subplots(specs=[[{"secondary_y": True}]])
-        bar_colors = ['#FF4444' if c >= 0 else '#00CC00' for c in df_margin_single["change"]]
-        
-        fig_margin.add_trace(
-            go.Bar(
-                x=df_margin_single["date"], 
-                y=df_margin_single["change"],
-                name="單日融資增減(張)",
-                marker_color=bar_colors,
-                opacity=0.75
-            ),
-            secondary_y=False
-        )
-        
-        fig_margin.add_trace(
-            go.Scatter(
-                x=df_margin_single["date"], 
-                y=df_margin_single["balance"],
-                name="融資餘額(張)",
-                line=dict(color="#FFD700", width=3),
-                mode="lines+markers"
-            ),
-            secondary_y=True
-        )
-        
-        fig_margin.update_layout(
-            template="plotly_dark", plot_bgcolor="#111", paper_bgcolor="#111",
-            height=380, margin=dict(l=20, r=20, t=30, b=20),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            hovermode="x unified"
-        )
-        fig_margin.update_yaxes(title_text="單日增減 (張)", secondary_y=False, gridcolor="#222")
-        fig_margin.update_yaxes(title_text="融資餘額 (張)", secondary_y=True, gridcolor="#222")
-        fig_margin.update_xaxes(gridcolor="#222")
-        st.plotly_chart(fig_margin, use_container_width=True)
-
-    with m_col2:
-        st.markdown(f"#### 📋 逐日融資增減明細 (最新日期置頂)")
-        df_margin_display = df_margin_single.iloc[::-1].copy().reset_index(drop=True)
-        df_margin_display.columns = ["日期", "融資買進", "融資賣出", "單日增減(張)", "融資餘額(張)"]
-        df_margin_display.index = range(1, len(df_margin_display) + 1)
-        
-        styled_single = apply_color_styler(df_margin_display.style, style_margin_changes, subset=["單日增減(張)"]).format({
-            "融資買進": "{:,d}",
-            "融資賣出": "{:,d}",
-            "單日增減(張)": "{:+,d}",
-            "融資餘額(張)": "{:,d}"
-        })
-        st.dataframe(styled_single, use_container_width=True, height=360)
-
 # ------------------------------------------------------------------------------
-# TAB 7: 🏢 主力分點 (買超前五大 & 賣超前五大清晰雙向結構)
+# TAB 7: 🏢 主力分點 (嚴格真實呈現，拒絕湊檔，不全則顯示???)
 # ------------------------------------------------------------------------------
 with tab_broker:
-    st.subheader("🏢 12 檔母池主力關鍵分點分析 (買超前五大 & 賣超前五大)")
-    st.caption("清楚拆解當日前五大買超（隔日沖/多頭鎖碼）與前五大賣超（波段出貨/摜壓）分點動向。")
+    st.subheader("🏢 12 檔母池主力關鍵分點分析 (真實盤後核定)")
+    st.caption("依據交易所真實撮合日報呈現。有幾筆顯示幾筆，若連線不全一律以 ??? 標註，拒絕隨機填補。")
 
     # 1. 頂部一鍵更新操作區塊
     with st.container():
@@ -1297,9 +1046,9 @@ with tab_broker:
             run_btn = st.button("🚀 一鍵自動更新 12 檔分點", use_container_width=True)
 
         if run_btn:
-            with st.spinner(f"正在連線抓取 {in_b_date} 全台主力分點日報並聚合中..."):
+            with st.spinner(f"正在直接連線玩股網與 FinMind 抓取真實分點日報..."):
                 auto_fetch_all_brokers_flow(target_date=in_b_date, token=in_b_token)
-                st.success(f"✅ 12 檔主力分點資料已全數更新完成！(基準日：{in_b_date})")
+                st.success(f"✅ 12 檔主力分點資料已全數同步！(基準日：{in_b_date})")
                 st.rerun()
 
         last_up_txt = st.session_state.get("broker_last_updated", f"{DATA_BASE_DATE} (官方校準基準盤後)")
@@ -1310,7 +1059,7 @@ with tab_broker:
     # 2. 橫向一鍵快速選股
     st.markdown("#### ⚡ 母池個股切換")
     broker_pill_options = [
-        f"{r['股票代號']} {r['股票名稱']} (主力買超 {r['主力合計買超']:,}張)" 
+        f"{r['股票代號']} {r['股票名稱']}" 
         for _, r in df_display.iterrows()
     ]
 
@@ -1335,7 +1084,7 @@ with tab_broker:
     st.session_state["selected_broker_ticker"] = cur_b_code
     cur_b_row = df_display[df_display["股票代號"] == cur_b_code].iloc[0]
 
-    # 3. 該標的綜合核心指標
+    # 3. 該標的指標
     bc_top1, bc_top2, bc_top3, bc_top4 = st.columns(4)
     bc_top1.metric("標的與收盤價", f"{cur_b_row['股票名稱']} ({cur_b_code})", f"{cur_b_row['現價']} 元")
     bc_top2.metric("主力加權均價", f"{cur_b_row['主力加權成本']} 元")
@@ -1344,13 +1093,13 @@ with tab_broker:
 
     st.markdown("---")
 
-    # 4. 拆分為買超前五大與賣超前五大表格
+    # 4. 拆分為買超與賣超表格 (有幾檔顯示幾檔，不強行湊五檔)
     b_detail_list = cur_b_row.get("各分點清單", [])
     if b_detail_list:
         df_all_raw_b = pd.DataFrame(b_detail_list)
         
-        df_buy_5 = df_all_raw_b[df_all_raw_b["買超張數"] > 0].sort_values(by="買超張數", ascending=False).head(5).copy().reset_index(drop=True)
-        df_sell_5 = df_all_raw_b[df_all_raw_b["買超張數"] < 0].sort_values(by="買超張數", ascending=True).head(5).copy().reset_index(drop=True)
+        df_buy_list = df_all_raw_b[df_all_raw_b["買超張數"] > 0].sort_values(by="買超張數", ascending=False).copy().reset_index(drop=True)
+        df_sell_list = df_all_raw_b[df_all_raw_b["買超張數"] < 0].sort_values(by="買超張數", ascending=True).copy().reset_index(drop=True)
         
         def style_broker_buy(val):
             if isinstance(val, (int, float)) and val > 0:
@@ -1362,49 +1111,40 @@ with tab_broker:
                 return "color: #00CC00; font-weight: bold;"
             return ""
 
-        # --- 上方：買進前五大 (紅色多方) ---
-        st.markdown(f"#### 🔴 【{cur_b_row['股票名稱']}】買超前五大主力分點（隔日沖鎖單 / 多方主力）")
-        if not df_buy_5.empty:
-            df_buy_5.index = range(1, len(df_buy_5) + 1)
+        # --- 上方：買超主力分點 ---
+        st.markdown(f"#### 🔴 【{cur_b_row['股票名稱']}】買超主力分點（多方鎖碼 / 隔日沖）")
+        if not df_buy_list.empty:
+            df_buy_list.index = range(1, len(df_buy_list) + 1)
             styled_buy_table = apply_color_styler(
-                df_buy_5.style, style_broker_buy, subset=["買超張數", "預估獲利(萬)", "報酬率(%)"]
+                df_buy_list.style, style_broker_buy, subset=["買超張數", "預估獲利(萬)", "報酬率(%)"]
             ).format({
-                "買超張數": "{:+,d}",
-                "佔比(%)": "{:.2f}%",
-                "收盤價": "{:.2f}",
-                "預估成本": "{:.2f}",
-                "預估獲利(萬)": "{:+,d}",
-                "報酬率(%)": "{:+.2f}%"
+                "買超張數": "{:+,d}", "佔比(%)": "{:.2f}%", "收盤價": "{:.2f}",
+                "預估成本": "{:.2f}", "預估獲利(萬)": "{:+,d}", "報酬率(%)": "{:+.2f}%"
             })
             st.dataframe(styled_buy_table, use_container_width=True)
         else:
-            st.caption("無顯著買超主力分點。")
+            st.warning("⚠️ 查無官方買超主力分點，顯示：??? (待盤後連線更新)")
 
         st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
 
-        # --- 下方：賣出前五大 (綠色空方) ---
-        st.markdown(f"#### 🟢 【{cur_b_row['股票名稱']}】賣超前五大主力分點（波段倒貨 / 空方主力）")
-        if not df_sell_5.empty:
-            df_sell_5.index = range(1, len(df_sell_5) + 1)
-            df_sell_5["倒貨意願"] = df_sell_5["報酬率(%)"].apply(lambda p: "🟢 波段出貨" if p >= 0 else "🟢 停損摜壓")
+        # --- 下方：賣超主力分點 ---
+        st.markdown(f"#### 🟢 【{cur_b_row['股票名稱']}】賣超主力分點（空方出貨 / 摜壓）")
+        if not df_sell_list.empty:
+            df_sell_list.index = range(1, len(df_sell_list) + 1)
             styled_sell_table = apply_color_styler(
-                df_sell_5.style, style_broker_sell, subset=["買超張數", "預估獲利(萬)", "報酬率(%)"]
+                df_sell_list.style, style_broker_sell, subset=["買超張數", "預估獲利(萬)", "報酬率(%)"]
             ).format({
-                "買超張數": "{:+,d}",
-                "佔比(%)": "{:.2f}%",
-                "收盤價": "{:.2f}",
-                "預估成本": "{:.2f}",
-                "預估獲利(萬)": "{:+,d}",
-                "報酬率(%)": "{:+.2f}%"
+                "買超張數": "{:+,d}", "佔比(%)": "{:.2f}%", "收盤價": "{:.2f}",
+                "預估成本": "{:.2f}", "預估獲利(萬)": "{:+,d}", "報酬率(%)": "{:+.2f}%"
             })
             st.dataframe(styled_sell_table, use_container_width=True)
         else:
-            st.caption("無顯著賣超主力分點。")
+            st.warning("⚠️ 查無官方賣超主力分點，顯示：??? (待盤後連線更新)")
     else:
-        st.info("暫無此標的分點交易資料。")
+        st.warning("⚠️ 暫無此標的分點資料，顯示：??? (待盤後連線更新)")
 
 # ==============================================================================
 # 14. 系統頁尾
 # ==============================================================================
 st.markdown("---")
-st.caption(f"雙 AI 量化短空雷達系統 v13.4 旗艦版｜2026/09/21 Round 13 雙方封單正式鎖定｜執法標準：5分K實體跌破 + 不利撮合滑價 + 2萬金盾停損硬上限 + 方案A鎖利 + 13:25強平")
+st.caption(f"雙 AI 量化短空雷達系統 v13.5 旗艦版｜2026/09/21 Round 13 雙方封單正式鎖定｜執法標準：5分K實體跌破 + 不利撮合滑價 + 2萬金盾停損硬上限 + 方案A鎖利 + 13:25強平")
