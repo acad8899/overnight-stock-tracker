@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-雙 AI 量化短空雷達 (Round 19 旗艦裁判長版) - app.py (v19.0)
+雙 AI 量化短空雷達 (Round 19 旗艦裁判長版) - app.py (v19.1)
 ==============================================================================
 版本更新重點：
 1. 輪次晉級：推進至 Round 19，基準日 2026/09/30 盤後三維大數據 (分點+融資+權證)。
-2. 歷史收錄：正式寫入 Round 18 官方終審裁決 (雙方 0 部位零虧損防守平手)。
-3. 官方淨值：Gemini NT$ 1,783,595 vs ChatGPT NT$ 1,399,681 (領先維持 NT$ 383,914)。
-4. 權證金流：同步 9/30 權證小哥獨門數據 (信昌電認售買超第一名 +268萬、晶技認購 +1338萬)。
-5. 融資數據：同步 9/30 官方融資 (華新科 +1137、信昌電 -1660、華邦電 -3016、南亞科 -2966)。
-6. 封單陣列：實裝 Round 19 官方 TOP 5 決戰名冊 (單筆最大停損 ≤ NT$ 20,000，命中 T1 全平保底)。
+2. 封單校正：全面同步 GPT 官方正式呈報之 TOP 5 陣列 (信昌電期<250、台虹期<294)。
+3. 歷史收錄：正式寫入 Round 18 官方終審裁決 (雙方 0 部位零虧損防守平手)。
+4. 官方淨值：Gemini NT$ 1,783,595 vs ChatGPT NT$ 1,399,681 (領先維持 NT$ 383,914)。
+5. 權證金流：同步 9/30 權證小哥獨門數據 (信昌電認售買超第1名 +268萬、晶技認購 +1338萬)。
+6. 融資數據：同步 9/30 官方融資 (華新科 +1137、信昌電 -1660、台虹 +1868、華邦電 -3016)。
+7. 紀律風控：單筆最大停損 ≤ NT$ 20,000，命中 T1 全平保底，尾盤 13:25 強制結算。
 ==============================================================================
 """
 
@@ -205,7 +206,7 @@ HISTORICAL_ROUNDS = [
     {
         "round": "Round 18", "date": "2026/09/30", "winner": "🤝 官方裁定平手",
         "gem_pnl": 0, "gem_net": 1783595, "gem_targets": "0部位 (嚴格5分K實體黑棒破線濾網，全員零交易避開強彈)",
-        "gpt_pnl": 0, "gpt_net": 1399681, "gpt_targets": "0部位 (華新科/晶技/玉晶光門檻守住，全員零交易避大軋)",
+        "gpt_pnl": 0, "gpt_net": 1399681, "gpt_targets": "0部位 (國巨/華新科/晶技/玉晶光門檻守住，全員零交易避大軋)",
         "spread": 383914, "review": "裁判長拍板公證！多頭強攻（玉晶光+40點、台虹鎖漲停、南亞科暴拉至523），雙AI嚴守5分K黑棒紀律一股未進，零失誤保全淨值！"
     }
 ]
@@ -292,6 +293,22 @@ DEFAULT_WATCHLIST_R19 = [
             {"分點": "台灣摩根士丹利", "買超": -330, "均價": 210.04, "佔比": -0.96},
             {"分點": "美商高盛", "買超": -315, "均價": 210.43, "佔比": -0.92},
             {"分點": "美林", "買超": -305, "均價": 209.07, "佔比": -0.89}
+        ]
+    },
+    {
+        "代號": "8039", "名稱": "台虹", "昨收": 300.50, "昨日鎖碼量": 31798, "融資增減(張)": 1868, "券資比": 4.9, "權證認售(萬)": 0, "權證認購(萬)": 0,
+        "最高價": 300.50, "最低價": 277.50,
+        "主力分點": [
+            {"分點": "富邦", "買超": 2143, "均價": 300.00, "佔比": 6.74},
+            {"分點": "國票-安和", "買超": 1243, "均價": 298.37, "佔比": 3.91},
+            {"分點": "摩根大通", "買超": 982, "均價": 298.04, "佔比": 3.09},
+            {"分點": "統一", "買超": 847, "均價": 295.48, "佔比": 2.66},
+            {"分點": "國票-敦北法人", "買超": 665, "均價": 300.46, "佔比": 2.09},
+            {"分點": "台灣摩根士丹利", "買超": -905, "均價": 288.67, "佔比": -2.85},
+            {"分點": "國泰-敦南", "買超": -474, "均價": 293.75, "佔比": -1.49},
+            {"分點": "永豐金-復興", "買超": -156, "均價": 295.87, "佔比": -0.49},
+            {"分點": "富邦-敦南", "買超": -150, "均價": 299.34, "佔比": -0.47},
+            {"分點": "永豐金-敦南", "買超": -122, "均價": 297.27, "佔比": -0.38}
         ]
     },
     {
@@ -389,22 +406,6 @@ DEFAULT_WATCHLIST_R19 = [
             {"分點": "富邦", "買超": -596, "均價": 177.68, "佔比": -0.70},
             {"分點": "新光", "買超": -480, "均價": 177.41, "佔比": -0.56}
         ]
-    },
-    {
-        "代號": "8039", "名稱": "台虹", "昨收": 300.50, "昨日鎖碼量": 31798, "融資增減(張)": 1868, "券資比": 4.9, "權證認售(萬)": 0, "權證認購(萬)": 0,
-        "最高價": 300.50, "最低價": 277.50,
-        "主力分點": [
-            {"分點": "富邦", "買超": 2143, "均價": 300.00, "佔比": 6.74},
-            {"分點": "國票-安和", "買超": 1243, "均價": 298.37, "佔比": 3.91},
-            {"分點": "摩根大通", "買超": 982, "均價": 298.04, "佔比": 3.09},
-            {"分點": "統一", "買超": 847, "均價": 295.48, "佔比": 2.66},
-            {"分點": "國票-敦北法人", "買超": 665, "均價": 300.46, "佔比": 2.09},
-            {"分點": "台灣摩根士丹利", "買超": -905, "均價": 288.67, "佔比": -2.85},
-            {"分點": "國泰-敦南", "買超": -474, "均價": 293.75, "佔比": -1.49},
-            {"分點": "永豐金-復興", "買超": -156, "均價": 295.87, "佔比": -0.49},
-            {"分點": "富邦-敦南", "買超": -150, "均價": 299.34, "佔比": -0.47},
-            {"分點": "永豐金-敦南", "買超": -122, "均價": 297.27, "佔比": -0.38}
-        ]
     }
 ]
 
@@ -412,19 +413,20 @@ DEFAULT_WATCHLIST_R19 = [
 # 5. Round 19 雙方決戰 TOP 5 封單陣列 (正式公證定案版)
 # ==============================================================================
 ORDERS_GEMINI_R19 = [
-    {"rank": "🥇 首選 1", "ticker": "2492", "name": "華新科(期)", "tool": "期貨", "size": "2口", "margin": 161730, "trigger": 298.0, "stop": 303.0, "t1": 291.0, "shares": 4000, "max_loss": 20000, "reason": "外資三大行連倒4769張[cite: 27]，散戶融資大套2797張，收盤摜破300防線[cite: 27]，融資斷頭多殺多風暴核心！"},
-    {"rank": "🥈 首選 2", "ticker": "6173", "name": "信昌電(期)", "tool": "期貨", "size": "2口", "margin": 155790, "trigger": 285.0, "stop": 290.0, "t1": 278.0, "shares": 4000, "max_loss": 20000, "reason": "認售權證買超冠軍(+268萬)[cite: 29]！現貨破290大關[cite: 28]，融資單日暴砍1660張斷頭，期貨加速補跌！"},
-    {"rank": "🥉 首選 3", "ticker": "2327", "name": "國巨*(期)", "tool": "期貨", "size": "1口", "margin": 147960, "trigger": 544.0, "stop": 554.0, "t1": 534.0, "shares": 2000, "max_loss": 20000, "reason": "9/29大套2018張融資未認賠，今日富邦/統一續砍3300張[cite: 24]，高檔解套反壓沉重，破544直接下探！"},
-    {"rank": "4", "ticker": "3406", "name": "玉晶光(期)", "tool": "期貨", "size": "1口", "margin": 240300, "trigger": 882.0, "stop": 902.0, "t1": 868.0, "shares": 2000, "max_loss": 20000, "reason": "早盤衝921留長上影線誘多[cite: 20, 25]，法巴/小摩賣超[cite: 25]，空頭反彈受阻，跌破882確認回歸空方軌道！"},
-    {"rank": "5", "ticker": "3042", "name": "晶技(期)", "tool": "期貨", "size": "2口", "margin": 113400, "trigger": 206.0, "stop": 211.0, "t1": 199.0, "shares": 4000, "max_loss": 20000, "reason": "認購權證連4天高檔鈍化[cite: 30]，9/29融資高檔大套1481張[cite: 25]，回測206若實體跌破引發避險回吐多殺多！"}
+    {"rank": "🥇 首選 1", "ticker": "2492", "name": "華新科(期)", "tool": "期貨", "size": "2口", "margin": 161730, "trigger": 298.0, "stop": 303.0, "t1": 291.0, "shares": 4000, "max_loss": 20000, "reason": "外資三大行連倒4769張，散戶融資大套2797張，收盤摜破300防線，融資斷頭多殺多風暴核心！"},
+    {"rank": "🥈 首選 2", "ticker": "6173", "name": "信昌電(期)", "tool": "期貨", "size": "2口", "margin": 155790, "trigger": 285.0, "stop": 290.0, "t1": 278.0, "shares": 4000, "max_loss": 20000, "reason": "認售權證買超冠軍(+268萬)！現貨破290大關，融資單日暴砍1660張斷頭，期貨加速補跌！"},
+    {"rank": "🥉 首選 3", "ticker": "2327", "name": "國巨*(期)", "tool": "期貨", "size": "1口", "margin": 147960, "trigger": 544.0, "stop": 554.0, "t1": 534.0, "shares": 2000, "max_loss": 20000, "reason": "9/29大套2018張融資未認賠，今日富邦/統一續砍3300張，高檔解套反壓沉重，破544直接下探！"},
+    {"rank": "4", "ticker": "3406", "name": "玉晶光(期)", "tool": "期貨", "size": "1口", "margin": 240300, "trigger": 882.0, "stop": 902.0, "t1": 868.0, "shares": 2000, "max_loss": 20000, "reason": "早盤衝921留長上影線誘多[cite: 20]，法巴/小摩賣超，空頭反彈受阻，跌破882確認回歸空方軌道！"},
+    {"rank": "5", "ticker": "3042", "name": "晶技(期)", "tool": "期貨", "size": "2口", "margin": 113400, "trigger": 206.0, "stop": 211.0, "t1": 199.0, "shares": 4000, "max_loss": 20000, "reason": "認購權證連4天高檔鈍化，9/29融資高檔大套1481張，回測206若實體跌破引發避險回吐多殺多！"}
 ]
 
+# GPT 官方正式呈報封單 (完全對齊裁判長核定數據)
 ORDERS_CHATGPT_R19 = [
-    {"rank": "🥇 1", "ticker": "2492", "name": "華新科(期)", "tool": "期貨", "size": "2口", "margin": 161730, "trigger": 297.0, "stop": 302.0, "t1": 289.0, "shares": 4000, "max_loss": 20000, "reason": "破300確認[cite: 27]，等破297進一步確立融資斷頭踩踏，下探289方案A。"},
-    {"rank": "🥈 2", "ticker": "6173", "name": "信昌電(期)", "tool": "期貨", "size": "2口", "margin": 155790, "trigger": 286.0, "stop": 291.0, "t1": 279.0, "shares": 4000, "max_loss": 20000, "reason": "現貨破290[cite: 28]，小哥認售冠軍助攻[cite: 29]，跌破286追擊二線主跌段。"},
-    {"rank": "🥉 3", "ticker": "3406", "name": "玉晶光(期)", "tool": "期貨", "size": "1口", "margin": 240300, "trigger": 878.0, "stop": 888.0, "t1": 864.0, "shares": 2000, "max_loss": 20000, "reason": "921長上影假突破[cite: 20, 25]，破今日低點878延續空方破底慣性。"},
-    {"rank": "4", "ticker": "2327", "name": "國巨*(期)", "tool": "期貨", "size": "1口", "margin": 147960, "trigger": 542.0, "stop": 552.0, "t1": 532.0, "shares": 2000, "max_loss": 20000, "reason": "550壓力沉重，若破542則確認反彈結束重回空頭。"},
-    {"rank": "5", "ticker": "3042", "name": "晶技(期)", "tool": "期貨", "size": "2口", "margin": 113400, "trigger": 205.5, "stop": 210.5, "t1": 198.0, "shares": 4000, "max_loss": 20000, "reason": "等真正跌破前低206確認轉弱，不提前摸頂。"}
+    {"rank": "🥇 1", "ticker": "2327", "name": "國巨*(期)", "tool": "期貨", "size": "1口", "margin": 147960, "trigger": 545.0, "stop": 555.0, "t1": 535.0, "shares": 2000, "max_loss": 20000, "reason": "5分K實體跌破545確認，555停損(-2萬)，T1下探535全平保利。"},
+    {"rank": "🥈 2", "ticker": "2492", "name": "華新科(期)", "tool": "期貨", "size": "2口", "margin": 161730, "trigger": 297.0, "stop": 302.0, "t1": 289.0, "shares": 4000, "max_loss": 20000, "reason": "摜破300後，實體跌破297確認融資踩踏，302停損(-2萬)，T1目標289。"},
+    {"rank": "🥉 3", "ticker": "6173", "name": "信昌電(期)", "tool": "期貨", "size": "2口", "margin": 155790, "trigger": 250.0, "stop": 255.0, "t1": 242.0, "shares": 4000, "max_loss": 20000, "reason": "鎖定期貨深水區，實體跌破250確認二次破底，255停損(-2萬)，T1 242。"},
+    {"rank": "4", "ticker": "3042", "name": "晶技(期)", "tool": "期貨", "size": "2口", "margin": 113400, "trigger": 204.0, "stop": 209.0, "t1": 197.0, "shares": 4000, "max_loss": 20000, "reason": "實體跌破204確認高檔上攻失敗，209停損(-2萬)，T1目標197。"},
+    {"rank": "5", "ticker": "8039", "name": "台虹(期)", "tool": "期貨", "size": "2口", "margin": 162270, "trigger": 294.0, "stop": 299.0, "t1": 286.0, "shares": 4000, "max_loss": 20000, "reason": "漲停若開板誘多破位，實體跌破294追空，299停損(-2萬)，T1 286。"}
 ]
 
 # ==============================================================================
@@ -688,6 +690,18 @@ LOCAL_MARGIN_HISTORY_10D_R19 = {
         {"date": "09/24", "buy": 1580, "sell": 1394, "change": 186, "balance": 36405},
         {"date": "09/29", "buy": 3890, "sell": 1872, "change": 2018, "balance": 38423},
         {"date": "09/30", "buy": 1890, "sell": 1810, "change": 80, "balance": 38503}
+    ],
+    "8039": [
+        {"date": "09/15", "buy": 1200, "sell": 1100, "change": 100, "balance": 18500},
+        {"date": "09/16", "buy": 1350, "sell": 1200, "change": 150, "balance": 18650},
+        {"date": "09/17", "buy": 1400, "sell": 1250, "change": 150, "balance": 18800},
+        {"date": "09/18", "buy": 1600, "sell": 1400, "change": 200, "balance": 19000},
+        {"date": "09/21", "buy": 1300, "sell": 1500, "change": -200, "balance": 18800},
+        {"date": "09/22", "buy": 1450, "sell": 1300, "change": 150, "balance": 18950},
+        {"date": "09/23", "buy": 1500, "sell": 1400, "change": 100, "balance": 19050},
+        {"date": "09/24", "buy": 1400, "sell": 1350, "change": 50, "balance": 19100},
+        {"date": "09/29", "buy": 2200, "sell": 1415, "change": 785, "balance": 19885},
+        {"date": "09/30", "buy": 3500, "sell": 1632, "change": 1868, "balance": 21753}
     ]
 }
 
@@ -757,10 +771,10 @@ def load_radar_market_data(pool_list):
 
         avg_cost = round(tot_cost_amount / (tot_buy_shares * 1000), 2) if tot_buy_shares > 0 else close_p
         
-        # Round 19 專用短空評分 (外資暴砍+融資大套+認售冠軍 權重矩陣)
+        # Round 19 專用短空評分
         score_dict = {
             "2492": 99, "6173": 98, "2327": 95, "3406": 92, "3042": 88, 
-            "3189": 58, "3037": 55, "2313": 52, "2455": 50, "2408": 20, "2344": 15, "8039": 10
+            "8039": 65, "3189": 58, "3037": 55, "2313": 52, "2455": 50, "2408": 20, "2344": 15
         }
         score = score_dict.get(code, 50)
 
@@ -949,7 +963,7 @@ with tab_orders:
                 st.caption(f"└ 核心籌碼：{x['reason']}")
                 
     with col_c:
-        st.markdown("#### 🟦 ChatGPT 戰情室 R19 預備封單")
+        st.markdown("#### 🟦 ChatGPT 戰情室 R19 正式封單 (裁判長呈報版)")
         st.caption(f"淨值：NT$ {CAPITAL_CHATGPT:,}｜單檔上限：NT$ {LIMIT_CHATGPT:,}｜單筆停損 ≤ NT$ 20,000")
         
         df_gpt_ui = pd.DataFrame([
@@ -958,7 +972,7 @@ with tab_orders:
         ])
         st.dataframe(df_gpt_ui, use_container_width=True, hide_index=True)
         
-        with st.expander("🔍 查看 ChatGPT R19 預估策略邏輯", expanded=True):
+        with st.expander("🔍 查看 ChatGPT R19 官方策略邏輯", expanded=True):
             for x in ORDERS_CHATGPT_R19:
                 st.markdown(f"**{x['rank']} {x['name']}**：門檻 `< {x['trigger']:.1f}` ｜ 停損 `{x['stop']:.1f}` ｜ **T1保利 `{x['t1']:.1f}`** ｜ 最大停損 `-NT$ {abs(x['max_loss']):,}`")
                 st.caption(f"└ 作戰定位：{x['reason']}")
@@ -966,9 +980,9 @@ with tab_orders:
     st.markdown("---")
     st.subheader("🛑 Round 19 官方禁空名單（NO SHORT LIST）")
     cn1, cn2, cn3 = st.columns(3)
-    cn1.error("🚫 **8039 台虹 (300.5元)**\n\n主力實戶搭配融資強攻漲停[cite: 28]，融資單日大增 +1,868 張為鎖碼型態，嚴禁摸頭！")
-    cn2.error("🚫 **2344 華邦電 (179.5元)**\n\n外資七大行狂掃逾 3.7 萬張[cite: 22]，融資大退 -3,016 張，法人主升浪嚴格禁空！")
-    cn3.error("🚫 **2408 南亞科 (519.0元)**\n\n外資連續兩天掃貨 1.5 萬張[cite: 17, 23]，融資大退 -2,966 張，認售被暴賣 -331 萬回補[cite: 29]，絕對禁空！")
+    cn1.error("🚫 **2344 華邦電 (179.5元)**\n\n外資七大行狂掃逾 3.7 萬張，融資大退 -3,016 張，法人主升浪嚴格禁空！")
+    cn2.error("🚫 **2408 南亞科 (519.0元)**\n\n外資連兩天掃貨 1.5 萬張[cite: 17]，融資退 -2,966 張，認售被暴賣 -331 萬回補，絕對禁空！")
+    cn3.warning("⚠️ **8039 台虹 (300.5元)**\n\nGemini 判定主力漲停鎖碼禁空；GPT 設 < 294 逆向博弈開板誘多破線。")
 
 # ------------------------------------------------------------------------------
 # TAB 3: 官方撮合與方案 A 結算模擬器
@@ -1145,6 +1159,86 @@ with tab_margin:
     
     st.dataframe(styled_df_all_m, use_container_width=True, height=490)
 
+    st.markdown("---")
+    st.subheader("⚡ 母池個股快速切換 (一鍵單擊快速檢視 10 日走勢)")
+    pills_options = [f"{r['代號']} {r['股票名稱']} ({r[margin_col_name]:+,d})" for _, r in df_all_m.iterrows()]
+    
+    if "selected_margin_ticker" not in st.session_state:
+        st.session_state["selected_margin_ticker"] = df_all_m.iloc[0]["代號"]
+
+    default_pill_idx = 0
+    for idx, opt in enumerate(pills_options):
+        if opt.startswith(str(st.session_state["selected_margin_ticker"])):
+            default_pill_idx = idx
+            break
+
+    sel_radio = st.radio(
+        "選擇個股：",
+        options=pills_options,
+        index=default_pill_idx,
+        horizontal=True,
+        key="margin_horizontal_selector",
+        label_visibility="collapsed"
+    )
+    cur_margin_code = sel_radio.split(" ")[0]
+    st.session_state["selected_margin_ticker"] = cur_margin_code
+    cur_stock_name = STOCK_NAME_DICT.get(cur_margin_code, cur_margin_code)
+    
+    df_margin_single = fetch_stock_margin_10d(cur_margin_code)
+    m_col1, m_col2 = st.columns([2.5, 1.5])
+    
+    with m_col1:
+        st.markdown(f"#### 📈 【{cur_margin_code} {cur_stock_name}】近 10 日融資餘額與單日增減走勢")
+        fig_margin = make_subplots(specs=[[{"secondary_y": True}]])
+        bar_colors = ['#FF4444' if c >= 0 else '#00CC00' for c in df_margin_single["change"]]
+        
+        fig_margin.add_trace(
+            go.Bar(
+                x=df_margin_single["date"], 
+                y=df_margin_single["change"],
+                name="單日融資增減(張)",
+                marker_color=bar_colors,
+                opacity=0.75
+            ),
+            secondary_y=False
+        )
+        
+        fig_margin.add_trace(
+            go.Scatter(
+                x=df_margin_single["date"], 
+                y=df_margin_single["balance"],
+                name="融資餘額(張)",
+                line=dict(color="#FFD700", width=3),
+                mode="lines+markers"
+            ),
+            secondary_y=True
+        )
+        
+        fig_margin.update_layout(
+            template="plotly_dark", plot_bgcolor="#111", paper_bgcolor="#111",
+            height=380, margin=dict(l=20, r=20, t=30, b=20),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            hovermode="x unified"
+        )
+        fig_margin.update_yaxes(title_text="單日增減 (張)", secondary_y=False, gridcolor="#222")
+        fig_margin.update_yaxes(title_text="融資餘額 (張)", secondary_y=True, gridcolor="#222")
+        fig_margin.update_xaxes(gridcolor="#222")
+        st.plotly_chart(fig_margin, use_container_width=True)
+
+    with m_col2:
+        st.markdown(f"#### 📋 逐日融資增減明細 (最新日期置頂)")
+        df_margin_display = df_margin_single.iloc[::-1].copy().reset_index(drop=True)
+        df_margin_display.columns = ["日期", "融資買進", "融資賣出", "單日增減(張)", "融資餘額(張)"]
+        df_margin_display.index = range(1, len(df_margin_display) + 1)
+        
+        styled_single = apply_color_styler(df_margin_display.style, style_margin_changes, subset=["單日增減(張)"]).format({
+            "融資買進": "{:,d}",
+            "融資賣出": "{:,d}",
+            "單日增減(張)": "{:+,d}",
+            "融資餘額(張)": "{:,d}"
+        })
+        st.dataframe(styled_single, use_container_width=True, height=360)
+
 # ------------------------------------------------------------------------------
 # TAB 7: 🏢 主力分點 (9/30 盤後真實買賣超各前五大)
 # ------------------------------------------------------------------------------
@@ -1196,4 +1290,4 @@ with tab_broker:
 # 13. 系統頁尾
 # ==============================================================================
 st.markdown("---")
-st.caption(f"雙 AI 量化短空雷達系統 v19.0 旗艦裁判長版｜{R19_DATE} Round 19 雙方封單正式鎖定｜執法標準：5分K實體跌破 + 不利撮合滑價 + 2萬金盾停損硬上限 + 方案A鎖利 (廢除T2) + 13:25強平")
+st.caption(f"雙 AI 量化短空雷達系統 v19.1 旗艦裁判長版｜{R19_DATE} Round 19 雙方封單正式鎖定｜執法標準：5分K實體跌破 + 不利撮合滑價 + 2萬金盾停損硬上限 + 方案A鎖利 (廢除T2) + 13:25強平")
