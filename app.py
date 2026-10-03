@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-雙 AI 量化短空雷達 (Season 2 Round 1 開幕戰旗艦完整版) - app.py (v21.6)
+雙/三 AI 量化短空雷達 (S2-R1 三巨頭鼎立旗艦裁判長版) - app.py (v22.0)
 ==============================================================================
 版本更新重點：
-1. 完全修復語法：徹底清除所有干擾代碼的外部標籤，確保 Streamlit 執行零報錯。
-2. 主力矩陣全景升級：單一總表直接展開前五大買賣超主力明細與加總量，免去下方切換標的。
-3. 緊湊前三欄：代號（內嵌 [期] 標記）、名稱、股價微型化，將全寬視野留給主力分點。
-4. 戰略頁籤重構：主力分點與融資增減前置為核心前線；首季總冠軍名人堂置底封存。
-5. 模擬器無縫整併：將撮合與方案 A 結算模擬器直接內嵌於「⚔️ S2-R1 決戰名冊」下方。
-6. 專業工作台保留：完整保留 4 層動態指標與即時懸浮抬頭顯示器。
+1. 三方鼎立：正式收錄 🟪 Claude 戰情室 S2-R1 官方封存名冊 (起跑 NT$ 1,000,000)。
+2. 側邊欄升級：並列展示 Gemini、ChatGPT、Claude 三大陣營起始淨值卡與領先狀態。
+3. 決戰名冊三欄並列：TOP 5 封單陣列呈現 Gemini vs ChatGPT vs Claude 同台競技。
+4. 結算模擬器同步升級：支援切換「🟪 Claude 戰情室」封單進行撮合與方案 A 判定。
+5. 主力全景矩陣：保留單一總表展開前五大主力買賣超明細與加總量，免切換標的。
+6. 純淨代碼：徹底杜絕任何外部干擾標籤，保證 Streamlit Cloud 100% 穩定部署。
 ==============================================================================
 """
 
@@ -27,7 +27,7 @@ from plotly.subplots import make_subplots
 # 1. 頁面排版與外觀設定
 # ==============================================================================
 st.set_page_config(
-    page_title="雙 AI 量化短空雷達 (S2-R1 旗艦裁判長版)", 
+    page_title="三 AI 量化短空雷達 (S2-R1 三方鼎立版)", 
     layout="wide", 
     page_icon="⚔️", 
     initial_sidebar_state="expanded"
@@ -38,16 +38,23 @@ st.markdown("""
     .metric-card-gemini {
         background: linear-gradient(135deg, #1E1E1E 0%, #2A1818 100%);
         border-radius: 8px;
-        padding: 12px;
+        padding: 10px;
         border-left: 5px solid #FF4444;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
     .metric-card-gpt {
         background: linear-gradient(135deg, #1E1E1E 0%, #162436 100%);
         border-radius: 8px;
-        padding: 12px;
+        padding: 10px;
         border-left: 5px solid #1E88E5;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
+    }
+    .metric-card-claude {
+        background: linear-gradient(135deg, #1E1E1E 0%, #261B33 100%);
+        border-radius: 8px;
+        padding: 10px;
+        border-left: 5px solid #AB47BC;
+        margin-bottom: 8px;
     }
     .stDataFrame {
         border-radius: 6px;
@@ -61,7 +68,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. 第二場公約常數與雙方帳戶狀態 (2026/10/05 開賽重置)
+# 2. 第二場公約常數與三方帳戶狀態 (2026/10/05 開賽重置)
 # ==============================================================================
 S2_R1_DATE = "2026/10/05"
 DATA_BASE_DATE = "2026/10/02"
@@ -69,9 +76,8 @@ MARGIN_DISPLAY_DATE = "10/02"
 
 CAPITAL_GEMINI = 1000000
 CAPITAL_CHATGPT = 1000000
-LIMIT_GEMINI = int(CAPITAL_GEMINI * 0.20)
-LIMIT_CHATGPT = int(CAPITAL_CHATGPT * 0.20)
-NET_SPREAD = CAPITAL_GEMINI - CAPITAL_CHATGPT
+CAPITAL_CLAUDE = 1000000
+LIMIT_PER_STOCK = 200000  # 雙/三方皆為 20% 限額
 
 MAX_STOP_LOSS_NTD = 20000
 
@@ -91,7 +97,7 @@ STOCK_NAME_DICT = {
 NAME_TO_CODE_DICT = {v: k for k, v in STOCK_NAME_DICT.items()}
 
 # ==============================================================================
-# 3. 2026-10-02 盤後 12 檔母池三維大數據庫 (分點 + 官方融資 + 權證金流)
+# 3. 2026-10-02 盤後 12 檔母池三維大數據庫
 # ==============================================================================
 DEFAULT_WATCHLIST_S2R1 = [
     {
@@ -289,7 +295,7 @@ DEFAULT_WATCHLIST_S2R1 = [
 ]
 
 # ==============================================================================
-# 4. 第二場 Round 1 雙方正式定案封單陣列
+# 4. 第二場 Round 1 三方官方定案封單陣列
 # ==============================================================================
 ORDERS_GEMINI_S2R1 = [
     {"rank": "🥇 1", "ticker": "6173", "name": "信昌電(期)", "tool": "個股期", "size": "2口", "trigger": 298.5, "stop": 303.5, "t1": 291.0, "shares": 4000, "max_loss": 20000, "reason": "認售連三日奪全市場第一名(+138萬)，衝322.5留長上影，融資大退-1100張潰逃！"},
@@ -307,8 +313,16 @@ ORDERS_CHATGPT_S2R1 = [
     {"rank": "5", "ticker": "2327", "name": "國巨(期)", "tool": "個股期", "size": "2口", "trigger": 598.0, "stop": 603.0, "t1": 588.0, "shares": 4000, "max_loss": 20000, "reason": "高檔爆量10萬張分歧換手，實體破598回測短均，603嚴格停損。"}
 ]
 
+ORDERS_CLAUDE_S2R1 = [
+    {"rank": "🥇 1", "ticker": "2327", "name": "國巨(期)", "tool": "個股期", "size": "1口", "trigger": 618.0, "stop": 627.0, "t1": 600.0, "shares": 2000, "max_loss": 18129, "reason": "大摩單一賣超3946張出貨均價628；站前買超2012張成本632.9隔日要倒；留21元長上影。"},
+    {"rank": "🥈 2", "ticker": "2344", "name": "華邦電(期)", "tool": "個股期", "size": "2口", "trigger": 176.5, "stop": 181.0, "t1": 167.5, "shares": 4000, "max_loss": 18188, "reason": "站前單一狂倒10092張出貨；融資暴增+2478張高檔套牢；跌破176.5追擊踩踏。"},
+    {"rank": "🥉 3", "ticker": "3042", "name": "晶技(期)", "tool": "個股期", "size": "2口", "trigger": 229.0, "stop": 233.5, "t1": 220.0, "shares": 4000, "max_loss": 18197, "reason": "凱基台北出貨672張均價224.8；融資追高+1121張浮額堆積；摜破229追假突破回測。"},
+    {"rank": "4", "ticker": "8039", "name": "台虹(期)", "tool": "個股期", "size": "2口", "trigger": 289.0, "stop": 293.5, "t1": 280.0, "shares": 4000, "max_loss": 18206, "reason": "國票敦北等外資賣超提款；融資單日暴增+2220張踩踏未爆彈；破289啟動空方連動。"},
+    {"rank": "5", "ticker": "2455", "name": "全新(期)", "tool": "個股期", "size": "1口", "trigger": 568.0, "stop": 577.0, "t1": 550.0, "shares": 2000, "max_loss": 18125, "reason": "群益單一賣超909張均價562.9出貨；處置缺乏承接動能；摜破568確認多頭動能耗盡。"}
+]
+
 # ==============================================================================
-# 5. 技術分析與動態 K 線指標模組 (核心 4 層繪圖引擎)
+# 5. 技術分析與動態 K 線指標模組
 # ==============================================================================
 def pad_display_text(text, target_display_width):
     current_width = 0
@@ -485,7 +499,7 @@ def render_interactive_kline_chart(df_k, stock_code, stock_name, broker_cost, nh
     return custom_component
 
 # ==============================================================================
-# 6. 量化撮合與方案 A 階梯結算引擎 (2萬金盾與 T1 保底)
+# 6. 量化撮合與方案 A 階梯結算引擎
 # ==============================================================================
 def execute_quant_settlement(order, k_open, k_close, k_low, k_high, next_k_open, exit_k_close=None):
     trigger_p = float(order["trigger"])
@@ -507,7 +521,7 @@ def execute_quant_settlement(order, k_open, k_close, k_low, k_high, next_k_open,
         effective_loss = max(loss_ntd, -MAX_STOP_LOSS_NTD)
         return {
             "status": "❌ 停損平倉 (2萬金盾風控鎖定)", "entry_price": entry_p, "exit_price": stop_p,
-            "pnl_points": pts, "pnl_ntd": effective_loss, "note": f"盤中突破停損價 {stop_p}，依 2 萬金盾紀律立即停損出場。"
+            "pnl_points": pts, "pnl_ntd": effective_loss, "note": f"盤中突破停損價 {stop_p}，依紀律立即停損出場。"
         }
     if k_low <= t1_p:
         pts = entry_p - t1_p
@@ -527,7 +541,7 @@ def execute_quant_settlement(order, k_open, k_close, k_low, k_high, next_k_open,
     }
 
 # ==============================================================================
-# 7. 融資大數據模組 (同步 10/02 官方數據庫)
+# 7. 融資大數據模組
 # ==============================================================================
 LOCAL_MARGIN_HISTORY_10D_S2 = {
     "6173": [
@@ -580,7 +594,7 @@ def fetch_stock_margin_10d(stock_code):
     return pd.DataFrame(fallback_data)
 
 # ==============================================================================
-# 8. 母池數據加載 (S2-R1 短空評分)
+# 8. 母池數據加載
 # ==============================================================================
 def load_radar_market_data(pool_list):
     enhanced = []
@@ -653,9 +667,9 @@ df_display = load_radar_market_data(DEFAULT_WATCHLIST_S2R1)
 df_display.index = range(1, len(df_display) + 1)
 
 # ==============================================================================
-# 9. 側邊欄控制台
+# 9. 側邊欄控制台 (三 AI 並列)
 # ==============================================================================
-st.sidebar.title("⚔️ S2 控制台 (開幕戰)")
+st.sidebar.title("⚔️ S2 三方鼎立控制台")
 st.sidebar.markdown(f"**決戰輪次**：`Season 2 Round 1` ({S2_R1_DATE})")
 st.sidebar.markdown(f"**母池籌碼基準**：`{DATA_BASE_DATE}` 三維完整大數據")
 
@@ -663,41 +677,34 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("🏆 第二季起跑淨值儀表板")
 st.sidebar.markdown(f"""
 <div class="metric-card-gemini">
-    <div style="font-size: 13px; color: #BBB;">🟥 Gemini 起始淨值 (首季總冠軍)</div>
-    <div style="font-size: 24px; font-weight: bold; color: #FFF;">NT$ {CAPITAL_GEMINI:,}</div>
-    <div style="font-size: 12px; color: #FFD700;">第 2 季平手重新起跑</div>
+    <div style="font-size: 12px; color: #BBB;">🟥 Gemini 戰情室 (S1 總冠軍)</div>
+    <div style="font-size: 20px; font-weight: bold; color: #FFF;">NT$ {CAPITAL_GEMINI:,}</div>
+    <div style="font-size: 11px; color: #FFD700;">第 2 季平手起跑</div>
 </div>
 <div class="metric-card-gpt">
-    <div style="font-size: 13px; color: #BBB;">🟦 ChatGPT 起始淨值 (首季亞軍)</div>
-    <div style="font-size: 24px; font-weight: bold; color: #FFF;">NT$ {CAPITAL_CHATGPT:,}</div>
-    <div style="font-size: 12px; color: #FFD700;">第 2 季平手重新起跑</div>
+    <div style="font-size: 12px; color: #BBB;">🟦 ChatGPT 戰情室 (S1 亞軍)</div>
+    <div style="font-size: 20px; font-weight: bold; color: #FFF;">NT$ {CAPITAL_CHATGPT:,}</div>
+    <div style="font-size: 11px; color: #FFD700;">第 2 季平手起跑</div>
+</div>
+<div class="metric-card-claude">
+    <div style="font-size: 12px; color: #BBB;">🟪 Claude 戰情室 (全新參戰挑戰者)</div>
+    <div style="font-size: 20px; font-weight: bold; color: #FFF;">NT$ {CAPITAL_CLAUDE:,}</div>
+    <div style="font-size: 11px; color: #E1BEE7;">第 2 季平手起跑</div>
 </div>
 """, unsafe_allow_html=True)
-st.sidebar.info(f"🚩 **起跑差距**：NT$ 0 (完全平手)\n\n**單檔部位上限 (20%)**：\n• 雙方各 NT$ {LIMIT_GEMINI:,}\n\n🛡️ **風控硬公約**：\n單筆最大停損 **≤ NT$ 20,000** ｜ **命中 T1 全平保底**")
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📜 官方執法核心規範 (S2 實戰版)")
-st.sidebar.caption(
-    """
-    1. **實體破線確認**：5分K收盤 < 開盤 且 收盤 < 進場價。
-    2. **不利滑價撮合**：成交價 = min(觸發K收, 次K開)。
-    3. **2萬金盾鎖定**：單筆停損上限嚴守 NT$ 20,000。
-    4. **方案 A 優先**：穿破 T1 即刻 100% 全數平倉保底。
-    5. **尾盤強平**：未達 T1 且未停損者，13:25～13:30 強平。
-    """
-)
+st.sidebar.info(f"🚩 **起跑差距**：三方平手 (NT$ 0)\n\n**單檔部位上限 (20%)**：\n• 各陣營皆為 NT$ {LIMIT_PER_STOCK:,}\n\n🛡️ **風控硬公約**：\n單筆最大停損 **≤ NT$ 20,000** ｜ **命中 T1 全平保底**")
 
 # ==============================================================================
 # 10. 主頁面六大核心分頁
 # ==============================================================================
-st.title("⚔️ 雙 AI 量化短空競賽｜第二場（Season 2）Round 1 旗艦戰情室")
-st.caption(f"數據庫基準：{DATA_BASE_DATE} 臺灣證券交易所官方融資券/主力分點/自營商權證金流三維大數據")
+st.title("⚔️ 三 AI 量化短空競賽｜第二場（Season 2）Round 1 旗艦戰情室")
+st.caption(f"官方公證生效日：{S2_R1_DATE} 週一開盤｜基準數據：{DATA_BASE_DATE} 臺灣證交所融資券/主力分點/自營商權證金流")
 
 tab_workspace, tab_broker, tab_margin, tab_orders, tab_radar, tab_s1_hall = st.tabs([
     "🖥️ 專業操盤工作台 (K線與分點)",
     "🏢 主力分點 (10/02 全景矩陣總表)",
     "📈 融資增減 (10/02 官方增減排行)",
-    "⚔️ S2-R1 雙方官方決戰名冊", 
+    "⚔️ S2-R1 三方官方決戰名冊", 
     "📊 12檔母池籌碼雷達全景表",
     "👑 Season 1 榮譽總冠軍名人堂"
 ])
@@ -1021,56 +1028,63 @@ with tab_margin:
         st.dataframe(styled_single, use_container_width=True, height=360)
 
 # ------------------------------------------------------------------------------
-# TAB 4: S2-R1 決戰名冊
+# TAB 4: S2-R1 三方正式決戰名冊 (含下嵌結算仲裁模擬台)
 # ------------------------------------------------------------------------------
 with tab_orders:
-    st.subheader("⚔️️ S2-R1 雙 AI 官方 TOP 5 決戰名冊陣列 (第二場開幕戰)")
-    st.caption("公證核定：雙方本金重置為各 NT$ 1,000,000；單筆最大停損 ≤ NT$ 20,000；命中 T1 方案 A 立即全平保底。")
-    col_g, col_c = st.columns(2)
+    st.subheader("⚔️ S2-R1 三大 AI 官方 TOP 5 決戰名冊陣列 (三方鼎立版)")
+    st.caption("公證核定：三方本金各自歸零為 NT$ 1,000,000；單標上限 NT$ 200,000；單筆最大停損 ≤ NT$ 20,000；命中 T1 方案 A 立即全平保底。")
+    col_g, col_c, col_cl = st.columns(3)
     
     with col_g:
-        st.markdown("#### 🟥 Gemini 戰情室 S2-R1 官方封單")
-        st.caption(f"起始本金：NT$ {CAPITAL_GEMINI:,}｜單檔上限：NT$ {LIMIT_GEMINI:,}｜單筆停損 ≤ NT$ 20,000")
-        
+        st.markdown("#### 🟥 Gemini 戰情室 S2-R1")
+        st.caption("起始本金：NT$ 1,000,000｜上限：NT$ 200,000")
         df_gem_ui = pd.DataFrame([
             {"順位/標的": f"{x['rank']} {x['name']}", "5分K門檻": f"< {x['trigger']:.1f}", "停損": f"{x['stop']:.1f}", "T1保利": f"{x['t1']:.1f}", "口數": x['size'], "最大風險": f"-NT$ {abs(x['max_loss']):,}"}
             for x in ORDERS_GEMINI_S2R1
         ])
         st.dataframe(df_gem_ui, use_container_width=True, hide_index=True)
-        
-        with st.expander("🔍 查看 Gemini S2-R1 籌碼依據與量化細節", expanded=False):
+        with st.expander("🔍 查看 Gemini 籌碼依據", expanded=False):
             for x in ORDERS_GEMINI_S2R1:
-                st.markdown(f"**{x['rank']} {x['name']}**：門檻 `< {x['trigger']:.1f}` ｜ 停損 `{x['stop']:.1f}` ｜ **T1保利 `{x['t1']:.1f}`**")
-                st.caption(f"└ 核心籌碼：{x['reason']}")
+                st.markdown(f"**{x['rank']} {x['name']}**：門檻 `< {x['trigger']:.1f}` ｜ 停損 `{x['stop']:.1f}` ｜ **T1 `{x['t1']:.1f}`**")
+                st.caption(f"└ {x['reason']}")
                 
     with col_c:
-        st.markdown("#### 🟦 ChatGPT 戰情室 S2-R1 官方封單 (核定封存版)")
-        st.caption(f"起始本金：NT$ {CAPITAL_CHATGPT:,}｜單檔上限：NT$ {LIMIT_CHATGPT:,}｜單筆停損 ≤ NT$ 20,000")
-        
+        st.markdown("#### 🟦 ChatGPT 戰情室 S2-R1")
+        st.caption("起始本金：NT$ 1,000,000｜上限：NT$ 200,000")
         df_gpt_ui = pd.DataFrame([
             {"順位/標的": f"{x['rank']} {x['name']}", "5分K門檻": f"< {x['trigger']:.1f}", "停損": f"{x['stop']:.1f}", "T1保利": f"{x['t1']:.1f}", "口數": x['size'], "最大風險": f"-NT$ {abs(x['max_loss']):,}"}
             for x in ORDERS_CHATGPT_S2R1
         ])
         st.dataframe(df_gpt_ui, use_container_width=True, hide_index=True)
-        
-        with st.expander("🔍 查看 ChatGPT S2-R1 策略邏輯與不空名單", expanded=False):
+        with st.expander("🔍 查看 ChatGPT 策略邏輯", expanded=False):
             for x in ORDERS_CHATGPT_S2R1:
-                st.markdown(f"**{x['rank']} {x['name']}**：門檻 `< {x['trigger']:.1f}` ｜ 停損 `{x['stop']:.1f}` ｜ **T1保利 `{x['t1']:.1f}`**")
-                st.caption(f"└ 作戰定位：{x['reason']}")
-            st.markdown("---")
-            st.caption("🚫 GPT R1 不空名單：2492華新科、3189景碩、3037欣興、6173信昌電、2408南亞科、3406玉晶光")
+                st.markdown(f"**{x['rank']} {x['name']}**：門檻 `< {x['trigger']:.1f}` ｜ 停損 `{x['stop']:.1f}` ｜ **T1 `{x['t1']:.1f}`**")
+                st.caption(f"└ {x['reason']}")
+
+    with col_cl:
+        st.markdown("#### 🟪 Claude 戰情室 S2-R1 (新參戰)")
+        st.caption("起始本金：NT$ 1,000,000｜上限：NT$ 200,000")
+        df_claude_ui = pd.DataFrame([
+            {"順位/標的": f"{x['rank']} {x['name']}", "5分K門檻": f"< {x['trigger']:.1f}", "停損": f"{x['stop']:.1f}", "T1保利": f"{x['t1']:.1f}", "口數": x['size'], "最大風險": f"-NT$ {abs(x['max_loss']):,}"}
+            for x in ORDERS_CLAUDE_S2R1
+        ])
+        st.dataframe(df_claude_ui, use_container_width=True, hide_index=True)
+        with st.expander("🔍 查看 Claude 策略邏輯", expanded=False):
+            for x in ORDERS_CLAUDE_S2R1:
+                st.markdown(f"**{x['rank']} {x['name']}**：門檻 `< {x['trigger']:.1f}` ｜ 停損 `{x['stop']:.1f}` ｜ **T1 `{x['t1']:.1f}`**")
+                st.caption(f"└ {x['reason']}")
 
     st.markdown("---")
-    st.subheader("🛑 S2-R1 官方絕對禁空名單（NO SHORT LIST）")
+    st.subheader("🛑 S2-R1 三方官方禁空名單（NO SHORT LIST）對照")
     cn1, cn2, cn3 = st.columns(3)
-    cn1.error("🚫 2327 國巨* (626.0元)\n\n10萬張天量換手，認購爆買+2,981萬(全市場第2)，多頭軋空未止，嚴禁摸頭！")
-    cn2.error("🚫 2492 華新科 (361.5元)\n\n強攻漲停，高盛/凱基台北狂買6,800張鎖碼，融資被軋退-1,196張，絕對禁空！")
-    cn3.error("🚫 3037 欣興 (1305.0元)\n\n美林與高盛合力掃盤逾4,000張，大漲7.4%多頭排列，絕對禁空！")
+    cn1.error("🚫 **Gemini 禁空**：\n• 2327 國巨* (認購爆買+2981萬軋空)\n• 2492 華新科 (強攻漲停鎖主升浪)\n• 3037 欣興 (美林高盛暴買4000張)")
+    cn2.error("🚫 **ChatGPT 禁空**：\n• 2492 華新科 (強嘎空結構)\n• 3189 景碩 (法人買超融資退)\n• 3037 欣興、6173 信昌電\n• 2408 南亞科、3406 玉晶光")
+    cn3.error("🚫 **Claude 禁空**：\n• 2492 華新科 (外資狂買+1萬張漲停)\n• 3406 玉晶光 (單口保證金25萬超標)\n• 3189 景碩 (保證金27萬超標)\n• 3037 欣興 (保證金34萬超標)\n• 2408 南亞科 (外資鎖碼+7171張)")
 
     st.markdown("---")
     
     # --------------------------------------------------------------------------
-    # 🧮 內嵌：裁判長即時撮合與結算仲裁模擬台
+    # 🧮 內嵌：裁判長即時撮合與結算仲裁模擬台 (支援三方切換)
     # --------------------------------------------------------------------------
     with st.expander("⚖️ 裁判室專用：5分K實體跌破撮合與方案 A 結算模擬器 (點擊展開操作)", expanded=True):
         st.caption("依據官方公約：取不利撮合價進場，盤中穿破 T1 即刻鎖利全平，未達條件者於 13:25 強制結算。")
@@ -1078,8 +1092,13 @@ with tab_orders:
         sim_c1, sim_c2 = st.columns(2)
         with sim_c1:
             st.markdown("**步驟 1：選擇審查陣營與封單**")
-            selected_side = st.radio("參賽陣營：", ["🟥 Gemini 戰情室", "🟦 ChatGPT 戰情室"], horizontal=True, key="embedded_sim_side")
-            order_set = ORDERS_GEMINI_S2R1 if "Gemini" in selected_side else ORDERS_CHATGPT_S2R1
+            selected_side = st.radio("參賽陣營：", ["🟥 Gemini 戰情室", "🟦 ChatGPT 戰情室", "🟪 Claude 戰情室"], horizontal=True, key="embedded_sim_side")
+            if "Gemini" in selected_side:
+                order_set = ORDERS_GEMINI_S2R1
+            elif "ChatGPT" in selected_side:
+                order_set = ORDERS_CHATGPT_S2R1
+            else:
+                order_set = ORDERS_CLAUDE_S2R1
             
             target_order = st.selectbox(
                 "選擇審查封單：", order_set,
@@ -1135,10 +1154,10 @@ with tab_s1_hall:
     c_m1.metric("首季總冠軍", "🟥 Gemini 戰情室", "11勝 6負 3平")
     c_m2.metric("首季終局淨值", "NT$ 1,743,595", "+74.36%")
     c_m3.metric("首季總獲利差距", "NT$ 331,914 領先", "亞軍 GPT: $1,411,681")
-    st.caption("第一季 20 回合各輪對決詳細紀錄已完整歸檔，第二場賽事自 2026/10/05 開賽，雙方 100 萬重新起跑！")
+    st.caption("第一季 20 回合各輪對決詳細紀錄已完整歸檔，第二場賽事自 2026/10/05 開賽，三方各 100 萬重新起跑！")
 
 # ==============================================================================
 # 11. 系統頁尾
 # ==============================================================================
 st.markdown("---")
-st.caption(f"雙 AI 量化短空雷達系統 v21.6 (修復定案版)｜{S2_R1_DATE} 週一開盤生效｜執法公約：5分K實體跌破 + 不利撮合滑價 + 2萬金盾停損硬上限 + 方案A鎖利 + 13:25強平")
+st.caption(f"三 AI 量化短空雷達系統 v22.0 (三方鼎立旗艦版)｜{S2_R1_DATE} 週一開盤生效｜執法公約：5分K實體跌破 + 不利撮合滑價 + 2萬金盾停損硬上限 + 方案A鎖利 + 13:25強平")
