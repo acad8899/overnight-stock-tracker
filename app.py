@@ -40,7 +40,7 @@ class StockDataService:
     }
 
   def fetch_twse_margin(self, date_str: str) -> Dict[str, Any]:
-    """從證交所抓取全市場個股融資融券增減 (自動定位個股明細表並清洗欄位格式)"""
+    """從證交所抓取全市場融資融券明細，自動定位個股表並清洗代號空白"""
     url = f"https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date={date_str}&selectType=ALL&response=json"
     margin_dict = {}
     try:
@@ -48,7 +48,7 @@ class StockDataService:
       if resp.status_code == 200:
         data = resp.json()
 
-        # 遍歷所有 tables，精準鎖定包含「代號」與「融資買進」的個股明細表 (通常為 tables[1])
+        # 遍歷所有 tables，精準鎖定包含「代號」與「買進」的個股明細表
         target_rows = []
         for table in data.get("tables", []):
           fields = table.get("fields", [])
@@ -58,7 +58,6 @@ class StockDataService:
             target_rows = table.get("data", [])
             break
 
-        # 舊版格式 fallback
         if not target_rows:
           target_rows = data.get("data", [])
 
@@ -70,7 +69,7 @@ class StockDataService:
           code = str(row[0]).strip().replace(" ", "")
 
           if code in UNIVERSE:
-            # 證交所欄位映射:
+            # 欄位映射:
             # row[2]: 融資買進(張)
             # row[3]: 融資賣出(張)
             # row[4]: 現金償還(張)
@@ -80,7 +79,7 @@ class StockDataService:
             cash_qty = int(str(row[4]).replace(",", "").strip() or 0)
             balance = int(str(row[6]).replace(",", "").strip() or 0)
 
-            # 單日融資淨增減 = 買進 - 賣出 - 現金償還
+            # 單日淨增減 = 買進 - 賣出 - 現金償還
             net_change = buy_qty - sell_qty - cash_qty
 
             margin_dict[code] = {
@@ -92,7 +91,7 @@ class StockDataService:
     return margin_dict
 
   def fetch_twse_institutional(self, date_str: str) -> Dict[str, Any]:
-    """從證交所抓取外資三大法人進出明細"""
+    """從證交所抓取外陸資買賣超股數並換算為張數"""
     url = f"https://www.twse.com.tw/rwd/zh/fund/T86?date={date_str}&selectType=ALLBUT0999&response=json"
     inst_dict = {}
     try:
@@ -102,7 +101,6 @@ class StockDataService:
         for row in data.get("data", []):
           code = str(row[0]).strip().replace(" ", "")
           if code in UNIVERSE:
-            # 外陸資買賣超股數換算為張數 (除以 1000)
             foreign_net = int(str(row[4]).replace(",", "").strip() or 0)
             inst_dict[code] = {"foreign_net_sheets": foreign_net // 1000}
     except Exception as e:
@@ -129,4 +127,48 @@ with st.sidebar:
 
   if st.button("🔄 刷新數據"):
     st.cache_data.clear()
-    st.
+    st.rerun()
+
+  st.markdown("---")
+  st.markdown("""
+    **💡 量化空方評級：**
+    * 🚨 **多殺多引信**：融資逆勢大增 ＋ 外資狂砍
+    * ⚠️ **隔日沖倒貨**：鎖漲停隔日沖重壓，待開盤踩踏
+    * 🛡️ **浮額清洗**：融資暴減清洗乾淨（防強彈）
+    """)
+
+
+@st.cache_data(ttl=300)
+def load_market_data(d_str: str):
+  margin_data = service.fetch_twse_margin(d_str)
+  inst_data = service.fetch_twse_institutional(d_str)
+  return margin_data, inst_data
+
+
+with st.spinner("正在自臺灣證券交易所官方 API 同步融資與法人數據..."):
+  margin_map, inst_map = load_market_data(date_param)
+
+# 整合 12 檔母池看板
+summary_rows = []
+for code, info in UNIVERSE.items():
+  m_info = margin_map.get(code, {"margin_change": 0, "margin_balance": 0})
+  i_info = inst_map.get(code, {"foreign_net_sheets": 0})
+
+  m_change = m_info["margin_change"]
+  f_net = i_info["foreign_net_sheets"]
+
+  # 量化空方條件研判
+  tag = "中立觀望"
+  if m_change > 500 and f_net < -2000:
+    tag = "🚨 多殺多引信 (資增 + 外資倒)"
+  elif code == "8039" and m_change > 0:
+    tag = "⚠️ 隔日沖倒貨 (富邦/凱基鎖板)"
+  elif m_change < -1000:
+    tag = "🛡️ 浮額清洗 (防強彈)"
+
+  summary_rows.append({
+      "代號": code,
+      "名稱": info["name"],
+      "融資增減(張)": m_change,
+      "外資買賣超(張)": f_net,
+      "
