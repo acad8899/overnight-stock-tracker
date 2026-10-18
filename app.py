@@ -24,23 +24,24 @@ UNIVERSE = {
     "6173": {"name": "信昌電", "market": "TPEx", "close": 0.0, "high": 0.0, "low": 0.0},
 }
 
-# 10/16 主力買賣超合計基準（張）
 MAJOR_NET_SUMMARY = {
-    "8039": 8586,
-    "2408": -5807,
-    "2327": -5643,
-    "3037": -3212,
-    "2344": 8054,
-    "2313": 9574,
-    "3406": -695,
-    "2492": -1342,
-    "3042": 15,
-    "3189": -310,
-    "2455": 252,
-    "6173": 0
+    "8039": 8586, "2408": -5807, "2327": -5643, "3037": -3212,
+    "2344": 8054, "2313": 9574, "3406": -695, "2492": -1342,
+    "3042": 15, "3189": -310, "2455": 252, "6173": 0
 }
 
-# 30 家重點分點明細
+FALLBACK_MARGIN = {
+    "2408": 3370, "8039": 379, "2455": 82, "3037": 67,
+    "2492": -44, "3042": -107, "2327": -126, "3406": -243,
+    "3189": -537, "2313": -666, "2344": -1303, "6173": 0
+}
+
+FALLBACK_FOREIGN = {
+    "2313": 15361, "2344": 12224, "3042": -510, "2492": -949,
+    "8039": -1168, "3406": -1259, "3037": -2805, "2327": -3717,
+    "2408": -7784, "2455": -94, "3189": -17, "6173": 0
+}
+
 def get_stock_brokers(code: str):
     if code == "8039":
         return [
@@ -99,71 +100,4 @@ class StockDataService:
             "Accept": "application/json, text/javascript, */*; q=0.01",
         }
 
-    def fetch_twse_margin(self, date_str: str) -> Dict[str, Any]:
-        url = f"https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date={date_str}&selectType=ALL&response=json"
-        margin_dict = {}
-        try:
-            resp = requests.get(url, headers=self.headers, timeout=8)
-            if resp.status_code == 200:
-                data = resp.json()
-                target_rows = []
-                for table in data.get("tables", []):
-                    fields = table.get("fields", [])
-                    if any("代號" in f for f in fields) and any("買進" in f for f in fields):
-                        target_rows = table.get("data", [])
-                        break
-                if not target_rows:
-                    target_rows = data.get("data", [])
-
-                for row in target_rows:
-                    if len(row) < 7:
-                        continue
-                    code = str(row[0]).strip().replace(" ", "")
-                    if code in UNIVERSE:
-                        buy_qty = int(str(row[2]).replace(",", "").strip() or 0)
-                        sell_qty = int(str(row[3]).replace(",", "").strip() or 0)
-                        cash_qty = int(str(row[4]).replace(",", "").strip() or 0)
-                        balance = int(str(row[6]).replace(",", "").strip() or 0)
-                        margin_dict[code] = {
-                            "margin_change": buy_qty - sell_qty - cash_qty,
-                            "margin_balance": balance,
-                        }
-        except Exception:
-            pass
-        return margin_dict
-
-    def fetch_twse_institutional(self, date_str: str) -> Dict[str, Any]:
-        url = f"https://www.twse.com.tw/rwd/zh/fund/T86?date={date_str}&selectType=ALLBUT0999&response=json"
-        inst_dict = {}
-        try:
-            resp = requests.get(url, headers=self.headers, timeout=8)
-            if resp.status_code == 200:
-                data = resp.json()
-                for row in data.get("data", []):
-                    code = str(row[0]).strip().replace(" ", "")
-                    if code in UNIVERSE:
-                        foreign_net = int(str(row[4]).replace(",", "").strip() or 0)
-                        inst_dict[code] = {"foreign_net_sheets": foreign_net // 1000}
-        except Exception:
-            pass
-        return inst_dict
-
-# ==========================================
-# 3. Streamlit 網頁應用介面
-# ==========================================
-st.set_page_config(page_title="短空狙擊雷達 - 旗艦分析版", layout="wide")
-st.title("⚡ 短空狙擊雷達：AI 評級 × 勝率演算 × 主力分點穿透")
-
-service = StockDataService()
-default_date = date(2026, 10, 16)
-
-with st.sidebar:
-    st.header("⚙️ 戰情控制台")
-    selected_date = st.date_input("查詢日期", value=default_date)
-    date_param = selected_date.strftime("%Y%m%d")
-
-    night_market_drop = st.number_input(
-        "台指夜盤跌點",
-        value=-1144,
-        step=-50,
-        help="週五夜盤跌點，共振加權至空方模型",
+    def fetch_twse_
