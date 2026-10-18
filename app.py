@@ -99,25 +99,61 @@ class StockDataService:
       print(f"TWSE 融資抓取異常: {e}")
     return margin_dict
 
-  def fetch_twse_institutional(self, date_str: str) -> Dict[str, Any]:
-    """從證交所抓取外資三大法人進出明細 (免Token)"""
-    url = f"https://www.twse.com.tw/rwd/zh/fund/T86?date={date_str}&selectType=ALLBUT0999&response=json"
-    inst_dict = {}
-    try:
-      resp = requests.get(url, headers=self.headers, timeout=10)
-      if resp.status_code == 200:
-        data = resp.json()
-        # TWSE 表格欄位: 代號(0), 名稱(1), 外資買賣超(4)...
-        for row in data.get("data", []):
-          code = row[0].strip()
-          if code in UNIVERSE:
-            foreign_net = int(
-                row[4].replace(",", "")
-            )  # 外陸資買賣超股數 (需換算為張)
-            inst_dict[code] = {"foreign_net_sheets": foreign_net // 1000}
-    except Exception as e:
-      print(f"TWSE 法人抓取異常: {e}")
-    return inst_dict
+  def fetch_twse_margin(self, date_str: str) -> Dict[str, Any]:
+        """從證交所抓取全市場個股融資融券增減（自動尋找個股表格並清洗空白）"""
+        url = f"https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date={date_str}&selectType=ALL&response=json"
+        margin_dict = {}
+        try:
+            resp = requests.get(url, headers=self.headers, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+
+                # 遍歷所有 tables，找到包含「代號」與「融資買進」的個股明細表
+                target_rows = []
+                for table in data.get("tables", []):
+                    # 若欄位包含 股票代號 與 融資，即為個股表
+                    fields = table.get("fields", [])
+                    if any("代號" in f for f in fields) and any(
+                        "買進" in f for f in fields
+                    ):
+                        target_rows = table.get("data", [])
+                        break
+
+                # 若舊版格式未分 table， fallback 到 data["data"]
+                if not target_rows:
+                    target_rows = data.get("data", [])
+
+                for row in target_rows:
+                    if len(row) < 7:
+                        continue
+                    # 清洗代號：去除頭尾所有空白
+                    code = str(row[0]).strip().replace(" ", "")
+
+                    if code in UNIVERSE:
+                        # 證交所欄位:
+                        # row[2]: 融資買進(張)
+                        # row[3]: 融資賣出(張)
+                        # row[4]: 現金償還(張)
+                        # row[6]: 今日融資餘額(張)
+                        buy_qty = int(str(row[2]).replace(",", "").strip() or 0)
+                        sell_qty = int(
+                            str(row[3]).replace(",", "").strip() or 0
+                        )
+                        cash_qty = int(
+                            str(row[4]).replace(",", "").strip() or 0
+                        )
+                        balance = int(str(row[6]).replace(",", "").strip() or 0)
+
+                        # 單日融資淨增減 = 買進 - 賣出 - 現金償還
+                        net_change = buy_qty - sell_qty - cash_qty
+
+                        margin_dict[code] = {
+                            "margin_change": net_change,
+                            "margin_balance": balance,
+                        }
+        except Exception as e:
+            print(f"TWSE 融資抓取異常: {e}")
+        return margin_dict
 
 
 # ==========================================
