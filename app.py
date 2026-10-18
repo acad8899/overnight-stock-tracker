@@ -334,38 +334,61 @@ st.divider()
 # 7. 30 家短空分點穿透檢視面板
 # ==========================================
 st.subheader("🔍 30 家短空分點明細穿透檢視")
+
+# 安全映射勝率字典
+win_rate_map = dict(zip(df_result["代號"], df_result["短空勝率"]))
+
 selected_target = st.selectbox(
     "選擇要檢視主力分點進出的股票：",
-    options=list(UNIVERSE.keys()),
-    format_func=lambda x: f"{x} {UNIVERSE[x]['name']} (勝率: {df_result.loc[df_result['代號']==x, '短空勝率'].values[0]}%)"
+    options=df_result["代號"].tolist(),
+    format_func=lambda x: (
+        f"{x} {UNIVERSE[x]['name']} (勝率: {win_rate_map.get(x, 0.0)}%)"
+    ),
 )
 
 broker_data = CHIP_DETAIL_DATABASE.get(selected_target, [])
 
 if broker_data:
-    st.markdown(f"#### 📊 {selected_target} {UNIVERSE[selected_target]['name']} 主力分點進出明細")
-    df_broker = pd.DataFrame(broker_data)
-    
-    col_l, col_r = st.columns([3, 2])
-    with col_l:
-        st.dataframe(
-            df_broker,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "買賣超": st.column_config.NumberColumn(format="%+d"),
-                "均價": st.column_config.NumberColumn(format="%.2f"),
-                "佔比": st.column_config.NumberColumn(format="%.2f%%"),
-            }
-        )
-    with col_r:
-        if selected_target == "8039":
-            st.error("⚠️ **隔日沖踩踏警示**\n富邦(+3493)、凱基城中(+1548)、凱基台北(+1159)、國票敦北(+691) 等鎖單逾 9,700 張全屬隔日沖大本營。週一開盤將引爆近 5.16 億元獲利逃命賣壓！")
-        elif selected_target == "2408":
-            st.error("🚨 **融資斷頭引信警示**\n散戶逆勢大接刀暴增 +3,370 張融資，美林與美商高盛聯手狂倒逾 7,400 張！開盤一旦摜破 443.5 將引爆連環斷頭多殺多。")
-        elif selected_target == "2327":
-            st.warning("📉 **弱勢破底警示**\n美林(-2669)、凱基(-2092)、大摩(-1337) 連續重砍，收在當日最低 567，破線向下無支撐。")
-        elif selected_target == "2344":
-            st.success("🟢 **主力強回補**\n瑞銀(+3195)、元大(+2585)、大摩(+2274) 大買超，融資清洗，禁止逆勢做空！")
+  st.markdown(
+      f"#### 📊 {selected_target} {UNIVERSE[selected_target]['name']}"
+      " 主力分點進出明細"
+  )
+  df_broker = pd.DataFrame(broker_data)
+
+  col_l, col_r = st.columns([3, 2])
+  with col_l:
+    st.dataframe(
+        df_broker,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "買賣超": st.column_config.NumberColumn(format="%+d"),
+            "均價": st.column_config.NumberColumn(format="%.2f"),
+            "佔比": st.column_config.NumberColumn(format="%.2f%%"),
+        },
+    )
+  with col_r:
+    if selected_target == "8039":
+      st.error(
+          "⚠️ **隔日沖踩踏警示**\n富邦(+3493)、凱基城中(+1548)、凱基台北(+1159)、國票敦北(+691)"
+          " 等鎖單逾 9,700 張全屬隔日沖大本營。週一開盤將引爆近 5.16"
+          " 億元獲利逃命賣壓！"
+      )
+    elif selected_target == "2408":
+      st.error(
+          "🚨 **融資斷頭引信警示**\n散戶逆勢大接刀暴增 +3,370"
+          " 張融資，美林與美商高盛聯手狂倒逾 7,400 張！開盤一旦摜破 443.5"
+          " 將引爆連環斷頭多殺多。"
+      )
+    elif selected_target == "2327":
+      st.warning(
+          "📉 **弱勢破底警示**\n美林(-2669)、凱基(-2092)、大摩(-1337)"
+          " 連續重砍，收在當日最低 567，破線向下無支撐。"
+      )
+    elif selected_target == "2344":
+      st.success(
+          "🟢 **主力強回補**\n瑞銀(+3195)、元大(+2585)、大摩(+2274)"
+          " 大買超，融資清洗，禁止逆勢做空！"
+      )
 else:
-    st.info("此標的目前無顯著的前十大集中分點異動，或處於橫盤整理。")
+  st.info("此標的目前無顯著的前十大集中分點異動，或處於橫盤整理。")
