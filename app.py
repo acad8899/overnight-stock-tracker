@@ -69,11 +69,6 @@ class StockDataService:
           code = str(row[0]).strip().replace(" ", "")
 
           if code in UNIVERSE:
-            # 欄位映射:
-            # row[2]: 融資買進(張)
-            # row[3]: 融資賣出(張)
-            # row[4]: 現金償還(張)
-            # row[6]: 今日融資餘額(張)
             buy_qty = int(str(row[2]).replace(",", "").strip() or 0)
             sell_qty = int(str(row[3]).replace(",", "").strip() or 0)
             cash_qty = int(str(row[4]).replace(",", "").strip() or 0)
@@ -158,17 +153,3 @@ for code, info in UNIVERSE.items():
   f_net = i_info["foreign_net_sheets"]
 
   # 量化空方條件研判
-  tag = "中立觀望"
-  if m_change > 500 and f_net < -2000:
-    tag = "🚨 多殺多引信 (資增 + 外資倒)"
-  elif code == "8039" and m_change > 0:
-    tag = "⚠️ 隔日沖倒貨 (富邦/凱基鎖板)"
-  elif m_change < -1000:
-    tag = "🛡️ 浮額清洗 (防強彈)"
-
-  summary_rows.append({
-      "代號": code,
-      "名稱": info["name"],
-      "融資增減(張)": m_change,
-      "外資買賣超(張)": f_net,
-      "
